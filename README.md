@@ -159,13 +159,3 @@ pm-intelligence-digest/
 - APScheduler
 - SQLite
 ```
-
-*Save the file."*
-
----
-
-Once saved, commit and push:
-```
-git add README.md
-git commit -m "docs: add comprehensive README"
-git push
