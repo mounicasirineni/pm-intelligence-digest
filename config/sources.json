@@ -1,0 +1,268 @@
+{
+  "sources": [
+    {
+      "id": "a16z_podcast",
+      "type": "podcast",
+      "name": "Andreessen Horowitz Podcast",
+      "url": "https://feeds.simplecast.com/JGE3yC0V",
+      "theme": "ai_technology",
+      "verified": false
+    },
+    {
+      "id": "platformer",
+      "type": "rss",
+      "name": "Platformer",
+      "url": "https://www.platformer.news/feed/",
+      "theme": "market_behavior",
+      "verified": false
+    },
+    {
+      "id": "mit_tech_review",
+      "type": "rss",
+      "name": "MIT Technology Review",
+      "url": "https://www.technologyreview.com/feed/",
+      "theme": "ai_technology",
+      "verified": false
+    },
+    {
+      "id": "import_ai",
+      "type": "rss",
+      "name": "Import AI (Jack Clark)",
+      "url": "https://importai.substack.com/feed",
+      "theme": "ai_technology",
+      "verified": false
+    },
+    {
+      "id": "shreyas_doshi",
+      "type": "rss",
+      "name": "Shreyas Doshi",
+      "url": "https://shreyasdoshi.substack.com/feed",
+      "theme": "product_craft",
+      "verified": false
+    },
+    {
+      "id": "gibson_biddle",
+      "type": "rss",
+      "name": "Gibson Biddle",
+      "url": "https://gibsonbiddle.substack.com/feed",
+      "theme": "product_craft",
+      "verified": false
+    },
+    {
+      "id": "techcrunch",
+      "type": "rss",
+      "name": "TechCrunch",
+      "url": "https://techcrunch.com/feed/",
+      "theme": "startup_disruption",
+      "verified": false
+    },
+    {
+      "id": "yc_blog",
+      "type": "rss",
+      "name": "Y Combinator Blog",
+      "url": "https://ycombinator.com/blog/rss",
+      "theme": "product_craft",
+      "verified": false
+    },
+    {
+      "id": "hn_frontpage",
+      "type": "rss",
+      "name": "Hacker News Frontpage",
+      "url": "https://hnrss.org/frontpage",
+      "theme": "startup_disruption",
+      "verified": false
+    },
+    {
+      "id": "google_blog",
+      "type": "rss",
+      "name": "Google Blog",
+      "url": "https://blog.google/rss/",
+      "theme": "company_strategy",
+      "verified": false
+    },
+    {
+      "id": "meta_engineering",
+      "type": "rss",
+      "name": "Meta Engineering",
+      "url": "https://engineering.fb.com/feed/",
+      "theme": "company_strategy",
+      "verified": false
+    },
+    {
+      "id": "microsoft_research",
+      "type": "rss",
+      "name": "Microsoft Research Blog",
+      "url": "https://www.microsoft.com/en-us/research/feed/",
+      "theme": "company_strategy",
+      "verified": false
+    },
+    {
+      "id": "simon_willison_blog",
+      "type": "rss",
+      "name": "Simon Willison’s Blog",
+      "url": "https://simonwillison.net/atom/everything/",
+      "theme": "ai_technology",
+      "verified": false
+    },
+    {
+      "id": "openai_news",
+      "type": "rss",
+      "name": "OpenAI News",
+      "url": "https://openai.com/news/rss.xml",
+      "theme": "company_strategy",
+      "verified": false
+    },
+    {
+      "id": "rest_of_world",
+      "type": "rss",
+      "name": "Rest of World",
+      "url": "https://restofworld.org/feed/",
+      "theme": "market_behavior",
+      "verified": false
+    },
+    {
+      "id": "benedict_evans",
+      "type": "rss",
+      "name": "Benedict Evans",
+      "url": "https://www.ben-evans.com/benedictevans/rss.xml",
+      "theme": "ai_technology",
+      "verified": false
+    },
+    {
+      "id": "ai_snake_oil",
+      "type": "rss",
+      "name": "AI Snake Oil",
+      "url": "https://aisnakeoil.substack.com/feed",
+      "theme": "ai_technology",
+      "verified": false
+    },
+    {
+      "id": "verge_transportation",
+      "type": "rss",
+      "name": "The Verge — Transportation",
+      "url": "https://www.theverge.com/rss/transportation/index.xml",
+      "theme": "market_behavior",
+      "verified": false
+    },
+    {
+      "id": "apple_newsroom",
+      "type": "rss",
+      "name": "Apple Newsroom",
+      "url": "https://www.apple.com/newsroom/rss-feed.rss",
+      "theme": "company_strategy",
+      "verified": false
+    },
+    {
+      "id": "amazon_news",
+      "type": "rss",
+      "name": "Amazon News",
+      "url": "https://www.aboutamazon.com/news/rss",
+      "theme": "company_strategy",
+      "verified": false
+    },
+    {
+      "id": "nvidia_blog",
+      "type": "rss",
+      "name": "NVIDIA Blog",
+      "url": "https://blogs.nvidia.com/feed/",
+      "theme": "ai_technology",
+      "verified": false
+    },
+    {
+      "id": "lennys_podcast",
+      "type": "podcast",
+      "name": "Lenny's Podcast",
+      "url": "env:LENNYS_PODCAST_RSS",
+      "theme": "product_craft"
+    },
+    {
+      "id": "stratechery",
+      "type": "rss",
+      "name": "Stratechery (Free)",
+      "url": "https://stratechery.com/feed/",
+      "theme": "product_craft",
+      "verified": false
+    },
+    {
+      "id": "nngroup",
+      "type": "rss",
+      "name": "Nielsen Norman Group",
+      "url": "https://www.nngroup.com/feed/rss/",
+      "theme": "design_ux",
+      "verified": false
+    },
+    {
+      "id": "ux_collective",
+      "type": "rss",
+      "name": "UX Collective",
+      "url": "https://uxdesign.cc/feed",
+      "theme": "design_ux",
+      "verified": false
+    },
+    {
+      "id": "politico_tech",
+      "type": "rss",
+      "name": "Politico Tech",
+      "url": "https://rss.politico.com/technology.xml",
+      "theme": "regulation_policy",
+      "verified": false
+    },
+    {
+      "id": "eff",
+      "type": "rss",
+      "name": "Electronic Frontier Foundation",
+      "url": "https://www.eff.org/rss/updates.xml",
+      "theme": "regulation_policy",
+      "verified": false
+    },
+    {
+      "id": "quartz",
+      "type": "rss",
+      "name": "Quartz",
+      "url": "https://qz.com/feed",
+      "theme": "consumer_behavior",
+      "verified": false
+    },
+    {
+      "id": "axios_business",
+      "type": "rss",
+      "name": "Axios Business",
+      "url": "https://www.axios.com/feeds/feed.rss",
+      "theme": "consumer_behavior",
+      "verified": false
+    },
+    {
+      "id": "hard_fork",
+      "type": "podcast",
+      "name": "Hard Fork",
+      "url": "https://feeds.simplecast.com/l2i9YnTd",
+      "theme": "market_behavior",
+      "verified": false
+    },
+    {
+      "id": "acquired",
+      "type": "podcast",
+      "name": "Acquired",
+      "url": "https://feeds.simplecast.com/7y1CbAbN",
+      "theme": "product_craft",
+      "verified": false
+    },
+    {
+      "id": "dwarkesh",
+      "type": "podcast",
+      "name": "Dwarkesh Podcast",
+      "url": "https://dwarkeshpatel.substack.com/feed",
+      "theme": "ai_technology",
+      "verified": false
+    },
+    {
+      "id": "pivot",
+      "type": "podcast",
+      "name": "Pivot",
+      "url": "https://feeds.megaphone.fm/pivot",
+      "theme": "consumer_behavior",
+      "verified": false
+    }
+  ]
+}
+

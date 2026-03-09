@@ -1,0 +1,23 @@
+{
+  "sources": [
+    {
+      "id": "lenny",
+      "type": "rss",
+      "name": "Lenny’s Newsletter",
+      "url": "https://www.lennysnewsletter.com/feed"
+    },
+    {
+      "id": "stratechery",
+      "type": "rss",
+      "name": "Stratechery",
+      "url": "https://stratechery.com/feed/"
+    },
+    {
+      "id": "podcast_transcripts_placeholder",
+      "type": "podcast_transcript",
+      "name": "Podcast transcripts (placeholder)",
+      "url": "https://example.com/transcripts/index.html"
+    }
+  ]
+}
+
