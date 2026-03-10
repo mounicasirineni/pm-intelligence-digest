@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
+import sqlite3
 import logging
 import os
 import re
@@ -9,7 +11,7 @@ from typing import Any, Dict, List, Tuple
 
 import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
-from flask import Flask, redirect, render_template, url_for
+from flask import Flask, redirect, render_template, url_for, abort
 import pytz
 
 from .config import load_settings
@@ -163,6 +165,34 @@ def _get_or_run_pipeline(force_refresh: bool = False):
     return synthesis, items_by_theme, generated_at
 
 
+def _get_digest_for_date(date_str: str):
+    """Fetch a digest for a specific YYYY-MM-DD date from SQLite."""
+    settings = load_settings()
+    conn = sqlite3.connect(str(settings.database_path))
+    try:
+        cur = conn.execute(
+            "SELECT synthesis_json, items_by_theme_json, generated_at "
+            "FROM digests WHERE date = ?",
+            (date_str,),
+        )
+        row = cur.fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        return None
+
+    synthesis_json, items_json, generated_at_str = row
+    try:
+        synthesis = json.loads(synthesis_json)
+        items_by_theme = json.loads(items_json)
+        generated_at = datetime.fromisoformat(generated_at_str)
+    except Exception:
+        return None
+
+    return synthesis, items_by_theme, generated_at
+
+
 @app.route("/")
 def index():
     synthesis, items_by_theme, generated_at = _get_or_run_pipeline(force_refresh=False)
@@ -178,6 +208,64 @@ def index():
 def refresh():
     _get_or_run_pipeline(force_refresh=True)
     return redirect(url_for("index"))
+
+
+@app.route("/history")
+def history():
+    settings = load_settings()
+    conn = sqlite3.connect(str(settings.database_path))
+    try:
+        cur = conn.execute(
+            "SELECT date, generated_at FROM digests ORDER BY date DESC"
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    history_rows: List[Dict[str, Any]] = []
+    for date_str, generated_at_str in rows:
+        try:
+            d = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            continue
+        try:
+            gen_dt = datetime.fromisoformat(generated_at_str)
+        except Exception:
+            gen_dt = None
+
+        history_rows.append(
+            {
+                "date": date_str,
+                "label": d.strftime("%B %d, %Y"),
+                "generated_at": gen_dt.strftime("%H:%M") if gen_dt else "",
+            }
+        )
+
+    return render_template(
+        "history.html",
+        history_rows=history_rows,
+    )
+
+
+@app.route("/<date_str>")
+def digest_by_date(date_str: str):
+    # Expect YYYY-MM-DD
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        abort(404)
+
+    result = _get_digest_for_date(date_str)
+    if result is None:
+        abort(404)
+
+    synthesis, items_by_theme, generated_at = result
+    return render_template(
+        "index.html",
+        synthesis=synthesis or {},
+        items_by_theme=items_by_theme or {},
+        generated_at=generated_at,
+    )
 
 
 def create_app() -> Flask:

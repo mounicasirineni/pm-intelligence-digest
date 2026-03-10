@@ -158,4 +158,3 @@ pm-intelligence-digest/
 - feedparser
 - APScheduler
 - SQLite
-```

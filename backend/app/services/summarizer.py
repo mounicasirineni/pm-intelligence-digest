@@ -17,6 +17,7 @@ SYSTEM_PROMPT = (
     "from content — not just summarize, but identify what actually matters for "
     "someone tracking industry trends, technology direction, company strategy, and "
     "market behavior shifts."
+    "Format each bullet as plain text only. Do not bold, italicize, or use any markdown formatting inside bullet text."
 )
 
 
@@ -102,6 +103,7 @@ Guidance:
 - Insights should be 3–5 bullets.
 - Go beyond what happened; explain why it matters in terms of product strategy, AI/tech direction, company moves, and market behavior.
 - "confidence" should reflect how much genuine signal (vs. noise) you believe this item contains for a Senior PM tracking the space.
+- If this article is a newsletter containing multiple unrelated stories, focus your analysis exclusively on the lead story — the one reflected in the article title. Ignore secondary stories, roundups, and link digests further in the body.
 """.strip()
 
     settings = load_settings()
