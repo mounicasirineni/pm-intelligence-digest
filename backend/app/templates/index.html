@@ -122,6 +122,57 @@
       border-bottom: none;
     }
 
+    /* Quality score bar */
+    .quality-bar {
+      margin: -0.25rem 0 1.75rem;
+      padding: 0.6rem 0.75rem 0.75rem;
+      border-radius: 4px;
+      background: rgba(27, 58, 107, 0.02);
+      border: 1px solid rgba(223, 222, 215, 0.9);
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .quality-bar-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .quality-bar-label {
+      font-size: 0.74rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .quality-bar-score {
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .quality-bar-flag {
+      margin-left: 0.15rem;
+      font-size: 0.82rem;
+    }
+
+    .quality-bar-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.5rem;
+      margin-top: 0.15rem;
+    }
+
+    .quality-pill {
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      background: var(--pill-bg);
+      border: 1px solid rgba(27, 58, 107, 0.12);
+      font-size: 0.72rem;
+      white-space: nowrap;
+    }
+
     .section-label {
       font-size: 0.78rem;
       text-transform: uppercase;
@@ -412,6 +463,37 @@
         <a href="/history">Archive</a>
       </div>
     </header>
+
+    {% if eval_summary %}
+    <section class="quality-bar">
+      <div class="quality-bar-header">
+        <span class="quality-bar-label">Quality Score</span>
+        <span class="quality-bar-score">
+          {% if eval_summary.has_flags %}
+            <span class="quality-bar-flag">⚠</span>
+          {% endif %}
+          {{ "%.0f"|format(eval_summary.overall_score or 0) }}/100
+        </span>
+      </div>
+      <div class="quality-bar-pills">
+        <span class="quality-pill">
+          Citation Coverage: {{ "%.1f"|format(eval_summary.citation_coverage_pct or 0) }}%
+        </span>
+        <span class="quality-pill">
+          Theme Balance: {{ "%.1f"|format(eval_summary.theme_balance_score or 0) }}% non-AI
+        </span>
+        <span class="quality-pill">
+          Coherence: {{ "%.1f"|format(eval_summary.avg_coherence or 0) }}/5
+        </span>
+        <span class="quality-pill">
+          Insight Depth: {{ "%.1f"|format(eval_summary.avg_insight_depth or 0) }}/5
+        </span>
+        <span class="quality-pill">
+          Grounding: {{ "%.1f"|format(eval_summary.avg_citation_support or 0) }}/5
+        </span>
+      </div>
+    </section>
+    {% endif %}
 
     <!-- What's shifting -->
     <section class="section">

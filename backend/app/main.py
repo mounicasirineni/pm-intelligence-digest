@@ -162,6 +162,15 @@ def _get_or_run_pipeline(force_refresh: bool = False):
     # Persist today's digest so subsequent processes can reuse it.
     save_digest(synthesis, items_by_theme, generated_at)
 
+    # Run quality evals for this date, but never break the pipeline.
+    try:
+        from .services import evaluator
+
+        date_str = generated_at.date().isoformat() if generated_at else None
+        evaluator.run(date_str, synthesis, items_by_theme)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"Evals failed silently: {e}")
+
     return synthesis, items_by_theme, generated_at
 
 
@@ -193,14 +202,74 @@ def _get_digest_for_date(date_str: str):
     return synthesis, items_by_theme, generated_at
 
 
+def _get_eval_summary_for_date(date_str: str):
+    """Fetch a compact eval summary for a specific YYYY-MM-DD date, or None."""
+    settings = load_settings()
+    conn = sqlite3.connect(str(settings.database_path))
+    try:
+        cur = conn.execute(
+            """
+            SELECT
+              theme_balance_json,
+              citation_coverage_json,
+              llm_judge_json,
+              overall_score,
+              flags_json
+            FROM evals
+            WHERE date = ?
+            """,
+            (date_str,),
+        )
+        row = cur.fetchone()
+    except sqlite3.OperationalError:
+        # evals table may not exist yet
+        return None
+    finally:
+        conn.close()
+
+    if row is None:
+        return None
+
+    theme_balance_json, citation_coverage_json, llm_judge_json, overall_score, flags_json = row
+    try:
+        theme_balance = json.loads(theme_balance_json) if theme_balance_json else {}
+        citation_coverage = json.loads(citation_coverage_json) if citation_coverage_json else {}
+        llm_judge = json.loads(llm_judge_json) if llm_judge_json else {}
+        flags = json.loads(flags_json) if flags_json else {}
+    except Exception:
+        return None
+
+    citation_pct = float(citation_coverage.get("citation_coverage_pct") or 0.0)
+    avg_coherence = float(llm_judge.get("avg_coherence") or 0.0)
+    avg_insight_depth = float(llm_judge.get("avg_insight_depth") or 0.0)
+    avg_citation_support = float(llm_judge.get("avg_citation_support") or 0.0)
+    theme_balance_score = float(theme_balance.get("theme_balance_score") or 0.0)
+    overall = float(overall_score or 0.0)
+    has_flags = bool(flags.get("flagged_paragraphs"))
+
+    return {
+        "overall_score": overall,
+        "citation_coverage_pct": citation_pct,
+        "avg_coherence": avg_coherence,
+        "avg_insight_depth": avg_insight_depth,
+        "avg_citation_support": avg_citation_support,
+        "theme_balance_score": theme_balance_score,
+        "has_flags": has_flags,
+    }
+
+
 @app.route("/")
 def index():
     synthesis, items_by_theme, generated_at = _get_or_run_pipeline(force_refresh=False)
+    eval_summary = None
+    if generated_at:
+        eval_summary = _get_eval_summary_for_date(generated_at.date().isoformat())
     return render_template(
         "index.html",
         synthesis=synthesis or {},
         items_by_theme=items_by_theme or {},
         generated_at=generated_at,
+        eval_summary=eval_summary,
     )
 
 
@@ -260,11 +329,13 @@ def digest_by_date(date_str: str):
         abort(404)
 
     synthesis, items_by_theme, generated_at = result
+    eval_summary = _get_eval_summary_for_date(date_str)
     return render_template(
         "index.html",
         synthesis=synthesis or {},
         items_by_theme=items_by_theme or {},
         generated_at=generated_at,
+        eval_summary=eval_summary,
     )
 
 
