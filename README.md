@@ -139,11 +139,13 @@ Open `http://127.0.0.1:8000` — first load runs the full pipeline (~60 seconds)
 ```
 ANTHROPIC_API_KEY=        # Required
 CLAUDE_MODEL=claude-sonnet-4-5
-LOOKBACK_HOURS=24
-DIGEST_SCHEDULE_HOUR=7
+LOOKBACK_HOURS=24         # Content lookback window in hours
+DIGEST_SCHEDULE_HOUR=7    # Optional: auto-refresh hour (requires scheduler to be enabled)
 DIGEST_SCHEDULE_MINUTE=0
-DIGEST_TIMEZONE=Asia/Kolkata
+DIGEST_TIMEZONE=Asia/Kolkata  # Timezone for scheduled refresh
 ```
+
+The scheduler is optional. By default, run the pipeline manually via `http://127.0.0.1:8000/refresh`. To enable automatic daily refresh, set `ENABLE_SCHEDULER=true` in `.env` (disabled by default).
 
 ### Validating Sources
 ```bash
