@@ -6,7 +6,7 @@
 
 I built this tool to solve a real problem during my job search: staying current on industry trends, company moves, and product thinking — without spending hours on LinkedIn or drowning in newsletter noise.
 
-The brief runs every morning at 7am, pulls from 33 curated sources across 8 themes, and uses Claude to do two things most digest tools don't:
+The brief runs on demand via /refresh, pulls from 33 curated sources across 8 themes, and uses Claude to do two things most digest tools don't:
 
 1. **Extract signal, not summaries** — each article is analyzed for what it means, not just what happened
 2. **Reason across sources** — a second AI pass synthesizes patterns across all content, surfacing insights a sharp PM should have an opinion on
@@ -49,7 +49,8 @@ RSS/Podcast Sources (33)
   (digests + evals, keyed by date)
         ↓
   Flask Web App
-  (daily auto-refresh at 7am)
+  (on-demand via /refresh; optional
+  daily scheduler via .env)
 ```
 
 ## Evals Framework
