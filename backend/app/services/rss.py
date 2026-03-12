@@ -93,7 +93,7 @@ def _resolve_env_url(url: str) -> str | None:
     var_name = url.split(":", 1)[1]
     resolved = os.getenv(var_name)
     if not resolved:
-        logger.warning("Environment variable %s not set for podcast feed.", var_name)
+        logger.warning("Environment variable %s not set for source feed.", var_name)
     return resolved
 
 

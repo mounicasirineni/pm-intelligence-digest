@@ -41,10 +41,10 @@
       "verified": false
     },
     {
-      "id": "gibson_biddle",
+      "id": "svpg",
       "type": "rss",
-      "name": "Gibson Biddle",
-      "url": "https://gibsonbiddle.substack.com/feed",
+      "name": "SVPG (Marty Cagan)",
+      "url": "https://www.svpg.com/feed/",
       "theme": "product_craft",
       "verified": false
     },
@@ -61,7 +61,7 @@
       "type": "rss",
       "name": "Y Combinator Blog",
       "url": "https://ycombinator.com/blog/rss",
-      "theme": "product_craft",
+      "theme": "startup_disruption",
       "verified": false
     },
     {
@@ -180,7 +180,7 @@
       "type": "rss",
       "name": "Stratechery (Free)",
       "url": "https://stratechery.com/feed/",
-      "theme": "product_craft",
+      "theme": "market_behavior",
       "verified": false
     },
     {
@@ -243,8 +243,8 @@
       "id": "acquired",
       "type": "podcast",
       "name": "Acquired",
-      "url": "https://feeds.simplecast.com/7y1CbAbN",
-      "theme": "product_craft",
+      "url": "https://feeds.transistor.fm/acquired",
+      "theme": "company_strategy",
       "verified": false
     },
     {
@@ -261,6 +261,54 @@
       "name": "Pivot",
       "url": "https://feeds.megaphone.fm/pivot",
       "theme": "consumer_behavior",
+      "verified": false
+    },
+    {
+      "id": "lennys_newsletter",
+      "type": "rss",
+      "name": "Lenny's Newsletter",
+      "url": "env:LENNYS_NEWSLETTER_RSS",
+      "theme": "product_craft",
+      "verified": false
+    },
+    {
+      "id": "how_i_ai",
+      "type": "podcast",
+      "name": "How I AI (Claire Vo)",
+      "url": "env:HOW_I_AI_RSS",
+      "theme": "product_craft",
+      "verified": false
+    },
+    {
+      "id": "sifted",
+      "type": "rss",
+      "name": "Sifted",
+      "url": "https://sifted.eu/feed",
+      "theme": "market_behavior",
+      "verified": false
+    },
+    {
+      "id": "medianama",
+      "type": "rss",
+      "name": "Medianama",
+      "url": "https://www.medianama.com/feed/",
+      "theme": "regulation_policy",
+      "verified": false
+    },
+    {
+      "id": "yourstory",
+      "type": "rss",
+      "name": "YourStory",
+      "url": "https://yourstory.com/feed",
+      "theme": "startup_disruption",
+      "verified": false
+    },
+    {
+      "id": "vulcan_post",
+      "type": "rss",
+      "name": "Vulcan Post",
+      "url": "https://vulcanpost.com/feed",
+      "theme": "market_behavior",
       "verified": false
     }
   ]
