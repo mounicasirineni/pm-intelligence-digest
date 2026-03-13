@@ -4,7 +4,7 @@ import logging
 import os
 from datetime import datetime, timezone, timedelta
 from time import mktime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import feedparser
 
@@ -21,7 +21,6 @@ def _parse_published(entry: Any) -> datetime | None:
     if not struct_time:
         return None
     try:
-        # Interpret feed timestamps as UTC.
         return datetime.fromtimestamp(mktime(struct_time), tz=timezone.utc)
     except Exception:
         return None
@@ -43,11 +42,9 @@ def _fetch_rss_items(
     for entry in parsed.entries[:max_items]:
         total_entries += 1
 
-        # Prefer content, then summary, then description.
         content_text = ""
         if getattr(entry, "content", None):
             try:
-                # Many feeds put HTML in content[0].value
                 content_text = entry.content[0].value or ""
             except Exception:
                 content_text = ""
@@ -93,7 +90,7 @@ def _resolve_env_url(url: str) -> str | None:
     var_name = url.split(":", 1)[1]
     resolved = os.getenv(var_name)
     if not resolved:
-        logger.warning("Environment variable %s not set for podcast feed.", var_name)
+        logger.warning("Environment variable %s not set for source feed.", var_name)
     return resolved
 
 
@@ -117,7 +114,6 @@ def _fetch_podcast_items(
     for entry in parsed.entries[:max_items]:
         total_entries += 1
 
-        # Many podcast feeds use summary or description for show-notes.
         transcript_or_description = getattr(entry, "summary", "") or getattr(
             entry, "description", ""
         )
@@ -157,16 +153,19 @@ def _fetch_podcast_items(
     return items
 
 
-def fetch_items_grouped_by_theme() -> Dict[str, List[Dict[str, Any]]]:
+def fetch_items_grouped_by_theme() -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Any]]:
     """
     Fetch items from all configured sources and group them by theme.
 
     Returns:
-        {
-          "ai_technology": [ {item}, ... ],
-          "product_craft": [ {item}, ... ],
-          ...
-        }
+        Tuple of:
+          - grouped items: {theme: [item, ...], ...}
+          - fetch_metadata: {
+              sources_configured: int,
+              sources_active: int,       # returned ≥1 item in lookback window
+              sources_empty: int,        # returned 0 items in lookback window
+              empty_source_names: [...], # names of empty sources
+            }
     """
     settings = load_settings()
     cfg = load_sources_config(settings.sources_config_path)
@@ -174,9 +173,15 @@ def fetch_items_grouped_by_theme() -> Dict[str, List[Dict[str, Any]]]:
 
     by_theme: Dict[str, List[Dict[str, Any]]] = {}
 
+    sources_configured = len(sources)
+    sources_active = 0
+    sources_empty = 0
+    empty_source_names: List[str] = []
+
     for source in sources:
         theme = source.get("theme", "unknown")
         source_type = source.get("type")
+        source_name = source.get("name", source.get("id", "unknown"))
 
         try:
             if source_type == "rss":
@@ -184,22 +189,44 @@ def fetch_items_grouped_by_theme() -> Dict[str, List[Dict[str, Any]]]:
             elif source_type == "podcast":
                 fetched = _fetch_podcast_items(source, lookback_hours=settings.lookback_hours)
             else:
-                logger.warning("Unsupported source type '%s' for id=%s", source_type, source.get("id"))
+                logger.warning(
+                    "Unsupported source type '%s' for id=%s", source_type, source.get("id")
+                )
+                sources_empty += 1
+                empty_source_names.append(source_name)
                 continue
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:
             logger.exception(
                 "Failed to fetch source id=%s url=%s: %s",
                 source.get("id"),
                 source.get("url"),
                 exc,
             )
+            sources_empty += 1
+            empty_source_names.append(source_name)
             continue
 
         if not fetched:
+            sources_empty += 1
+            empty_source_names.append(source_name)
             continue
 
+        sources_active += 1
         bucket = by_theme.setdefault(theme, [])
         bucket.extend(fetched)
 
-    return by_theme
+    fetch_metadata: Dict[str, Any] = {
+        "sources_configured": sources_configured,
+        "sources_active": sources_active,
+        "sources_empty": sources_empty,
+        "empty_source_names": empty_source_names,
+    }
 
+    logger.info(
+        "Fetch complete: %d/%d sources active, %d empty",
+        sources_active,
+        sources_configured,
+        sources_empty,
+    )
+
+    return by_theme, fetch_metadata

@@ -5,7 +5,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from ..config import load_settings
 
@@ -15,6 +15,7 @@ class DigestRecord:
     synthesis: Dict[str, Any]
     items_by_theme: Dict[str, Any]
     generated_at: datetime
+    fetch_metadata: Dict[str, Any]
 
 
 def _get_db_path() -> Path:
@@ -31,7 +32,7 @@ def _get_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Ensure the digests table exists."""
+    """Ensure the digests table exists with all required columns."""
     conn = _get_connection()
     try:
         conn.execute(
@@ -40,10 +41,16 @@ def init_db() -> None:
                 date TEXT PRIMARY KEY,
                 synthesis_json TEXT NOT NULL,
                 items_by_theme_json TEXT NOT NULL,
-                generated_at TEXT NOT NULL
+                generated_at TEXT NOT NULL,
+                fetch_metadata_json TEXT
             )
             """
         )
+        # Migrate existing tables that lack fetch_metadata_json
+        try:
+            conn.execute("ALTER TABLE digests ADD COLUMN fetch_metadata_json TEXT")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         conn.commit()
     finally:
         conn.close()
@@ -55,7 +62,10 @@ def get_digest_for_today() -> Optional[DigestRecord]:
     conn = _get_connection()
     try:
         cur = conn.execute(
-            "SELECT synthesis_json, items_by_theme_json, generated_at FROM digests WHERE date = ?",
+            """
+            SELECT synthesis_json, items_by_theme_json, generated_at, fetch_metadata_json
+            FROM digests WHERE date = ?
+            """,
             (today,),
         )
         row = cur.fetchone()
@@ -65,11 +75,12 @@ def get_digest_for_today() -> Optional[DigestRecord]:
     if row is None:
         return None
 
-    synthesis_json, items_json, generated_at_str = row
+    synthesis_json, items_json, generated_at_str, fetch_metadata_json = row
     try:
         synthesis = json.loads(synthesis_json)
         items_by_theme = json.loads(items_json)
         generated_at = datetime.fromisoformat(generated_at_str)
+        fetch_metadata = json.loads(fetch_metadata_json) if fetch_metadata_json else {}
     except Exception:
         return None
 
@@ -77,6 +88,7 @@ def get_digest_for_today() -> Optional[DigestRecord]:
         synthesis=synthesis,
         items_by_theme=items_by_theme,
         generated_at=generated_at,
+        fetch_metadata=fetch_metadata,
     )
 
 
@@ -84,6 +96,7 @@ def save_digest(
     synthesis: Dict[str, Any],
     items_by_theme: Dict[str, Any],
     generated_at: datetime,
+    fetch_metadata: Dict[str, Any] | None = None,
 ) -> None:
     """Insert or replace today's digest."""
     digest_date = generated_at.date().isoformat()
@@ -91,17 +104,53 @@ def save_digest(
     try:
         conn.execute(
             """
-            INSERT OR REPLACE INTO digests (date, synthesis_json, items_by_theme_json, generated_at)
-            VALUES (?, ?, ?, ?)
+            INSERT OR REPLACE INTO digests
+                (date, synthesis_json, items_by_theme_json, generated_at, fetch_metadata_json)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 digest_date,
                 json.dumps(synthesis or {}),
                 json.dumps(items_by_theme or {}),
                 generated_at.isoformat(),
+                json.dumps(fetch_metadata or {}),
             ),
         )
         conn.commit()
     finally:
         conn.close()
 
+
+def get_digest_by_date(target_date: str) -> Optional[DigestRecord]:
+    """Return digest for a specific date (YYYY-MM-DD), else None."""
+    conn = _get_connection()
+    try:
+        cur = conn.execute(
+            """
+            SELECT synthesis_json, items_by_theme_json, generated_at, fetch_metadata_json
+            FROM digests WHERE date = ?
+            """,
+            (target_date,),
+        )
+        row = cur.fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        return None
+
+    synthesis_json, items_json, generated_at_str, fetch_metadata_json = row
+    try:
+        synthesis = json.loads(synthesis_json)
+        items_by_theme = json.loads(items_json)
+        generated_at = datetime.fromisoformat(generated_at_str)
+        fetch_metadata = json.loads(fetch_metadata_json) if fetch_metadata_json else {}
+    except Exception:
+        return None
+
+    return DigestRecord(
+        synthesis=synthesis,
+        items_by_theme=items_by_theme,
+        generated_at=generated_at,
+        fetch_metadata=fetch_metadata,
+    )

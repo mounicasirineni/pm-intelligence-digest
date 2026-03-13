@@ -17,6 +17,7 @@ SYSTEM_PROMPT = (
     "from content — not just summarize, but identify what actually matters for "
     "someone tracking industry trends, technology direction, company strategy, and "
     "market behavior shifts."
+    "Format each bullet as plain text only. Do not bold, italicize, or use any markdown formatting inside bullet text."
 )
 
 
@@ -62,8 +63,9 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
 
     Returns:
         {
-          "insights": [ "...", ... ],  # 3–5 bullets
-          "pm_interview_relevance": "...",
+          "insights": [ "...", ... ],        # 3–5 bullets
+          "pm_interview_relevance": "...",   # text explanation
+          "pm_relevance_score": "high" | "medium" | "low",  # categorical
           "confidence": "high" | "medium" | "low"
         }
     """
@@ -95,13 +97,20 @@ Please respond in strict JSON with the following structure:
     "bullet 3"
   ],
   "pm_interview_relevance": "one line explaining why this matters (or doesn't) for a PM interview",
+  "pm_relevance_score": "high" | "medium" | "low",
   "confidence": "high" | "medium" | "low"
 }}
 
 Guidance:
 - Insights should be 3–5 bullets.
 - Go beyond what happened; explain why it matters in terms of product strategy, AI/tech direction, company moves, and market behavior.
-- "confidence" should reflect how much genuine signal (vs. noise) you believe this item contains for a Senior PM tracking the space.
+- "pm_relevance_score" should be a categorical assessment of how useful this item is for PM interview preparation:
+    high   = directly relevant to product strategy, company moves, or market shifts a PM interviewer would ask about
+    medium = tangentially relevant; useful context but not a likely interview topic
+    low    = not relevant to PM interview prep (e.g. sports tech, celebrity news, off-topic content)
+- "pm_interview_relevance" should be a one-line text explanation supporting your pm_relevance_score judgment.
+- "confidence" should reflect how much genuine signal (vs. noise) you believe this item contains for a Senior PM tracking the space — high means rich, substantive content; low means thin, paywalled, or off-topic.
+- If this article is a newsletter containing multiple unrelated stories, focus your analysis exclusively on the lead story — the one reflected in the article title. Ignore secondary stories, roundups, and link digests further in the body.
 """.strip()
 
     settings = load_settings()
@@ -127,7 +136,6 @@ Guidance:
         logger.exception("Unexpected Claude response format: %s", exc)
         raise
 
-    # Log and print the raw text for debugging / inspection.
     logger.debug("Raw Claude response text: %s", text)
     print("Raw Claude response text from summarizer:")
     print(text)
@@ -142,6 +150,7 @@ Guidance:
             "raw_text": text,
             "insights": [],
             "pm_interview_relevance": "",
+            "pm_relevance_score": "medium",
             "confidence": "medium",
         }
 
@@ -151,11 +160,17 @@ Guidance:
         insights = [str(insights)]
 
     pm_interview_relevance = parsed.get("pm_interview_relevance") or ""
-    confidence = parsed.get("confidence") or "medium"
+    pm_relevance_score = str(parsed.get("pm_relevance_score") or "medium").lower()
+    if pm_relevance_score not in {"high", "medium", "low"}:
+        pm_relevance_score = "medium"
+
+    confidence = str(parsed.get("confidence") or "medium").lower()
+    if confidence not in {"high", "medium", "low"}:
+        confidence = "medium"
 
     return {
         "insights": insights,
         "pm_interview_relevance": str(pm_interview_relevance),
-        "confidence": str(confidence).lower(),
+        "pm_relevance_score": pm_relevance_score,
+        "confidence": confidence,
     }
-

@@ -98,6 +98,21 @@
       color: var(--muted);
     }
 
+    .header-nav {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .header-nav a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(27, 58, 107, 0.25);
+    }
+
+    .header-nav a:hover {
+      border-bottom-color: rgba(27, 58, 107, 0.6);
+    }
+
     .section {
       padding: 1.5rem 0 1.75rem;
       border-bottom: 1px solid var(--border-subtle);
@@ -105,6 +120,57 @@
 
     .section:last-of-type {
       border-bottom: none;
+    }
+
+    /* Quality score bar */
+    .quality-bar {
+      margin: -0.25rem 0 1.75rem;
+      padding: 0.6rem 0.75rem 0.75rem;
+      border-radius: 4px;
+      background: rgba(27, 58, 107, 0.02);
+      border: 1px solid rgba(223, 222, 215, 0.9);
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .quality-bar-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .quality-bar-label {
+      font-size: 0.74rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .quality-bar-score {
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .quality-bar-flag {
+      margin-left: 0.15rem;
+      font-size: 0.82rem;
+    }
+
+    .quality-bar-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.5rem;
+      margin-top: 0.15rem;
+    }
+
+    .quality-pill {
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      background: var(--pill-bg);
+      border: 1px solid rgba(27, 58, 107, 0.12);
+      font-size: 0.72rem;
+      white-space: nowrap;
     }
 
     .section-label {
@@ -393,7 +459,25 @@
         Generated at {{ generated_at.strftime('%H:%M %Z') if generated_at.tzinfo else generated_at.strftime('%H:%M') }}
       </div>
       {% endif %}
+      <div class="header-nav">
+        <a href="/history">Archive</a>
+        <span style="color: var(--border-subtle); margin: 0 0.5rem;">|</span>
+        <a href="/evals">Evals</a>
+      </div>
     </header>
+
+    {% if eval_summary %}
+<section class="quality-bar">
+  <div class="quality-bar-header">
+    <span class="quality-bar-label">Quality Score</span>
+    <span class="quality-bar-score">
+      {{ "%.0f"|format(eval_summary.overall_score or 0) }}/100
+    </span>
+    <span style="color: var(--muted); font-size: 0.82rem; margin-left: 0.75rem;">·</span>
+    <a href="/evals" style="font-size: 0.82rem; margin-left: 0.5rem; border-bottom: none; color: var(--accent);">See Evals for breakdown →</a>
+  </div>
+</section>
+{% endif %}
 
     <!-- What's shifting -->
     <section class="section">
@@ -542,13 +626,38 @@
 
       <div class="collapsible-body" id="source-details-body">
         {% if items_by_theme %}
+
+          {# ── Separate utilized vs filtered-out ── #}
+          {% set utilized_items = [] %}
+          {% set filtered_items = [] %}
           {% for theme, items in items_by_theme.items() %}
-            {% if items %}
-              <div class="section-label" style="margin-top: 1rem;">{{ theme.replace('_', ' ') | title }}</div>
-              {% for item in items %}
+            {% for item in items %}
+              {% set conf = (item.confidence or 'medium') | lower %}
+              {% set rel = (item.pm_relevance_score or 'medium') | lower %}
+              {% if conf in ['high', 'medium'] and rel in ['high', 'medium'] %}
+                {% set _ = utilized_items.append(item) %}
+              {% else %}
+                {% set _ = filtered_items.append({'item': item, 'reason': 'Low Confidence' if conf not in ['high','medium'] else 'Low Relevance'}) %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+
+          {# ── Utilized ── #}
+          <div style="margin-top: 0.75rem;">
+            <div class="collapsible-header" id="utilized-header" style="cursor: pointer;">
+              <div class="section-label" style="margin: 0;">Utilized — {{ utilized_items | length }} articles</div>
+              <span class="collapsible-toggle" style="font-size: 0.75rem;">Show <span class="collapsible-icon" id="utilized-icon">+</span></span>
+            </div>
+            <div class="collapsible-body" id="utilized-body">
+            {% if utilized_items %}
+              {% for item in utilized_items %}
+                {% set cite_idx = citation_index_map.get((item.source_name, item.title)) %}
                 <article class="source-item">
                   <div class="source-title-row">
                     <div class="source-title">
+                      {% if cite_idx %}
+                        <span style="color: var(--muted); font-size: 0.85rem; margin-right: 0.4rem;">[{{ cite_idx }}]</span>
+                      {% endif %}
                       {% if item.url %}
                         <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
                       {% else %}
@@ -557,12 +666,6 @@
                     </div>
                     <div class="source-meta">
                       {{ item.source_name }}
-                      {% if item.confidence %}
-                        {% set conf = item.confidence|lower %}
-                        <span class="confidence-badge confidence-{{ conf if conf in ['high','medium','low'] else 'low' }}">
-                          {{ conf }}
-                        </span>
-                      {% endif %}
                     </div>
                   </div>
                   {% if item.insights %}
@@ -574,14 +677,52 @@
                   {% endif %}
                 </article>
               {% endfor %}
+            {% else %}
+              <p>No utilized articles for this date.</p>
             {% endif %}
-          {% endfor %}
+          </div>
+        </div>
+
+          {# ── Filtered Out ── #}
+          {% if filtered_items %}
+            <div style="margin-top: 1.5rem;">
+              <div class="collapsible-header" id="filtered-header" style="cursor: pointer;">
+                <div class="section-label" style="margin: 0;">
+                  Filtered Out — {{ filtered_items | length }} articles
+                </div>
+                <span class="collapsible-toggle" style="font-size: 0.75rem;">
+                  Show <span class="collapsible-icon" id="filtered-icon">+</span>
+                </span>
+              </div>
+              <div class="collapsible-body" id="filtered-body" style="margin-top: 0.5rem;">
+                {% for entry in filtered_items %}
+                  {% set item = entry.item %}
+                  {% set reason = entry.reason %}
+                  <article class="source-item" style="opacity: 0.6;">
+                    <div class="source-title-row">
+                      <div class="source-title">
+                        {% if item.url %}
+                          <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+                        {% else %}
+                          {{ item.title }}
+                        {% endif %}
+                      </div>
+                      <div class="source-meta">
+                        {{ item.source_name }}
+                        <span class="confidence-badge confidence-low" style="margin-left: 0.4rem;">{{ reason }}</span>
+                      </div>
+                    </div>
+                  </article>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
         {% else %}
           <p>No source-level items available yet. After you run the pipeline, each contributing article or episode will appear here.</p>
         {% endif %}
       </div>
     </section>
-  </div>
 
   <script>
     (function () {
@@ -674,6 +815,26 @@
           }
         });
       });
+      // Filtered Out collapsible
+      var filteredHeader = document.getElementById("filtered-header");
+      var filteredBody = document.getElementById("filtered-body");
+      var filteredIcon = document.getElementById("filtered-icon");
+      if (filteredHeader && filteredBody && filteredIcon) {
+        filteredHeader.addEventListener("click", function () {
+          var isOpen = filteredBody.classList.toggle("open");
+          filteredIcon.textContent = isOpen ? "\u2212" : "+";
+        });
+      }
+      // Utilized collapsible
+      var utilizedHeader = document.getElementById("utilized-header");
+var utilizedBody = document.getElementById("utilized-body");
+var utilizedIcon = document.getElementById("utilized-icon");
+if (utilizedHeader && utilizedBody && utilizedIcon) {
+  utilizedHeader.addEventListener("click", function () {
+    var isOpen = utilizedBody.classList.toggle("open");
+    utilizedIcon.textContent = isOpen ? "\u2212" : "+";
+  });
+}
     })();
   </script>
 </body>

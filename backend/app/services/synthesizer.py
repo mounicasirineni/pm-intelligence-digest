@@ -20,9 +20,14 @@ SYSTEM_PROMPT = (
     "strategy, product craft, startup disruption, market behavior, consumer "
     "behavior, regulation & policy, and design & UX. Surface what is actually "
     "shifting in the industry — not what happened, but what it means and what "
-    "patterns are emerging. Weight AI and non-AI signals equally. A sharp PM "
-    "should be able to walk into any interview and have a prepared opinion on "
-    "the insights you surface."
+    "patterns are emerging. "
+    "CRITICAL: At least half of your whats_shifting paragraphs must be grounded "
+    "primarily in non-AI themes — business model shifts, consumer behavior changes, "
+    "regulatory moves, market dynamics, or design/UX trends. An insight that "
+    "mentions AI as a secondary factor is acceptable, but a paragraph whose central "
+    "claim is an AI development does not count as non-AI coverage. "
+    "A sharp PM should be able to walk into any interview and have a prepared "
+    "opinion on the insights you surface."
 )
 
 
@@ -59,47 +64,53 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
     """
     Run a second-pass synthesis across all summarized items.
 
+    Filters to items that are:
+      - confidence: high or medium (summary is reliable)
+      - pm_relevance_score: high or medium (topic is PM-relevant)
+
     Args:
         grouped_summaries: dict[theme, list[items]] where each item contains at least:
             - title
             - source_name
             - insights (list[str])
             - confidence: "high" | "medium" | "low"
+            - pm_relevance_score: "high" | "medium" | "low"
 
     Returns:
-        Structured JSON with source attribution, e.g.:
-        {
-          "whats_shifting": [
-            {
-              "paragraph": "Paragraph text with [1][3] inline citations.",
-              "source_indices": [1, 3]
-            }
-          ],
-          "company_watch": {
-            "Google": {
-              "paragraph": "Signal for Google with [2] citation.",
-              "source_indices": [2]
-            },
-            ...
-          },
-          "startup_radar": [ "...", ... ],
-          "pm_craft_today": "...",
-          "interview_angle": "...",
-          "source_index_lookup": {
-            1: {"title": "...", "source_name": "...", "theme": "..."},
-            ...
-          }
-        }
+        Structured JSON with source attribution.
     """
     client = _build_client()
 
-    # Flatten and filter to high/medium confidence items.
+    # Two-step filter before synthesis:
+    # Step 1 — confidence: drop items the model couldn't summarize reliably
+    # Step 2 — pm_relevance_score: drop items that aren't relevant to PM interviews
+    # Order matters: no point evaluating relevance on an unreliable summary.
     filtered_items: List[Dict[str, Any]] = []
+    dropped_low_confidence = 0
+    dropped_low_relevance = 0
+
     for theme, items in grouped_summaries.items():
         for item in items:
-            conf_raw = (item.get("confidence") or "").lower()
+            # Step 1: confidence check
+            conf_raw = str(item.get("confidence") or "medium").lower()
             if conf_raw not in {"high", "medium"}:
+                dropped_low_confidence += 1
+                logger.info(
+                    "FILTER [step=1 reason=low_confidence] skipping relevance check: %s — %s",
+                    item.get("source_name"), item.get("title")
+                )
                 continue
+
+            # Step 2: PM relevance check (only reached if confidence passes)
+            relevance_raw = str(item.get("pm_relevance_score") or "medium").lower()
+            if relevance_raw not in {"high", "medium"}:
+                dropped_low_relevance += 1
+                logger.info(
+                    "FILTER [step=2 reason=low_relevance] dropped after confidence passed: %s — %s",
+                    item.get("source_name"), item.get("title")
+                )
+                continue
+
             filtered_items.append(
                 {
                     "theme": theme,
@@ -107,11 +118,17 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     "source_name": item.get("source_name", ""),
                     "insights": item.get("insights") or [],
                     "confidence": conf_raw,
+                    "pm_relevance_score": relevance_raw,
                 }
             )
 
+    if dropped_low_confidence:
+        logger.info("Dropped %d items with low confidence before synthesis.", dropped_low_confidence)
+    if dropped_low_relevance:
+        logger.info("Dropped %d items with low PM relevance before synthesis.", dropped_low_relevance)
+
     if not filtered_items:
-        logger.warning("No high/medium confidence items available for synthesis.")
+        logger.warning("No eligible items available for synthesis after filtering.")
         return {
             "whats_shifting": [],
             "company_watch": {},
@@ -172,7 +189,7 @@ Now produce a structured JSON object with the following shape:
       "paragraph": "One of 3-4 paragraph-length insights that synthesize across sources and themes, "
                    "balancing AI/tech signals WITH business model shifts, consumer behavior changes, "
                    "regulatory moves, and design/UX trends. Each sentence ends with inline [n] style "
-                   "citations referencing item numbers, and each paragraph draws on at least two distinct themes.",
+                   "citations referencing item numbers. Only cite [n] if a specific bullet from item [n] directly supports that sentence.",
       "source_indices": [1, 3]
     }}
   ],
@@ -191,8 +208,7 @@ Now produce a structured JSON object with the following shape:
     "Uber": null
   }},
   "startup_radar": [
-    "2-3 startup moves worth knowing about, including both AI and non-AI startups and disruption patterns, "
-    "each as a sentence or short paragraph"
+    "2-3 items featuring early-stage companies making unexpected moves, new entrants disrupting established markets, or funding events signaling emerging categories. Exclude established research labs, geopolitical incidents, and large-cap company moves — those belong in company_watch or whats_shifting."
   ],
   "pm_craft_today": "single most actionable PM craft insight from today's content, drawing especially from "
                     "product_craft, design_ux, and consumer_behavior themes (not just AI sources)",
@@ -203,11 +219,13 @@ Now produce a structured JSON object with the following shape:
 
 Guidance:
 - When making a claim in whats_shifting, you MUST cite which item numbers support it using [n] notation at the end of each sentence. Every sentence in whats_shifting must have at least one citation.
+- CRITICAL CITATION RULE: Only cite item [n] if a specific insight bullet from that item directly supports the exact claim you are making in that sentence. Do not cite an item merely because it is thematically related or appeared in the same section. If you cannot point to a specific bullet from item [n] that supports the claim, do not cite it.
 - The source_indices array for each whats_shifting entry must list all item numbers that meaningfully support that paragraph.
 - For company_watch entries, also include inline [n] citations and a matching source_indices array for each company you populate.
+- Apply the same citation rule to company_watch: only cite an item if its insight bullets directly support the specific claim made about that company.
 - For company_watch, only include companies (from Google, Microsoft, Apple, Meta, Amazon, OpenAI, Anthropic, NVIDIA, Uber) that have clear signal today; omit or set null for companies without signal.
 - Do not restate per-source summaries; always combine signals across sources and themes.
-- Ensure whats_shifting paragraphs balance AI/tech stories WITH business model shifts, consumer behavior changes, regulatory moves, and design/UX trends; explicitly avoid an AI-only framing.
+- Ensure whats_shifting contains at least 2 paragraphs whose central claim comes from a non-AI theme (business model shifts, consumer behavior, regulatory moves, market dynamics, design/UX). A paragraph that mentions AI as context but leads with a non-AI insight counts. A paragraph whose main point is an AI development does not count.
 - For pm_craft_today, favor insights grounded in product_craft, design_ux, and consumer_behavior themes, even when they intersect with AI.
 - For interview_angle, rotate focus across different PM skill areas (product strategy, consumer insight, regulatory navigation, AI, etc.) over time instead of defaulting to AI every time.
 """.strip()
@@ -228,11 +246,9 @@ Guidance:
             ],
         )
 
-        # Print the raw response content object before any processing.
         print("Raw Claude synthesis response content:")
         print(response.content)
 
-        # Extract the primary text block.
         try:
             content_block = response.content[0]
             text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
@@ -258,7 +274,7 @@ Guidance:
                 "interview_angle": "",
             }
 
-        # Ensure required keys exist with reasonable defaults, and normalize structure.
+        # Normalize whats_shifting
         raw_whats_shifting = parsed.get("whats_shifting") or []
         normalized_whats_shifting: List[Dict[str, Any]] = []
         if isinstance(raw_whats_shifting, list):
@@ -290,6 +306,7 @@ Guidance:
                 {"paragraph": str(raw_whats_shifting), "source_indices": []}
             )
 
+        # Normalize company_watch
         raw_company_watch = parsed.get("company_watch") or {}
         if not isinstance(raw_company_watch, dict):
             raw_company_watch = {"_raw": str(raw_company_watch)}
@@ -330,7 +347,7 @@ Guidance:
         pm_craft_today = parsed.get("pm_craft_today") or ""
         interview_angle = parsed.get("interview_angle") or ""
 
-        # Build a lookup table so the UI can resolve item indices to titles/sources.
+        # Build lookup table for UI citation resolution
         source_index_lookup: Dict[int, Dict[str, Any]] = {}
         for entry in indexed_items:
             idx = entry["index"]
@@ -352,6 +369,4 @@ Guidance:
     except Exception as exc:
         print("Exception during Claude synthesis call/parse:", exc)
         traceback.print_exc()
-        # Re-raise so the calling code sees the failure during debugging.
         raise
-

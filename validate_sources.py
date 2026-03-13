@@ -20,7 +20,7 @@ def _resolve_url(source: Dict[str, Any]) -> tuple[str | None, str | None]:
     raw_url = source.get("url") or ""
     source_type = source.get("type")
 
-    if source_type == "podcast" and raw_url.startswith("env:"):
+    if raw_url.startswith("env:"):
         var_name = raw_url.split(":", 1)[1]
         value = os.getenv(var_name)
         if not value:
