@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PM Intelligence Brief – Evals</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #FAFAF8;
+      --text: #1A1A18;
+      --accent: #1B3A6B;
+      --muted: #7A7A72;
+      --border-subtle: #DFDED7;
+      --green: #2D6A4F;
+      --amber: #B45309;
+      --red: #991B1B;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px 16px 40px;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: "Source Serif 4", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1, h2 {
+      font-family: "Playfair Display", "Source Serif 4", Georgia, serif;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin: 0;
+    }
+
+    .header {
+      margin-bottom: 2.5rem;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 1.25rem;
+    }
+
+    .header-title {
+      font-size: clamp(2.1rem, 3vw, 2.6rem);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+
+    .header-subtitle {
+      margin-top: 0.5rem;
+      font-size: 0.95rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    .header-nav {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      display: flex;
+      gap: 1.25rem;
+    }
+
+    .header-nav a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(27, 58, 107, 0.25);
+    }
+
+    .header-nav a:hover {
+      border-bottom-color: rgba(27, 58, 107, 0.6);
+    }
+
+    .header-nav span {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .section {
+      padding: 1.5rem 0 1.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .section:last-of-type {
+      border-bottom: none;
+    }
+
+    .section-heading {
+      font-size: 1.2rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .section-subtitle {
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Tables ── */
+    .eval-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .eval-table thead tr {
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .eval-table th {
+      text-align: left;
+      font-family: "Source Serif 4", serif;
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 0 0.75rem 0.6rem 0;
+      white-space: nowrap;
+    }
+
+    .eval-table th:first-child { padding-left: 0; }
+
+    .eval-table td {
+      padding: 0.5rem 0.75rem 0.5rem 0;
+      border-top: 1px solid rgba(223, 222, 215, 0.6);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .eval-table td:first-child { padding-left: 0; }
+
+    .eval-table tbody tr:first-child td { border-top: none; }
+
+    .eval-table .date-cell {
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    .eval-table .date-cell a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(27, 58, 107, 0.25);
+    }
+
+    .eval-table .date-cell a:hover {
+      border-bottom-color: rgba(27, 58, 107, 0.6);
+    }
+
+    /* Score colouring */
+    .score-high { color: var(--green); font-weight: 600; }
+    .score-mid  { color: var(--amber); }
+    .score-low  { color: var(--red);   }
+
+    /* Overall score badge */
+    .overall-badge {
+      display: inline-block;
+      font-weight: 700;
+      font-size: 1.05rem;
+      min-width: 3rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(27, 58, 107, 0.05);
+      border: 1px solid rgba(27, 58, 107, 0.12);
+    }
+
+    /* Column group headers */
+    .col-group-header {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      padding-top: 0.25rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border-subtle);
+      text-align: center;
+    }
+
+    .eval-table thead tr:nth-child(2) th {
+      padding-top: 0.4rem;
+    }
+
+    /* Section divider within table */
+    .col-divider {
+      border-left: 1px solid var(--border-subtle);
+      padding-left: 0.75rem !important;
+    }
+
+    /* Legend */
+    .legend {
+      margin-top: 1rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .legend-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 1.5rem;
+    }
+
+    .flag-indicator {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .empty-state {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">PM Intelligence Brief</h1>
+      <div class="header-subtitle">Evals</div>
+      <nav class="header-nav">
+        <a href="/">Today&rsquo;s brief</a>
+        <a href="/history">History</a>
+        <span>Evals</span>
+      </nav>
+    </header>
+
+    <!-- Quality Scores -->
+    <section class="section">
+      <h2 class="section-heading">Quality Scores</h2>
+      <div class="section-subtitle">
+        How well the synthesis reasons across sources — scored by an LLM judge (1&ndash;5 per dimension, out of 100 overall)
+      </div>
+
+      {% if eval_rows %}
+        <div class="legend" style="margin-bottom: 1.5rem;">
+          <div class="legend-row">
+            <span><strong>Overall</strong> — weighted sum across all sections (out of 100)</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Coherence</strong> — do all sentences support a single unified insight?</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Insight Depth</strong> — is this a genuine synthesis revealing something non-obvious, or just a summary?</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Grounding</strong> — does the cited source actually contain evidence for each claim?</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Topical Breadth (What&rsquo;s Shifting)</strong> — does this section cover both AI and non-AI themes, or is it AI-heavy?</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Relevance (Interview Angle)</strong> — how can a strong PM candidate use this insight to demonstrate strategic thinking in an interview?</span>
+          </div>
+          <div class="legend-row" style="margin-top: 1rem;">
+            <span><strong>Scoring methodology:</strong> Each dimension is scored 1–5 by an LLM judge. Section scores are weighted and summed to 100: What&rsquo;s Shifting contributes 40 pts, Company Watch 25 pts, Startup Radar 20 pts, PM Craft 10 pts, and Interview Angle 5 pts.</span>
+          </div>
+        </div>
+
+        <table class="eval-table">
+          <thead>
+            <tr>
+              <th rowspan="2">Date</th>
+              <th rowspan="2">Overall</th>
+              <th colspan="4" class="col-divider col-group-header">What&rsquo;s Shifting</th>
+              <th colspan="3" class="col-divider col-group-header">Company Watch</th>
+              <th colspan="3" class="col-divider col-group-header">Startup Radar</th>
+              <th colspan="1" class="col-divider col-group-header">PM Craft</th>
+              <th colspan="1" class="col-divider col-group-header">Interview Angle</th>
+            </tr>
+            <tr>
+              <th class="col-divider">Coherence</th>
+              <th>Insight</th>
+              <th>Grounding</th>
+              <th>Breadth</th>
+              <th class="col-divider">Coherence</th>
+              <th>Insight</th>
+              <th>Grounding</th>
+              <th class="col-divider">Coherence</th>
+              <th>Insight</th>
+              <th>Grounding</th>
+              <th class="col-divider">Insight</th>
+              <th class="col-divider">Relevance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in eval_rows %}
+            <tr>
+              <td class="date-cell">
+                <a href="/{{ row.date }}">{{ row.label }}</a>
+              </td>
+              <td>
+                <span class="overall-badge {% if row.overall_score >= 80 %}score-high{% elif row.overall_score >= 65 %}score-mid{% else %}score-low{% endif %}">
+                  {{ "%.1f"|format(row.overall_score) }}
+                </span>
+              </td>
+              <td class="col-divider {% if row.ws_coherence >= 4 %}score-high{% elif row.ws_coherence >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.ws_coherence) }}
+              </td>
+              <td class="{% if row.ws_insight >= 4 %}score-high{% elif row.ws_insight >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.ws_insight) }}
+              </td>
+              <td class="{% if row.ws_grounding >= 4 %}score-high{% elif row.ws_grounding >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.ws_grounding) }}
+              </td>
+              <td class="{% if row.ws_breadth >= 4 %}score-high{% elif row.ws_breadth >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.ws_breadth) if row.ws_breadth else "—" }}
+              </td>
+              <td class="col-divider {% if row.cw_coherence >= 4 %}score-high{% elif row.cw_coherence >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.cw_coherence) if row.cw_coherence else "—" }}
+              </td>
+              <td class="{% if row.cw_insight >= 4 %}score-high{% elif row.cw_insight >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.cw_insight) if row.cw_insight else "—" }}
+              </td>
+              <td class="{% if row.cw_grounding >= 4 %}score-high{% elif row.cw_grounding >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.cw_grounding) if row.cw_grounding else "—" }}
+              </td>
+              <td class="col-divider {% if row.sr_coherence >= 4 %}score-high{% elif row.sr_coherence >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.sr_coherence) if row.sr_coherence else "—" }}
+              </td>
+              <td class="{% if row.sr_insight >= 4 %}score-high{% elif row.sr_insight >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.sr_insight) if row.sr_insight else "—" }}
+              </td>
+              <td class="{% if row.sr_grounding >= 4 %}score-high{% elif row.sr_grounding >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.sr_grounding) if row.sr_grounding else "—" }}
+              </td>
+              <td class="col-divider {% if row.pc_insight >= 4 %}score-high{% elif row.pc_insight >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.pc_insight) if row.pc_insight else "—" }}
+              </td>
+              <td class="col-divider {% if row.ia_relevance >= 4 %}score-high{% elif row.ia_relevance >= 3 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.2f"|format(row.ia_relevance) if row.ia_relevance else "—" }}
+              </td>
+
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+
+      {% else %}
+        <p class="empty-state">No evals have been run yet.</p>
+      {% endif %}
+    </section>
+
+    <!-- Guardrails -->
+    <section class="section">
+      <h2 class="section-heading">Guardrails</h2>
+      <div class="section-subtitle">
+        Pipeline health indicators &mdash; not included in the quality score
+      </div>
+
+      {% if eval_rows %}
+        <div class="legend" style="margin-bottom: 1.5rem;">
+          <div class="legend-row">
+            <span><strong>Silent %</strong> = sources with no new articles in the lookback window / total configured sources</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Fetched</strong> = total articles collected across all active sources; exceeds source count when a source publishes multiple articles per day</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Confident %</strong> = articles summarized with high-medium confidence / total fetched articles; low confidence means the model could not reliably extract signal</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Relevant %</strong> = articles with high-medium PM relevance / confident articles; low relevance means the content is not useful for PM interview prep</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Utilized %</strong> = articles cited in the final synthesis / PM relevant articles; measures how much of the eligible pool the synthesizer used</span>
+          </div>
+          <div class="legend-row" style="margin-top: 0.25rem;">
+            <span><strong>Weak %</strong> = paragraphs scoring &le; 2 on any quality dimension / total paragraphs scored; high values indicate systemic synthesis quality issues</span>
+          </div>
+        </div>
+
+        <table class="eval-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Silent %</th>
+              <th>Fetched</th>
+              <th>Confident %</th>
+              <th>Relevant %</th>
+              <th>Utilized %</th>
+              <th>Weak %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in eval_rows %}
+            <tr>
+              <td class="date-cell">
+                <a href="/{{ row.date }}">{{ row.label }}</a>
+              </td>
+              <td class="{% if row.sources_configured and (100 - row.sources_active_pct) <= 20 %}score-high{% elif row.sources_configured and (100 - row.sources_active_pct) <= 40 %}score-mid{% elif row.sources_configured %}score-low{% endif %}">
+                {{ "%.1f"|format(100 - row.sources_active_pct) if row.sources_configured else "—" }}{% if row.sources_configured %}%{% endif %}
+              </td>
+              <td>{{ row.fetched if row.fetched else "—" }}</td>
+              <td class="{% if row.confident_pct >= 80 %}score-high{% elif row.confident_pct >= 60 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.1f"|format(row.confident_pct) if row.fetched else "—" }}{% if row.fetched %}%{% endif %}
+              </td>
+              <td class="{% if row.relevant_pct >= 70 %}score-high{% elif row.relevant_pct >= 50 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.1f"|format(row.relevant_pct) if row.fetched else "—" }}{% if row.fetched %}%{% endif %}
+              </td>
+              <td class="{% if row.utilized_pct >= 80 %}score-high{% elif row.utilized_pct >= 60 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.1f"|format(row.utilized_pct) if row.fetched else "—" }}{% if row.fetched %}%{% endif %}
+              </td>
+              <td class="{% if row.weak_pct == 0 %}score-high{% elif row.weak_pct <= 20 %}score-mid{% else %}score-low{% endif %}">
+                {{ "%.1f"|format(row.weak_pct) if row.fetched else "—" }}{% if row.fetched %}%{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+
+      {% else %}
+        <p class="empty-state">No guardrail data available yet.</p>
+      {% endif %}
+    </section>
+
+  </div>
+</body>
+</html>

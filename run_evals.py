@@ -17,16 +17,20 @@ def _get_connection() -> sqlite3.Connection:
     return sqlite3.connect(str(db_path))
 
 
-def _load_digest_for_date(conn: sqlite3.Connection, date_str: str) -> Tuple[Dict[str, Any], Dict[str, Any]] | None:
+def _load_digest_for_date(
+    conn: sqlite3.Connection, date_str: str
+) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]] | None:
     cur = conn.execute(
-        "SELECT synthesis_json, items_by_theme_json FROM digests WHERE date = ?",
+        "SELECT synthesis_json, items_by_theme_json, fetch_metadata_json FROM digests WHERE date = ?",
         (date_str,),
     )
     row = cur.fetchone()
     if row is None:
         return None
-    synthesis_json, items_json = row
-    return json.loads(synthesis_json), json.loads(items_json)
+    synthesis = json.loads(row[0])
+    items_by_theme = json.loads(row[1])
+    fetch_metadata = json.loads(row[2]) if row[2] else {}
+    return synthesis, items_by_theme, fetch_metadata
 
 
 def _iter_all_digest_dates(conn: sqlite3.Connection) -> List[str]:
@@ -40,31 +44,42 @@ def _run_for_date(conn: sqlite3.Connection, date_str: str) -> None:
         print(f"[skip] No digest found for {date_str}")
         return
 
-    synthesis, items_by_theme = loaded
+    synthesis, items_by_theme, fetch_metadata = loaded
     print(f"[run] Evaluating {date_str}...", end=" ", flush=True)
-    result = evaluator.run(date_str, synthesis, items_by_theme)
+    result = evaluator.run(date_str, synthesis, items_by_theme, fetch_metadata=fetch_metadata)
     print(f"done (overall_score={result.get('overall_score'):.1f})")
 
 
 def _print_report(conn: sqlite3.Connection) -> None:
+    # Ensure table + columns exist
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS evals (
           date TEXT PRIMARY KEY,
-          theme_balance_json TEXT,
-          citation_coverage_json TEXT,
-          source_utilization_json TEXT,
+          pipeline_funnel_json TEXT,
+          pm_relevance_json TEXT,
           llm_judge_json TEXT,
+          interview_angle_json TEXT,
           overall_score REAL,
           flags_json TEXT,
           evaluated_at TEXT
         )
         """
     )
+    for col, col_type in [
+        ("pipeline_funnel_json", "TEXT"),
+        ("pm_relevance_json", "TEXT"),
+        ("interview_angle_json", "TEXT"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE evals ADD COLUMN {col} {col_type}")
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
 
     cur = conn.execute(
-        "SELECT date, theme_balance_json, citation_coverage_json, llm_judge_json, overall_score "
+        "SELECT date, pipeline_funnel_json, pm_relevance_json, "
+        "llm_judge_json, pm_craft_json, interview_angle_json, overall_score "
         "FROM evals ORDER BY date"
     )
     rows = cur.fetchall()
@@ -72,54 +87,93 @@ def _print_report(conn: sqlite3.Connection) -> None:
         print("No evals found. Run evals first.")
         return
 
+    # ── QUALITY TABLE ──────────────────────────────────────────────────────────
+    print()
+    print("QUALITY SCORES (out of 100)")
     print(
-        f"{'Date':<12} {'Overall':>8} {'Coherence':>10} {'Insight':>8} {'Grounding':>10} {'ThemeBal%':>10} {'Citation%':>10}"
+        f"{'Date':<12} {'Overall':>8} "
+        f"{'WS-Coh':>7} {'WS-Ins':>7} {'WS-Grd':>7} {'WS-Brd':>7} "
+        f"{'CW-Coh':>7} {'CW-Ins':>7} {'CW-Grd':>7} "
+        f"{'SR-Coh':>7} {'SR-Ins':>7} {'SR-Grd':>7} "
+        f"{'PC-Ins':>7} {'IA-Rel':>7}"
     )
-    print("-" * 86)
+    print("-" * 120)
 
-    for date_str, tb_json, cc_json, llm_json, overall in rows:
-        theme_balance = json.loads(tb_json) if tb_json else {}
-        citation_cov = json.loads(cc_json) if cc_json else {}
+    for row in rows:
+        date_str, pf_json, pm_json, llm_json, pc_json, ia_json, overall = row
         llm = json.loads(llm_json) if llm_json else {}
+        pc  = json.loads(pc_json)  if pc_json  else {}
+        ia  = json.loads(ia_json)  if ia_json  else {}
 
-        citation_pct = float(citation_cov.get("citation_coverage_pct") or 0.0)
-        avg_coh = float(llm.get("avg_coherence") or 0.0)
-        avg_insight = float(llm.get("avg_insight_depth") or 0.0)
-        avg_cit_sup = float(llm.get("avg_citation_support") or 0.0)
-        theme_balance_score = float(theme_balance.get("theme_balance_score") or 0.0)
-        overall_score = float(overall or 0.0)
+        ws_c = float(llm.get("ws_avg_coherence")        or llm.get("avg_coherence")        or 0.0)
+        ws_i = float(llm.get("ws_avg_insight_depth")    or llm.get("avg_insight_depth")    or 0.0)
+        ws_g = float(llm.get("ws_avg_citation_support") or llm.get("avg_citation_support") or 0.0)
+        ws_b = float(llm.get("ws_topical_breadth")      or 0.0)
+        cw_c = float(llm.get("cw_avg_coherence")        or 0.0)
+        cw_i = float(llm.get("cw_avg_insight_depth")    or 0.0)
+        cw_g = float(llm.get("cw_avg_citation_support") or 0.0)
+        sr_c = float(llm.get("sr_avg_coherence")        or 0.0)
+        sr_i = float(llm.get("sr_avg_insight_depth")    or 0.0)
+        sr_g = float(llm.get("sr_avg_citation_support") or 0.0)
+        pc_i = float(pc.get("insight_depth")            or 0.0)
+        ia_r = float(ia.get("relevance")                or 0.0)
+        ov   = float(overall or 0.0)
 
         print(
-            f"{date_str:<12} "
-            f"{overall_score:>8.1f} "
-            f"{avg_coh:>10.2f} "
-            f"{avg_insight:>8.2f} "
-            f"{avg_cit_sup:>10.2f} "
-            f"{theme_balance_score:>10.1f} "
-            f"{citation_pct:>10.1f}"
+            f"{date_str:<12} {ov:>8.1f} "
+            f"{ws_c:>7.2f} {ws_i:>7.2f} {ws_g:>7.2f} {ws_b:>7.2f} "
+            f"{cw_c:>7.2f} {cw_i:>7.2f} {cw_g:>7.2f} "
+            f"{sr_c:>7.2f} {sr_i:>7.2f} {sr_g:>7.2f} "
+            f"{pc_i:>7.2f} {ia_r:>7.2f}"
         )
 
     print()
-    print("* Citation% is diagnostic only — not included in overall score")
+    print("  WS=What's Shifting(40pts) CW=Company Watch(25pts) SR=Startup Radar(20pts) PC=PM Craft(10pts) IA=Interview Angle(5pts)")
+    print("  Coh=Coherence  Ins=Insight Depth  Grd=Grounding  Brd=Topical Breadth  Rel=PM Relevance")
+
+    # ── GUARDRAILS TABLE ───────────────────────────────────────────────────────
+    print()
+    print("GUARDRAILS (diagnostic — not in score)")
+    print(
+        f"{'Date':<12} {'Silent%':>8} {'Fetched':>8} "
+        f"{'Conf%':>7} {'Rel%':>7} {'Util%':>7}"
+    )
+    print("-" * 56)
+
+    for row in rows:
+        date_str, pf_json, pm_json, llm_json, pc_json, ia_json, overall = row
+        pf = json.loads(pf_json) if pf_json else {}
+
+        src_cfg    = int(pf.get("sources_configured") or 0)
+        src_act    = int(pf.get("sources_active")     or 0)
+        silent_pct = ((src_cfg - src_act) / src_cfg * 100.0) if src_cfg else 0.0
+        fetched    = int(pf.get("fetched")            or 0)
+        conf_pct   = float(pf.get("confident_pct")   or 0.0)
+        rel_pct    = float(pf.get("relevant_pct")     or 0.0)
+        util_pct   = float(pf.get("utilized_pct")     or 0.0)
+
+        print(
+            f"{date_str:<12} {silent_pct:>8.1f} {fetched:>8} "
+            f"{conf_pct:>7.1f} {rel_pct:>7.1f} {util_pct:>7.1f}"
+        )
+
+    print()
+    print("  Silent% — sources with no new articles in the lookback window / configured sources")
+    print("  Fetched — total articles collected across all active sources;")
+    print("            exceeds source count when a source publishes multiple articles per day")
+    print("  Conf%   — articles summarized with high/med confidence / fetched;")
+    print("            low confidence means the model could not reliably extract signal")
+    print("  Rel%    — high/med PM relevance / confident;")
+    print("            low relevance means the content is not useful for PM interview prep")
+    print("  Util%   — articles cited in the final synthesis / relevant;")
+    print("            measures how much of the eligible pool the synthesizer used")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run quality evals over stored digests.")
-    parser.add_argument(
-        "date",
-        nargs="?",
-        help="Specific date to run (YYYY-MM-DD). Defaults to today if omitted and --all is not set.",
-    )
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Run evals for all dates in the digests archive.",
-    )
-    parser.add_argument(
-        "--report",
-        action="store_true",
-        help="Print a trend summary table from the evals table.",
-    )
+    parser.add_argument("date", nargs="?", help="Specific date (YYYY-MM-DD). Defaults to today.")
+    parser.add_argument("--all", action="store_true", help="Run evals for all archived dates.")
+    parser.add_argument("--report", action="store_true", help="Print trend summary table.")
     args = parser.parse_args()
 
     conn = _get_connection()
@@ -132,14 +186,9 @@ def main() -> None:
             for d in dates:
                 _run_for_date(conn, d)
         else:
-            if args.date:
-                date_str = args.date
-            else:
-                date_str = date.today().isoformat()
-            _run_for_date(conn, date_str)
+            _run_for_date(conn, args.date or date.today().isoformat())
 
         if args.report:
-            print()
             _print_report(conn)
     finally:
         conn.close()
@@ -147,4 +196,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

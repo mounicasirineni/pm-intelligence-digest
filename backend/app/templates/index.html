@@ -461,39 +461,23 @@
       {% endif %}
       <div class="header-nav">
         <a href="/history">Archive</a>
+        <span style="color: var(--border-subtle); margin: 0 0.5rem;">|</span>
+        <a href="/evals">Evals</a>
       </div>
     </header>
 
     {% if eval_summary %}
-    <section class="quality-bar">
-      <div class="quality-bar-header">
-        <span class="quality-bar-label">Quality Score</span>
-        <span class="quality-bar-score">
-          {% if eval_summary.has_flags %}
-            <span class="quality-bar-flag">⚠</span>
-          {% endif %}
-          {{ "%.0f"|format(eval_summary.overall_score or 0) }}/100
-        </span>
-      </div>
-      <div class="quality-bar-pills">
-        <span class="quality-pill">
-          Citation Coverage: {{ "%.1f"|format(eval_summary.citation_coverage_pct or 0) }}%
-        </span>
-        <span class="quality-pill">
-          Theme Balance: {{ "%.1f"|format(eval_summary.theme_balance_score or 0) }}% non-AI
-        </span>
-        <span class="quality-pill">
-          Coherence: {{ "%.1f"|format(eval_summary.avg_coherence or 0) }}/5
-        </span>
-        <span class="quality-pill">
-          Insight Depth: {{ "%.1f"|format(eval_summary.avg_insight_depth or 0) }}/5
-        </span>
-        <span class="quality-pill">
-          Grounding: {{ "%.1f"|format(eval_summary.avg_citation_support or 0) }}/5
-        </span>
-      </div>
-    </section>
-    {% endif %}
+<section class="quality-bar">
+  <div class="quality-bar-header">
+    <span class="quality-bar-label">Quality Score</span>
+    <span class="quality-bar-score">
+      {{ "%.0f"|format(eval_summary.overall_score or 0) }}/100
+    </span>
+    <span style="color: var(--muted); font-size: 0.82rem; margin-left: 0.75rem;">·</span>
+    <a href="/evals" style="font-size: 0.82rem; margin-left: 0.5rem; border-bottom: none; color: var(--accent);">See Evals for breakdown →</a>
+  </div>
+</section>
+{% endif %}
 
     <!-- What's shifting -->
     <section class="section">
@@ -642,13 +626,38 @@
 
       <div class="collapsible-body" id="source-details-body">
         {% if items_by_theme %}
+
+          {# ── Separate utilized vs filtered-out ── #}
+          {% set utilized_items = [] %}
+          {% set filtered_items = [] %}
           {% for theme, items in items_by_theme.items() %}
-            {% if items %}
-              <div class="section-label" style="margin-top: 1rem;">{{ theme.replace('_', ' ') | title }}</div>
-              {% for item in items %}
+            {% for item in items %}
+              {% set conf = (item.confidence or 'medium') | lower %}
+              {% set rel = (item.pm_relevance_score or 'medium') | lower %}
+              {% if conf in ['high', 'medium'] and rel in ['high', 'medium'] %}
+                {% set _ = utilized_items.append(item) %}
+              {% else %}
+                {% set _ = filtered_items.append({'item': item, 'reason': 'Low Confidence' if conf not in ['high','medium'] else 'Low Relevance'}) %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+
+          {# ── Utilized ── #}
+          <div style="margin-top: 0.75rem;">
+            <div class="collapsible-header" id="utilized-header" style="cursor: pointer;">
+              <div class="section-label" style="margin: 0;">Utilized — {{ utilized_items | length }} articles</div>
+              <span class="collapsible-toggle" style="font-size: 0.75rem;">Show <span class="collapsible-icon" id="utilized-icon">+</span></span>
+            </div>
+            <div class="collapsible-body" id="utilized-body">
+            {% if utilized_items %}
+              {% for item in utilized_items %}
+                {% set cite_idx = citation_index_map.get((item.source_name, item.title)) %}
                 <article class="source-item">
                   <div class="source-title-row">
                     <div class="source-title">
+                      {% if cite_idx %}
+                        <span style="color: var(--muted); font-size: 0.85rem; margin-right: 0.4rem;">[{{ cite_idx }}]</span>
+                      {% endif %}
                       {% if item.url %}
                         <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
                       {% else %}
@@ -657,12 +666,6 @@
                     </div>
                     <div class="source-meta">
                       {{ item.source_name }}
-                      {% if item.confidence %}
-                        {% set conf = item.confidence|lower %}
-                        <span class="confidence-badge confidence-{{ conf if conf in ['high','medium','low'] else 'low' }}">
-                          {{ conf }}
-                        </span>
-                      {% endif %}
                     </div>
                   </div>
                   {% if item.insights %}
@@ -674,14 +677,52 @@
                   {% endif %}
                 </article>
               {% endfor %}
+            {% else %}
+              <p>No utilized articles for this date.</p>
             {% endif %}
-          {% endfor %}
+          </div>
+        </div>
+
+          {# ── Filtered Out ── #}
+          {% if filtered_items %}
+            <div style="margin-top: 1.5rem;">
+              <div class="collapsible-header" id="filtered-header" style="cursor: pointer;">
+                <div class="section-label" style="margin: 0;">
+                  Filtered Out — {{ filtered_items | length }} articles
+                </div>
+                <span class="collapsible-toggle" style="font-size: 0.75rem;">
+                  Show <span class="collapsible-icon" id="filtered-icon">+</span>
+                </span>
+              </div>
+              <div class="collapsible-body" id="filtered-body" style="margin-top: 0.5rem;">
+                {% for entry in filtered_items %}
+                  {% set item = entry.item %}
+                  {% set reason = entry.reason %}
+                  <article class="source-item" style="opacity: 0.6;">
+                    <div class="source-title-row">
+                      <div class="source-title">
+                        {% if item.url %}
+                          <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+                        {% else %}
+                          {{ item.title }}
+                        {% endif %}
+                      </div>
+                      <div class="source-meta">
+                        {{ item.source_name }}
+                        <span class="confidence-badge confidence-low" style="margin-left: 0.4rem;">{{ reason }}</span>
+                      </div>
+                    </div>
+                  </article>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
         {% else %}
           <p>No source-level items available yet. After you run the pipeline, each contributing article or episode will appear here.</p>
         {% endif %}
       </div>
     </section>
-  </div>
 
   <script>
     (function () {
@@ -774,6 +815,26 @@
           }
         });
       });
+      // Filtered Out collapsible
+      var filteredHeader = document.getElementById("filtered-header");
+      var filteredBody = document.getElementById("filtered-body");
+      var filteredIcon = document.getElementById("filtered-icon");
+      if (filteredHeader && filteredBody && filteredIcon) {
+        filteredHeader.addEventListener("click", function () {
+          var isOpen = filteredBody.classList.toggle("open");
+          filteredIcon.textContent = isOpen ? "\u2212" : "+";
+        });
+      }
+      // Utilized collapsible
+      var utilizedHeader = document.getElementById("utilized-header");
+var utilizedBody = document.getElementById("utilized-body");
+var utilizedIcon = document.getElementById("utilized-icon");
+if (utilizedHeader && utilizedBody && utilizedIcon) {
+  utilizedHeader.addEventListener("click", function () {
+    var isOpen = utilizedBody.classList.toggle("open");
+    utilizedIcon.textContent = isOpen ? "\u2212" : "+";
+  });
+}
     })();
   </script>
 </body>
