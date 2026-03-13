@@ -59,6 +59,13 @@ RSS/Podcast Sources (33)
   daily scheduler via .env)
 ```
 
+## Built With
+
+- **Python / Flask** — lightweight server with minimal boilerplate; easy to extend routes as the pipeline grew
+- **Claude API (Anthropic)** — `claude-sonnet-4-5` for pipeline reasoning, `claude-haiku-4-5-20251001` for evals (fast and cheap at ~$0.02/day)
+- **feedparser, APScheduler, SQLite** — feedparser for RSS parsing, APScheduler for optional daily refresh, SQLite for zero-infra date-keyed caching of digests and evals
+- **Cursor + Claude** — AI-assisted development throughout; product decisions, architecture, eval design, and source curation were mine — Claude handled code generation and iteration, Cursor applied every change
+
 ## Evals Framework
 
 Every brief is automatically scored after generation using a two-layer system:
@@ -230,10 +237,3 @@ pm-intelligence-digest/
 - [ ] Evals threshold alerts after 2-week baseline
 - [ ] "Save to prep notes" — tag insights into interview prep
 - [ ] Mobile-optimized layout
-
-## Built With
-
-- **Python / Flask** — lightweight server with minimal boilerplate; easy to extend routes as the pipeline grew
-- **Claude API (Anthropic)** — `claude-sonnet-4-5` for pipeline reasoning, `claude-haiku-4-5-20251001` for evals (fast and cheap at ~$0.02/day)
-- **feedparser, APScheduler, SQLite** — feedparser for RSS parsing, APScheduler for optional daily refresh, SQLite for zero-infra date-keyed caching of digests and evals
-- **Cursor** — AI-assisted development environment; used for all code generation, iteration, and debugging throughout the build
