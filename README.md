@@ -233,6 +233,7 @@ pm-intelligence-digest/
 
 ## Built With
 
-- Python / Flask
-- Claude API (Anthropic) — `claude-sonnet-4-5` for pipeline, `claude-haiku-4-5-20251001` for evals
-- feedparser, APScheduler, SQLite
+- **Python / Flask** — lightweight server with minimal boilerplate; easy to extend routes as the pipeline grew
+- **Claude API (Anthropic)** — `claude-sonnet-4-5` for pipeline reasoning, `claude-haiku-4-5-20251001` for evals (fast and cheap at ~$0.02/day)
+- **feedparser, APScheduler, SQLite** — feedparser for RSS parsing, APScheduler for optional daily refresh, SQLite for zero-infra date-keyed caching of digests and evals
+- **Cursor** — AI-assisted development environment; used for all code generation, iteration, and debugging throughout the build
