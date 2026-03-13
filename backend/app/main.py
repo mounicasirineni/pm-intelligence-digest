@@ -170,7 +170,7 @@ def _get_or_run_pipeline(force_refresh: bool = False):
         date_str = generated_at.date().isoformat() if generated_at else None
         evaluator.run(date_str, synthesis, items_by_theme, fetch_metadata=fetch_metadata)
     except Exception as e:
-        logger.warning(f"Evals failed silently: {e}")
+    logger.error(f"Evals failed: {e}", exc_info=True)
  
     return synthesis, items_by_theme, generated_at, fetch_metadata
 
