@@ -351,7 +351,7 @@ Guidance:
         source_index_lookup: Dict[int, Dict[str, Any]] = {}
         for entry in indexed_items:
             idx = entry["index"]
-            source_index_lookup[idx] = {
+            source_index_lookup[str(idx)] = {
                 "title": entry["title"],
                 "source_name": entry["source_name"],
                 "theme": entry["theme"],
