@@ -1,10 +1,12 @@
 # PM Intelligence Brief
 
-> A daily AI-powered intelligence digest built for senior product managers preparing for interviews at top tech companies.
+> A daily AI-powered intelligence digest built for senior product managers who want signal, not noise.
 
 ## What This Is
 
-I built this tool to solve a real problem during my job search: staying current on industry trends, company moves, and product thinking — without spending hours on LinkedIn or drowning in newsletter noise.
+LinkedIn has become an AI echo chamber — FUD-driven posts, clickbait course promotions, and engagement farming. Most PM newsletters sit behind paid subscriptions or bury the insight under 800 words of preamble.
+
+I built this tool to cut through that: stay current on industry trends, company moves, and product thinking without the noise tax.
 
 The brief runs on demand via /refresh, pulls from 33 curated sources across 8 themes, and uses Claude to do two things most digest tools don't:
 
