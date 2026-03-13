@@ -168,9 +168,11 @@ def _get_or_run_pipeline(force_refresh: bool = False):
     try:
         from .services import evaluator
         date_str = generated_at.date().isoformat() if generated_at else None
+        print(f"[evals] Starting eval for {date_str}", flush=True)
         evaluator.run(date_str, synthesis, items_by_theme, fetch_metadata=fetch_metadata)
+        print(f"[evals] Completed eval for {date_str}", flush=True)
     except Exception as e:
-        logger.error(f"Evals failed: {e}", exc_info=True)
+        print(f"[evals] FAILED: {e}", flush=True)
  
     return synthesis, items_by_theme, generated_at, fetch_metadata
 
