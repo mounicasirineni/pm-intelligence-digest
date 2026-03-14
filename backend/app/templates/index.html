@@ -509,7 +509,7 @@
                   <div class="insight-sources">
                     Sources:
                     {% for idx in insight.source_indices %}
-                      {% set meta = synthesis.source_index_lookup[idx] if synthesis.source_index_lookup[idx] is defined else None %}
+                      {% set meta = synthesis.source_index_lookup[idx|string] if synthesis.source_index_lookup[idx|string] is defined else None %}
                       {% if meta %}
                         {{ meta.title }}{% if not loop.last %};{% endif %}
                       {% endif %}
@@ -584,7 +584,7 @@
               <div class="insight-sources">
                 Sources:
                 {% for idx in indices %}
-                  {% set meta = synthesis.source_index_lookup[idx] if synthesis.source_index_lookup[idx] is defined else None %}
+                  {% set meta = synthesis.source_index_lookup[idx|string] if synthesis.source_index_lookup[idx|string] is defined else None %}
                   {% if meta %}
                     {{ meta.title }}{% if not loop.last %};{% endif %}
                   {% endif %}
