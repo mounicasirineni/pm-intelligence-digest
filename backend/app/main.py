@@ -214,8 +214,7 @@ def _get_eval_summary_for_date(date_str: str):
         cur = conn.execute(
             """
             SELECT
-              theme_balance_json,
-              citation_coverage_json,
+              pipeline_funnel_json,
               llm_judge_json,
               overall_score,
               flags_json
@@ -226,7 +225,6 @@ def _get_eval_summary_for_date(date_str: str):
         )
         row = cur.fetchone()
     except sqlite3.OperationalError:
-        # evals table may not exist yet
         return None
     finally:
         conn.close()
@@ -234,31 +232,19 @@ def _get_eval_summary_for_date(date_str: str):
     if row is None:
         return None
 
-    theme_balance_json, citation_coverage_json, llm_judge_json, overall_score, flags_json = row
+    pipeline_funnel_json, llm_judge_json, overall_score, flags_json = row
     try:
-        theme_balance = json.loads(theme_balance_json) if theme_balance_json else {}
-        citation_coverage = json.loads(citation_coverage_json) if citation_coverage_json else {}
         llm_judge = json.loads(llm_judge_json) if llm_judge_json else {}
         flags = json.loads(flags_json) if flags_json else {}
     except Exception:
         return None
 
-    citation_pct = float(citation_coverage.get("citation_coverage_pct") or 0.0)
-    avg_coherence = float(llm_judge.get("avg_coherence") or 0.0)
-    avg_insight_depth = float(llm_judge.get("avg_insight_depth") or 0.0)
-    avg_citation_support = float(llm_judge.get("avg_citation_support") or 0.0)
-    theme_balance_score = float(theme_balance.get("theme_balance_score") or 0.0)
-    overall = float(overall_score or 0.0)
-    has_flags = bool(flags.get("flagged_paragraphs"))
-
     return {
-        "overall_score": overall,
-        "citation_coverage_pct": citation_pct,
-        "avg_coherence": avg_coherence,
-        "avg_insight_depth": avg_insight_depth,
-        "avg_citation_support": avg_citation_support,
-        "theme_balance_score": theme_balance_score,
-        "has_flags": has_flags,
+        "overall_score": float(overall_score or 0.0),
+        "avg_coherence": float(llm_judge.get("ws_avg_coherence") or llm_judge.get("avg_coherence") or 0.0),
+        "avg_insight_depth": float(llm_judge.get("ws_avg_insight_depth") or llm_judge.get("avg_insight_depth") or 0.0),
+        "avg_citation_support": float(llm_judge.get("ws_avg_citation_support") or llm_judge.get("avg_citation_support") or 0.0),
+        "has_flags": bool(flags.get("flagged_paragraphs")),
     }
 
 
