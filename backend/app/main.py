@@ -417,12 +417,18 @@ def digest_by_date(date_str: str):
 
     synthesis, items_by_theme, generated_at, fetch_metadata = result
     eval_summary = _get_eval_summary_for_date(date_str)
+    source_index_lookup = (synthesis or {}).get("source_index_lookup") or {}
+    citation_index_map = {
+        (v["source_name"], v["title"]): k
+        for k, v in source_index_lookup.items()
+    }
     return render_template(
         "index.html",
         synthesis=synthesis or {},
         items_by_theme=items_by_theme or {},
         generated_at=generated_at,
         eval_summary=eval_summary,
+        citation_index_map=citation_index_map,
     )
 
 
