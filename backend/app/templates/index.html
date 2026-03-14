@@ -542,7 +542,20 @@
       <div class="section-label">Section III</div>
       <h2 class="section-heading">PM Craft Today</h2>
       <div class="craft-block">
-        {{ synthesis.pm_craft_today or "Once today’s sources are summarized, your sharpest craft takeaway will appear here." }}
+        {% set pm_craft_text = synthesis.pm_craft_today.text if synthesis.pm_craft_today is mapping else synthesis.pm_craft_today %}
+        {% set pm_craft_indices = synthesis.pm_craft_today.source_indices if synthesis.pm_craft_today is mapping else [] %}
+        {{ pm_craft_text or "Once today's sources are summarized, your sharpest craft takeaway will appear here." }}
+        {% if pm_craft_indices and synthesis.source_index_lookup %}
+          <div class="insight-sources">
+            Sources:
+            {% for idx in pm_craft_indices %}
+              {% set meta = synthesis.source_index_lookup[idx|string] if synthesis.source_index_lookup[idx|string] is defined else None %}
+              {% if meta %}
+                {{ meta.title }}{% if not loop.last %};{% endif %}
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
       </div>
     </section>
 
@@ -603,7 +616,22 @@
       {% if synthesis.startup_radar %}
         <ol class="startup-list">
           {% for item in synthesis.startup_radar %}
-            <li>{{ item }}</li>
+            {% set bullet = item.bullet if item is mapping else item %}
+            {% set sr_indices = item.source_indices if item is mapping else [] %}
+            <li>
+              {{ bullet }}
+              {% if sr_indices and synthesis.source_index_lookup %}
+                <div class="insight-sources">
+                  Sources:
+                  {% for idx in sr_indices %}
+                    {% set meta = synthesis.source_index_lookup[idx|string] if synthesis.source_index_lookup[idx|string] is defined else None %}
+                    {% if meta %}
+                      {{ meta.title }}{% if not loop.last %};{% endif %}
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </li>
           {% endfor %}
         </ol>
       {% else %}
