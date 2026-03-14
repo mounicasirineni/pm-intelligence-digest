@@ -208,10 +208,15 @@ Now produce a structured JSON object with the following shape:
     "Uber": null
   }},
   "startup_radar": [
-    "2-3 items featuring early-stage companies making unexpected moves, new entrants disrupting established markets, or funding events signaling emerging categories. Exclude established research labs, geopolitical incidents, and large-cap company moves — those belong in company_watch or whats_shifting."
+    {
+      "bullet": "2-3 items featuring early-stage companies making unexpected moves, new entrants disrupting established markets, or funding events signaling emerging categories. Exclude established research labs, geopolitical incidents, and large-cap company moves — those belong in company_watch or whats_shifting.",
+      "source_indices": [1, 2]
+    }
   ],
-  "pm_craft_today": "single most actionable PM craft insight from today's content, drawing especially from "
-                    "product_craft, design_ux, and consumer_behavior themes (not just AI sources)",
+  "pm_craft_today": {
+    "text": "single most actionable PM craft insight from today's content, drawing especially from product_craft, design_ux, and consumer_behavior themes (not just AI sources)",
+    "source_indices": [3]
+  },
   "interview_angle": "one specific thing a PM should have a prepared opinion on before interviews this week, "
                      "sometimes focusing on product strategy, sometimes consumer insight, sometimes regulatory "
                      "navigation, sometimes AI — not always AI"
@@ -270,7 +275,7 @@ Guidance:
                 "whats_shifting": [],
                 "company_watch": {},
                 "startup_radar": [],
-                "pm_craft_today": "",
+                "pm_craft_today": {"text": "", "source_indices": []},
                 "interview_angle": "",
             }
 
@@ -340,11 +345,53 @@ Guidance:
                 "source_indices": cleaned_indices_cw,
             }
 
-        startup_radar = parsed.get("startup_radar") or []
-        if not isinstance(startup_radar, list):
-            startup_radar = [str(startup_radar)]
+        # Normalize startup_radar
+        raw_startup_radar = parsed.get("startup_radar") or []
+        if not isinstance(raw_startup_radar, list):
+            raw_startup_radar = [str(raw_startup_radar)]
 
-        pm_craft_today = parsed.get("pm_craft_today") or ""
+        normalized_startup_radar = []
+        for entry in raw_startup_radar:
+            if isinstance(entry, dict):
+                bullet = entry.get("bullet") or entry.get("text") or str(entry)
+                indices = entry.get("source_indices") or []
+            else:
+                bullet = str(entry)
+                indices = []
+            if not isinstance(indices, list):
+                indices = [indices]
+            cleaned_indices_sr = []
+            for idx in indices:
+                try:
+                    cleaned_indices_sr.append(int(idx))
+                except Exception:
+                    continue
+            normalized_startup_radar.append({
+                "bullet": bullet,
+                "source_indices": cleaned_indices_sr,
+            })
+
+        # Normalize pm_craft_today
+        raw_pm_craft = parsed.get("pm_craft_today") or {}
+        if isinstance(raw_pm_craft, dict):
+            pm_craft_text = str(raw_pm_craft.get("text") or raw_pm_craft.get("pm_craft_today") or "")
+            pm_craft_indices = raw_pm_craft.get("source_indices") or []
+        else:
+            pm_craft_text = str(raw_pm_craft)
+            pm_craft_indices = []
+        if not isinstance(pm_craft_indices, list):
+            pm_craft_indices = [pm_craft_indices]
+        cleaned_pm_craft_indices = []
+        for idx in pm_craft_indices:
+            try:
+                cleaned_pm_craft_indices.append(int(idx))
+            except Exception:
+                continue
+        pm_craft_today = {
+            "text": pm_craft_text,
+            "source_indices": cleaned_pm_craft_indices,
+        }
+
         interview_angle = parsed.get("interview_angle") or ""
 
         # Build lookup table for UI citation resolution
@@ -360,8 +407,8 @@ Guidance:
         return {
             "whats_shifting": normalized_whats_shifting,
             "company_watch": normalized_company_watch,
-            "startup_radar": startup_radar,
-            "pm_craft_today": str(pm_craft_today),
+            "startup_radar": normalized_startup_radar,
+            "pm_craft_today": pm_craft_today,
             "interview_angle": str(interview_angle),
             "source_index_lookup": source_index_lookup,
         }
