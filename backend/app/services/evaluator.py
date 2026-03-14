@@ -327,15 +327,24 @@ async def llm_judge(
                 "You assess whether synthesis covers a genuine breadth of industry topics."
             ),
             messages=[{"role": "user", "content": (
-                "Rate the TOPICAL BREADTH of this What's Shifting section (1-5):\n\n"
-                "TOPICAL BREADTH: Do the insights substantively cover non-AI topics — business model shifts, "
-                "consumer behavior changes, regulatory moves, market dynamics, design trends — or does every "
-                "insight ultimately reduce to an AI implication regardless of which sources were cited? "
-                "1=every paragraph is about AI even if framed as business/consumer/regulatory, "
-                "5=genuine mix where non-AI topics get substantive standalone insights\n\n"
+                "Count how many paragraphs in this What's Shifting section have a NON-AI topic "
+                "as their central claim. Non-AI topics include: business model shifts, consumer "
+                "behavior changes, regulatory moves, market dynamics, design/UX trends, supply "
+                "chain dynamics, competitive strategy, or financial market shifts.\n\n"
+                "Rules for counting:\n"
+                "- A paragraph COUNTS as non-AI if its central claim is a non-AI development, "
+                "even if AI is mentioned as secondary context.\n"
+                "- A paragraph does NOT count if its main point is an AI capability, AI product "
+                "launch, AI adoption, or AI safety/policy — even if framed in business language.\n\n"
+                "Score based on count:\n"
+                "1 = 0 non-AI paragraphs\n"
+                "2 = 1 non-AI paragraph\n"
+                "3 = 2 non-AI paragraphs\n"
+                "4 = 3 non-AI paragraphs\n"
+                "5 = 4 or more non-AI paragraphs\n\n"
                 f"What's Shifting section:\n{combined}\n\n"
                 'Return only valid JSON: '
-                '{"topical_breadth": N, "topical_breadth_reason": "one sentence"}'
+                '{"topical_breadth": N, "topical_breadth_reason": "one sentence stating how many non-AI paragraphs you counted and which topics they covered"}'
             )}],
         )
         block = response.content[0]
