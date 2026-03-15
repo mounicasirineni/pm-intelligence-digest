@@ -300,6 +300,7 @@ def _get_all_evals():
             "ws_insight":    float(llm.get("ws_avg_insight_depth") or llm.get("avg_insight_depth") or 0.0),
             "ws_grounding":  float(llm.get("ws_avg_citation_support") or llm.get("avg_citation_support") or 0.0),
             "ws_breadth":    float(llm.get("ws_topical_breadth") or 0.0),
+            "ws_breadth_reason": str(llm.get("ws_topical_breadth_reason") or ""),
             # Quality — CW
             "cw_coherence":  float(llm.get("cw_avg_coherence")  or 0.0),
             "cw_insight":    float(llm.get("cw_avg_insight_depth")  or 0.0),

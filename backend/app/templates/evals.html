@@ -317,7 +317,7 @@
               <td class="{% if row.ws_grounding >= 4 %}score-high{% elif row.ws_grounding >= 3 %}score-mid{% else %}score-low{% endif %}">
                 {{ "%.2f"|format(row.ws_grounding) }}
               </td>
-              <td class="{% if row.ws_breadth >= 4 %}score-high{% elif row.ws_breadth >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="{% if row.ws_breadth >= 4 %}score-high{% elif row.ws_breadth >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.ws_breadth_reason %}title="{{ row.ws_breadth_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.ws_breadth) if row.ws_breadth else "—" }}
               </td>
               <td class="col-divider {% if row.cw_coherence >= 4 %}score-high{% elif row.cw_coherence >= 3 %}score-mid{% else %}score-low{% endif %}">
