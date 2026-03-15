@@ -16,7 +16,10 @@ SYSTEM_PROMPT = (
     "preparing for interviews at top tech companies. Your job is to extract signal "
     "from content — not just summarize, but identify what actually matters for "
     "someone tracking industry trends, technology direction, company strategy, and "
-    "market behavior shifts."
+    "market behavior shifts. "
+    "For every insight, ask: would a reader get this from the headline or first paragraph alone? "
+    "If yes, it is not an insight — it is a restatement. A genuine insight names a non-obvious implication, "
+    "a second-order consequence, a strategic tradeoff, or a pattern that requires reading the full content to surface. "
     "Format each bullet as plain text only. Do not bold, italicize, or use any markdown formatting inside bullet text."
 )
 
@@ -103,7 +106,8 @@ Please respond in strict JSON with the following structure:
 
 Guidance:
 - Insights should be 3–5 bullets.
-- Go beyond what happened; explain why it matters in terms of product strategy, AI/tech direction, company moves, and market behavior.
+- Go beyond what happened; explain why it matters in terms of product strategy, AI/tech direction, company moves, and market behavior. Each bullet must pass this test: could a reader have written this bullet from the headline and first paragraph alone? If yes, rewrite it. Surface the implication, tradeoff, or pattern that only emerges from reading the full content.
+- Avoid generic PM glosses like 'this has implications for product strategy' or 'PMs should pay attention to this trend.' Instead, name the specific implication: what decision does this change, what assumption does it challenge, or what risk does it reveal?
 - "pm_relevance_score" should be a categorical assessment of how useful this item is for PM interview preparation:
     high   = directly relevant to product strategy, company moves, or market shifts a PM interviewer would ask about
     medium = tangentially relevant; useful context but not a likely interview topic

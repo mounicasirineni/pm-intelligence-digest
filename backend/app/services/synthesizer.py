@@ -21,6 +21,12 @@ SYSTEM_PROMPT = (
     "behavior, regulation & policy, and design & UX. Surface what is actually "
     "shifting in the industry — not what happened, but what it means and what "
     "patterns are emerging. "
+    "For every insight, ask: what would a reader NOT get from reading any single source? What is the non-obvious implication "
+    "that only emerges when you reason across multiple signals? A good insight names the underlying force driving multiple "
+    "seemingly unrelated events, challenges a conventional assumption, or identifies a second-order consequence that "
+    "practitioners haven't yet articulated. Avoid insights that merely restate a trend with a PM gloss — "
+    "'companies are investing in AI' is not an insight. 'AI investment is accelerating consolidation around "
+    "infrastructure players while commoditizing application-layer differentiation' is an insight. "
     "CRITICAL: In your whats_shifting paragraphs, maintain a 60/40 balance — approximately 60% grounded primarily in non-AI themes "
     "(business model shifts, consumer behavior changes, regulatory moves, market dynamics, or design/UX trends) and approximately 40% "
     "covering AI/tech developments. Both directions matter: do not let AI dominate, but do not drop AI coverage entirely either. "
@@ -185,10 +191,12 @@ Now produce a structured JSON object with the following shape:
 {{
   "whats_shifting": [
     {{
-      "paragraph": "One of 4-5 paragraph-length insights that synthesize across sources and themes, "
-                   "balancing AI/tech signals WITH business model shifts, consumer behavior changes, "
-                   "regulatory moves, and design/UX trends. Each sentence ends with inline [n] style "
-                   "citations referencing item numbers. Only cite [n] if a specific bullet from item [n] directly supports that sentence.",
+      "paragraph": "One of 4-5 paragraph-length insights. Each paragraph must: "
+                   "(1) open with a single declarative sentence naming the underlying force or pattern — not an event description; "
+                   "(2) develop the insight across 3-4 sentences by connecting signals from different sources or themes to reveal something non-obvious; "
+                   "(3) close with the strategic implication for a PM — what decision, risk, or opportunity does this pattern create? "
+                   "Balance AI/tech signals WITH business model shifts, consumer behavior changes, regulatory moves, and design/UX trends. "
+                   "Each sentence ends with inline [n] citations. Only cite [n] if a specific bullet from item [n] directly supports that sentence.",
       "source_indices": [1, 3]
     }}
   ],
@@ -222,13 +230,14 @@ Now produce a structured JSON object with the following shape:
 }}
 
 Guidance:
+- INSIGHT DEPTH RULE: Every whats_shifting paragraph must reveal something a reader could NOT get from any single source. Ask yourself: am I naming an underlying force that connects multiple signals, or am I just describing what happened with a PM gloss? 'Platforms are degrading quality' is a description. 'Market dominance removes the competitive pressure that originally forced quality — creating a predictable degradation lifecycle that PMs can use to time competitive entry' is an insight. If your paragraph could have been written from a single source, rewrite it.
 - When making a claim in whats_shifting, you MUST cite which item numbers support it using [n] notation at the end of each sentence. Every sentence in whats_shifting must have at least one citation.
 - CRITICAL CITATION RULE: Only cite item [n] if a specific insight bullet from that item directly supports the exact claim you are making in that sentence. Do not cite an item merely because it is thematically related or appeared in the same section. If you cannot point to a specific bullet from item [n] that supports the claim, do not cite it.
 - The source_indices array for each whats_shifting entry must list all item numbers that meaningfully support that paragraph.
 - For company_watch entries, also include inline [n] citations and a matching source_indices array for each company you populate.
 - Apply the same citation rule to company_watch: only cite an item if its insight bullets directly support the specific claim made about that company.
 - For company_watch, only include companies (from Google, Microsoft, Apple, Meta, Amazon, OpenAI, Anthropic, NVIDIA, Uber) that have clear signal today; omit or set null for companies without signal.
-- Do not restate per-source summaries; always combine signals across sources and themes.
+- Do not restate per-source summaries; always combine signals across sources and themes. The test: if you removed all but one citation from a paragraph and it still made sense, you have summarized, not synthesized. A synthesized paragraph requires at least two sources because the insight only emerges from their combination.
 - Ensure at least 60% of whats_shifting paragraphs have a non-AI theme as their central claim (business model shifts, consumer behavior, regulatory moves, market dynamics, design/UX). With 4 paragraphs that means 3 non-AI; with 5 paragraphs that means 3 non-AI. A paragraph that mentions AI as context but leads with a non-AI insight counts. A paragraph whose main point is an AI development does not count.
 - For pm_craft_today, favor insights grounded in product_craft, design_ux, and consumer_behavior themes, even when they intersect with AI.
 - For startup_radar, each bullet must contain a genuine 'so what' — the strategic implication, competitive threat, or market pattern revealed, not just a description of the event. A bullet that only describes what a company did without explaining what it means strategically is insufficient.
