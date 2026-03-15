@@ -163,7 +163,7 @@ All settings are in `.env`:
 
 ```
 ANTHROPIC_API_KEY=        # Required
-CLAUDE_MODEL=claude-sonnet-4-6
+CLAUDE_MODEL=claude-sonnet-4-5
 LOOKBACK_HOURS=24         # Content window
 DIGEST_SCHEDULE_HOUR=7    # Daily refresh time
 DIGEST_SCHEDULE_MINUTE=0
@@ -233,7 +233,8 @@ pm-intelligence-digest/
 | Tool | Role |
 |---|---|
 | Python / Flask | Web framework and request routing |
-| Claude API (Anthropic) — `claude-sonnet-4-6` | Signal extraction, cross-source synthesis, and LLM-as-judge evaluation |
+| Claude Sonnet (`claude-sonnet-4-5`) | Signal extraction (Pass 1) and cross-source synthesis (Pass 2) |
+| Claude Haiku (`claude-haiku-4-5-20251001`) | LLM-as-judge quality evaluation (Pass 3) |
 | feedparser | RSS and podcast feed parsing |
 | APScheduler | Daily background pipeline execution at 7am IST |
 | SQLite | Date-keyed digest and eval storage |
