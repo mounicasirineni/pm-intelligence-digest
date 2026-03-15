@@ -308,34 +308,34 @@
                   {{ "%.1f"|format(row.overall_score) }}
                 </span>
               </td>
-              <td class="col-divider {% if row.ws_coherence >= 4 %}score-high{% elif row.ws_coherence >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="col-divider {% if row.ws_coherence >= 4 %}score-high{% elif row.ws_coherence >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.ws_coherence_reason %}title="{{ row.ws_coherence_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.ws_coherence) }}
               </td>
-              <td class="{% if row.ws_insight >= 4 %}score-high{% elif row.ws_insight >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="{% if row.ws_insight >= 4 %}score-high{% elif row.ws_insight >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.ws_insight_reason %}title="{{ row.ws_insight_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.ws_insight) }}
               </td>
-              <td class="{% if row.ws_grounding >= 4 %}score-high{% elif row.ws_grounding >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="{% if row.ws_grounding >= 4 %}score-high{% elif row.ws_grounding >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.ws_grounding_reason %}title="{{ row.ws_grounding_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.ws_grounding) }}
               </td>
               <td class="{% if row.ws_breadth >= 4 %}score-high{% elif row.ws_breadth >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.ws_breadth_reason %}title="{{ row.ws_breadth_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.ws_breadth) if row.ws_breadth else "—" }}
               </td>
-              <td class="col-divider {% if row.cw_coherence >= 4 %}score-high{% elif row.cw_coherence >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="col-divider {% if row.cw_coherence >= 4 %}score-high{% elif row.cw_coherence >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.cw_coherence_reason %}title="{{ row.cw_coherence_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.cw_coherence) if row.cw_coherence else "—" }}
               </td>
-              <td class="{% if row.cw_insight >= 4 %}score-high{% elif row.cw_insight >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="{% if row.cw_insight >= 4 %}score-high{% elif row.cw_insight >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.cw_insight_reason %}title="{{ row.cw_insight_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.cw_insight) if row.cw_insight else "—" }}
               </td>
-              <td class="{% if row.cw_grounding >= 4 %}score-high{% elif row.cw_grounding >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="{% if row.cw_grounding >= 4 %}score-high{% elif row.cw_grounding >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.cw_grounding_reason %}title="{{ row.cw_grounding_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.cw_grounding) if row.cw_grounding else "—" }}
               </td>
-              <td class="col-divider {% if row.sr_coherence >= 4 %}score-high{% elif row.sr_coherence >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="col-divider {% if row.sr_coherence >= 4 %}score-high{% elif row.sr_coherence >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.sr_coherence_reason %}title="{{ row.sr_coherence_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.sr_coherence) if row.sr_coherence else "—" }}
               </td>
-              <td class="{% if row.sr_insight >= 4 %}score-high{% elif row.sr_insight >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="{% if row.sr_insight >= 4 %}score-high{% elif row.sr_insight >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.sr_insight_reason %}title="{{ row.sr_insight_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.sr_insight) if row.sr_insight else "—" }}
               </td>
-              <td class="{% if row.sr_grounding >= 4 %}score-high{% elif row.sr_grounding >= 3 %}score-mid{% else %}score-low{% endif %}">
+              <td class="{% if row.sr_grounding >= 4 %}score-high{% elif row.sr_grounding >= 3 %}score-mid{% else %}score-low{% endif %}" {% if row.sr_grounding_reason %}title="{{ row.sr_grounding_reason }}"{% endif %}>
                 {{ "%.2f"|format(row.sr_grounding) if row.sr_grounding else "—" }}
               </td>
               <td class="col-divider {% if row.pc_insight >= 4 %}score-high{% elif row.pc_insight >= 3 %}score-mid{% else %}score-low{% endif %}">

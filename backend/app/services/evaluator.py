@@ -434,6 +434,15 @@ async def llm_judge(
             sum(p["citation_support"] for p in scores) / len(scores),
         )
 
+    def _representative_reason(scores: List[Dict[str, Any]], dimension: str) -> str:
+        """Return the reason from the lowest-scoring paragraph for a given dimension."""
+        if not scores:
+            return ""
+        key = dimension
+        reason_key = f"{dimension}_reason"
+        lowest = min(scores, key=lambda p: p.get(key) or 5)
+        return str(lowest.get(reason_key) or "")
+
     ws_avg_c, ws_avg_i, ws_avg_g = _averages(ws_scores)
     cw_avg_c, cw_avg_i, cw_avg_g = _averages(cw_scores)
     sr_avg_c, sr_avg_i, sr_avg_g = _averages(sr_scores)
@@ -454,14 +463,23 @@ async def llm_judge(
         "ws_avg_citation_support": ws_avg_g,
         "ws_topical_breadth": ws_topical_breadth,
         "ws_topical_breadth_reason": topical_breadth_result.get("topical_breadth_reason", ""),
+        "ws_coherence_reason": _representative_reason(ws_scores, "coherence"),
+        "ws_insight_reason": _representative_reason(ws_scores, "insight_depth"),
+        "ws_grounding_reason": _representative_reason(ws_scores, "citation_support"),
         "cw_paragraph_scores": cw_scores,
         "cw_avg_coherence": cw_avg_c,
         "cw_avg_insight_depth": cw_avg_i,
         "cw_avg_citation_support": cw_avg_g,
+        "cw_coherence_reason": _representative_reason(cw_scores, "coherence"),
+        "cw_insight_reason": _representative_reason(cw_scores, "insight_depth"),
+        "cw_grounding_reason": _representative_reason(cw_scores, "citation_support"),
         "sr_paragraph_scores": sr_scores,
         "sr_avg_coherence": sr_avg_c,
         "sr_avg_insight_depth": sr_avg_i,
         "sr_avg_citation_support": sr_avg_g,
+        "sr_coherence_reason": _representative_reason(sr_scores, "coherence"),
+        "sr_insight_reason": _representative_reason(sr_scores, "insight_depth"),
+        "sr_grounding_reason": _representative_reason(sr_scores, "citation_support"),
         # legacy keys
         "avg_coherence": ws_avg_c,
         "avg_insight_depth": ws_avg_i,
