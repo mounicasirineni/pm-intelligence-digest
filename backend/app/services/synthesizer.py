@@ -209,7 +209,7 @@ Now produce a structured JSON object with the following shape:
   }},
   "startup_radar": [
     {{
-      "bullet": "2-3 items featuring early-stage companies making unexpected moves, new entrants disrupting established markets, or funding events signaling emerging categories. Exclude established research labs, geopolitical incidents, and large-cap company moves — those belong in company_watch or whats_shifting.",
+      "bullet": "2-3 items on early-stage or emerging companies making unexpected moves. Each bullet MUST go beyond describing what happened — it must explain the strategic pattern it reveals, the incumbent it threatens, or the market shift it signals. Structure each bullet as: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. Avoid restating facts without synthesis. Exclude established research labs, geopolitical incidents, and large-cap company moves — those belong in company_watch or whats_shifting.",
       "source_indices": [1, 2]
     }}
   ],
@@ -232,6 +232,7 @@ Guidance:
 - Do not restate per-source summaries; always combine signals across sources and themes.
 - Ensure whats_shifting contains at least 2 paragraphs whose central claim comes from a non-AI theme (business model shifts, consumer behavior, regulatory moves, market dynamics, design/UX). A paragraph that mentions AI as context but leads with a non-AI insight counts. A paragraph whose main point is an AI development does not count.
 - For pm_craft_today, favor insights grounded in product_craft, design_ux, and consumer_behavior themes, even when they intersect with AI.
+- For startup_radar, each bullet must contain a genuine 'so what' — the strategic implication, competitive threat, or market pattern revealed, not just a description of the event. A bullet that only describes what a company did without explaining what it means strategically is insufficient.
 - For interview_angle, rotate focus across different PM skill areas (product strategy, consumer insight, regulatory navigation, AI, etc.) over time instead of defaulting to AI every time.
 """.strip()
 
