@@ -325,7 +325,7 @@ async def llm_judge(
             temperature=0.0,
             system=(
                 "You are an expert evaluator of product management intelligence briefs. "
-                "You assess whether synthesis covers a genuine balance of industry topics."
+                "You assess whether synthesis achieves a balanced mix of AI and non-AI industry topics."
             ),
             messages=[{"role": "user", "content": (
                 "Evaluate the TOPICAL BREADTH of this What's Shifting section.\n\n"
@@ -334,15 +334,15 @@ async def llm_judge(
                 "- Non-AI paragraphs: central claim is business model shifts, consumer behavior, regulatory moves, "
                 "market dynamics, supply chain, competitive strategy, design/UX, or financial markets\n"
                 "A paragraph that mentions AI as secondary context but leads with a non-AI insight counts as non-AI.\n\n"
-                "Score based on balance between AI and non-AI paragraphs:\n"
-                "1 = All paragraphs are AI-focused (0 non-AI)\n"
-                "2 = Heavily AI-skewed (1 non-AI out of 4+ paragraphs)\n"
-                "3 = Slight imbalance (2 non-AI out of 5, or 1 non-AI out of 3)\n"
-                "4 = Good balance (roughly half and half, e.g. 2-3 non-AI out of 5)\n"
-                "5 = Strong balance (3+ non-AI out of 5, with no single theme dominating)\n\n"
+                "The ideal balance is 60% non-AI and 40% AI. Score based on distance from this ideal:\n"
+                "1 = All AI or all non-AI (0% or 100% non-AI) — completely unbalanced\n"
+                "2 = Heavily skewed either way (less than 20% or more than 80% non-AI)\n"
+                "3 = Moderately skewed (20-39% non-AI, or 76-80% non-AI)\n"
+                "4 = Close to balanced (40-59% non-AI — slight AI skew but acceptable)\n"
+                "5 = Ideal balance (60-75% non-AI with meaningful AI coverage) — matches the 60/40 target\n\n"
                 f"What's Shifting section:\n{combined}\n\n"
                 'Return only valid JSON: '
-                '{"topical_breadth": N, "topical_breadth_reason": "one sentence stating how many AI vs non-AI paragraphs you counted and what the balance looks like"}'
+                '{"topical_breadth": N, "topical_breadth_reason": "one sentence stating the count of AI vs non-AI paragraphs and how close it is to the 60/40 ideal"}'
             )}],
         )
         block = response.content[0]

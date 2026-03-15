@@ -21,11 +21,10 @@ SYSTEM_PROMPT = (
     "behavior, regulation & policy, and design & UX. Surface what is actually "
     "shifting in the industry — not what happened, but what it means and what "
     "patterns are emerging. "
-    "CRITICAL: At least half of your whats_shifting paragraphs must be grounded "
-    "primarily in non-AI themes — business model shifts, consumer behavior changes, "
-    "regulatory moves, market dynamics, or design/UX trends. An insight that "
-    "mentions AI as a secondary factor is acceptable, but a paragraph whose central "
-    "claim is an AI development does not count as non-AI coverage. "
+    "CRITICAL: In your whats_shifting paragraphs, maintain a 60/40 balance — approximately 60% grounded primarily in non-AI themes "
+    "(business model shifts, consumer behavior changes, regulatory moves, market dynamics, or design/UX trends) and approximately 40% "
+    "covering AI/tech developments. Both directions matter: do not let AI dominate, but do not drop AI coverage entirely either. "
+    "An insight that mentions AI as a secondary factor is acceptable as non-AI. A paragraph whose central claim is an AI development counts as AI coverage. "
     "A sharp PM should be able to walk into any interview and have a prepared "
     "opinion on the insights you surface."
 )
@@ -186,7 +185,7 @@ Now produce a structured JSON object with the following shape:
 {{
   "whats_shifting": [
     {{
-      "paragraph": "One of 3-4 paragraph-length insights that synthesize across sources and themes, "
+      "paragraph": "One of 4-5 paragraph-length insights that synthesize across sources and themes, "
                    "balancing AI/tech signals WITH business model shifts, consumer behavior changes, "
                    "regulatory moves, and design/UX trends. Each sentence ends with inline [n] style "
                    "citations referencing item numbers. Only cite [n] if a specific bullet from item [n] directly supports that sentence.",
@@ -230,7 +229,7 @@ Guidance:
 - Apply the same citation rule to company_watch: only cite an item if its insight bullets directly support the specific claim made about that company.
 - For company_watch, only include companies (from Google, Microsoft, Apple, Meta, Amazon, OpenAI, Anthropic, NVIDIA, Uber) that have clear signal today; omit or set null for companies without signal.
 - Do not restate per-source summaries; always combine signals across sources and themes.
-- Ensure whats_shifting contains at least 2 paragraphs whose central claim comes from a non-AI theme (business model shifts, consumer behavior, regulatory moves, market dynamics, design/UX). A paragraph that mentions AI as context but leads with a non-AI insight counts. A paragraph whose main point is an AI development does not count.
+- Ensure at least 60% of whats_shifting paragraphs have a non-AI theme as their central claim (business model shifts, consumer behavior, regulatory moves, market dynamics, design/UX). With 4 paragraphs that means 3 non-AI; with 5 paragraphs that means 3 non-AI. A paragraph that mentions AI as context but leads with a non-AI insight counts. A paragraph whose main point is an AI development does not count.
 - For pm_craft_today, favor insights grounded in product_craft, design_ux, and consumer_behavior themes, even when they intersect with AI.
 - For startup_radar, each bullet must contain a genuine 'so what' — the strategic implication, competitive threat, or market pattern revealed, not just a description of the event. A bullet that only describes what a company did without explaining what it means strategically is insufficient.
 - For interview_angle, rotate focus across different PM skill areas (product strategy, consumer insight, regulatory navigation, AI, etc.) over time instead of defaulting to AI every time.
