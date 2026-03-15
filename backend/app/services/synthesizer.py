@@ -202,17 +202,77 @@ Now produce a structured JSON object with the following shape:
   ],
   "company_watch": {{
     "Google": {{
-      "paragraph": "2-3 sentences of signal for Google, with inline [2][4] citations.",
+      "paragraph": "2-3 sentences of strategic signal. "
+                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
+                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Only include this company if there is genuine signal today.",
       "source_indices": [2, 4]
     }},
-    "Microsoft": null,
-    "Apple": null,
-    "Meta": null,
-    "Amazon": null,
-    "OpenAI": null,
-    "Anthropic": null,
-    "NVIDIA": null,
-    "Uber": null
+    "Microsoft": {{
+      "paragraph": "2-3 sentences of strategic signal. "
+                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
+                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Only include this company if there is genuine signal today.",
+      "source_indices": [2, 4]
+    }},
+    "Apple": {{
+      "paragraph": "2-3 sentences of strategic signal. "
+                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
+                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Only include this company if there is genuine signal today.",
+      "source_indices": [2, 4]
+    }},
+    "Meta": {{
+      "paragraph": "2-3 sentences of strategic signal. "
+                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
+                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Only include this company if there is genuine signal today.",
+      "source_indices": [2, 4]
+    }},
+    "Amazon": {{
+      "paragraph": "2-3 sentences of strategic signal. "
+                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
+                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Only include this company if there is genuine signal today.",
+      "source_indices": [2, 4]
+    }},
+    "OpenAI": {{
+      "paragraph": "2-3 sentences of strategic signal. "
+                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
+                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Only include this company if there is genuine signal today.",
+      "source_indices": [2, 4]
+    }},
+    "Anthropic": {{
+      "paragraph": "2-3 sentences of strategic signal. "
+                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
+                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Only include this company if there is genuine signal today.",
+      "source_indices": [2, 4]
+    }},
+    "NVIDIA": {{
+      "paragraph": "2-3 sentences of strategic signal. "
+                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
+                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Only include this company if there is genuine signal today.",
+      "source_indices": [2, 4]
+    }},
+    "Uber": {{
+      "paragraph": "2-3 sentences of strategic signal. "
+                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
+                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Only include this company if there is genuine signal today.",
+      "source_indices": [2, 4]
+    }}
   }},
   "startup_radar": [
     {{
@@ -236,6 +296,7 @@ Guidance:
 - The source_indices array for each whats_shifting entry must list all item numbers that meaningfully support that paragraph.
 - For company_watch entries, also include inline [n] citations and a matching source_indices array for each company you populate.
 - Apply the same citation rule to company_watch: only cite an item if its insight bullets directly support the specific claim made about that company.
+- COMPANY WATCH INSIGHT RULE: Each company paragraph must answer 'what is strategically shifting for this company today' — not just 'what did they do.' A paragraph that only describes a product launch or announcement without explaining the strategic positioning, competitive implication, or market signal it represents is insufficient. Ask: does this paragraph tell a PM something they could use to form an opinion about this company's direction in an interview? If not, either deepen it or omit the company.
 - For company_watch, only include companies (from Google, Microsoft, Apple, Meta, Amazon, OpenAI, Anthropic, NVIDIA, Uber) that have clear signal today; omit or set null for companies without signal.
 - Do not restate per-source summaries; always combine signals across sources and themes. The test: if you removed all but one citation from a paragraph and it still made sense, you have summarized, not synthesized. A synthesized paragraph requires at least two sources because the insight only emerges from their combination.
 - Ensure at least 60% of whats_shifting paragraphs have a non-AI theme as their central claim (business model shifts, consumer behavior, regulatory moves, market dynamics, design/UX). With 4 paragraphs that means 3 non-AI; with 5 paragraphs that means 3 non-AI. A paragraph that mentions AI as context but leads with a non-AI insight counts. A paragraph whose main point is an AI development does not count.
