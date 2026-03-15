@@ -208,15 +208,15 @@ Now produce a structured JSON object with the following shape:
     "Uber": null
   }},
   "startup_radar": [
-    {
+    {{
       "bullet": "2-3 items featuring early-stage companies making unexpected moves, new entrants disrupting established markets, or funding events signaling emerging categories. Exclude established research labs, geopolitical incidents, and large-cap company moves — those belong in company_watch or whats_shifting.",
       "source_indices": [1, 2]
-    }
+    }}
   ],
-  "pm_craft_today": {
+  "pm_craft_today": {{
     "text": "single most actionable PM craft insight from today's content, drawing especially from product_craft, design_ux, and consumer_behavior themes (not just AI sources)",
     "source_indices": [3]
-  },
+  }},
   "interview_angle": "one specific thing a PM should have a prepared opinion on before interviews this week, "
                      "sometimes focusing on product strategy, sometimes consumer insight, sometimes regulatory "
                      "navigation, sometimes AI — not always AI"
