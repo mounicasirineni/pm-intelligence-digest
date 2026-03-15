@@ -317,6 +317,7 @@ async def llm_judge(
         if not ws_paragraphs:
             return {"topical_breadth": 0, "topical_breadth_reason": "No paragraphs to evaluate."}
 
+        client = _build_llm_client()
         combined = "\n\n".join(ws_paragraphs)
         response = client.messages.create(
             model=EVAL_MODEL,
