@@ -281,7 +281,10 @@ Now produce a structured JSON object with the following shape:
     }}
   ],
   "pm_craft_today": {{
-    "text": "single most actionable PM craft insight from today's content, drawing especially from product_craft, design_ux, and consumer_behavior themes (not just AI sources)",
+    "text": "single most actionable PM craft insight from today's content, drawing especially from product_craft, design_ux, and consumer_behavior themes (not just AI sources). "
+            "Must be a non-obvious takeaway that a reader would NOT get from the headline alone — a specific pattern, tradeoff, or reframe that changes how a PM would approach a real decision. "
+            "Avoid generic advice like 'PMs should focus on user needs' or 'test before building.' "
+            "Instead name the specific insight: what assumption does it challenge, what decision does it change, or what pattern does it reveal?",
     "source_indices": [3]
   }},
   "interview_angle": "one specific thing a PM should have a prepared opinion on before interviews this week, "
