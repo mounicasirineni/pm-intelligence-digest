@@ -195,6 +195,8 @@ Now produce a structured JSON object with the following shape:
                    "(1) open with a single declarative sentence naming the underlying force or pattern — not an event description; "
                    "(2) develop the insight across 3-4 sentences by connecting signals from different sources or themes to reveal something non-obvious; "
                    "(3) close with the strategic implication for a PM — what decision, risk, or opportunity does this pattern create? "
+                   "The implication must be directly derivable from the cited sources — do not introduce external facts, statistics, historical claims, or general knowledge not present in the items list. "
+                   "If you cannot ground the implication in a specific cited item, state it as a logical inference from the evidence rather than as a fact. "
                    "Balance AI/tech signals WITH business model shifts, consumer behavior changes, regulatory moves, and design/UX trends. "
                    "Each sentence ends with inline [n] citations. Only cite [n] if a specific bullet from item [n] directly supports that sentence.",
       "source_indices": [1, 3]
@@ -294,6 +296,7 @@ Now produce a structured JSON object with the following shape:
 
 Guidance:
 - INSIGHT DEPTH RULE: Every whats_shifting paragraph must reveal something a reader could NOT get from any single source. Ask yourself: am I naming an underlying force that connects multiple signals, or am I just describing what happened with a PM gloss? 'Platforms are degrading quality' is a description. 'Market dominance removes the competitive pressure that originally forced quality — creating a predictable degradation lifecycle that PMs can use to time competitive entry' is an insight. If your paragraph could have been written from a single source, rewrite it.
+- GROUNDING RULE FOR IMPLICATIONS: The closing PM implication sentence in each paragraph is the most common source of ungrounded claims. Do not introduce external statistics, historical references, or general knowledge claims in implication sentences — these cannot be cited and will fail grounding checks. If your implication relies on external knowledge (e.g. 'decades of research show...', 'historically...', 'studies suggest...'), rewrite it as a logical inference from the sources you have cited: 'this suggests...' or 'this implies...' rather than asserting it as established fact.
 - When making a claim in whats_shifting, you MUST cite which item numbers support it using [n] notation at the end of each sentence. Every sentence in whats_shifting must have at least one citation.
 - CRITICAL CITATION RULE: Only cite item [n] if a specific insight bullet from that item directly supports the exact claim you are making in that sentence. Do not cite an item merely because it is thematically related or appeared in the same section. If you cannot point to a specific bullet from item [n] that supports the claim, do not cite it.
 - The source_indices array for each whats_shifting entry must list all item numbers that meaningfully support that paragraph.
