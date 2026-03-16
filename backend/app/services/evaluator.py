@@ -435,12 +435,6 @@ async def llm_judge(
         )
 
     def _representative_reason(scores: List[Dict[str, Any]], dimension: str) -> str:
-        """
-        Return a representative reason for a dimension across paragraphs.
-        - If all paragraphs score 5: return empty string (nothing to debug)
-        - If all paragraphs tie at < 5: return 'All paragraphs scored X.X: [reason]'
-        - If there is a clear lowest scorer: return 'Lowest-scoring paragraph: [reason]'
-        """
         if not scores:
             return ""
 
@@ -451,19 +445,13 @@ async def llm_judge(
         min_score = min(all_scores)
         max_score = max(all_scores)
 
-        # All perfect — nothing to debug
-        if min_score == 5.0:
-            return ""
-
         lowest = min(scores, key=lambda p: p.get(key) or 5)
         reason = str(lowest.get(reason_key) or "")
 
-        # All tied at same score below 5
         if min_score == max_score:
             return f"All paragraphs scored {min_score:.1f}: {reason}"
 
-        # Clear lowest scorer
-        return f"Lowest-scoring paragraph: {reason}"
+        return f"Lowest-scoring paragraph ({min_score:.1f}): {reason}"
 
     ws_avg_c, ws_avg_i, ws_avg_g = _averages(ws_scores)
     cw_avg_c, cw_avg_i, cw_avg_g = _averages(cw_scores)
