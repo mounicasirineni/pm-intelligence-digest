@@ -289,9 +289,10 @@ Now produce a structured JSON object with the following shape:
             "Instead name the specific insight: what assumption does it challenge, what decision does it change, or what pattern does it reveal?",
     "source_indices": [3]
   }},
-  "interview_angle": "one specific thing a PM should have a prepared opinion on before interviews this week, "
-                     "sometimes focusing on product strategy, sometimes consumer insight, sometimes regulatory "
-                     "navigation, sometimes AI — not always AI"
+  "interview_angle": "one specific thing a PM should have a prepared opinion on before interviews this week. "
+                     "Must be anchored to a specific named company, case, or development from today's sources — not a general theme. "
+                     "Frame it as a debatable claim or tradeoff a PM would be asked to reason through, not a fact to recite. "
+                     "Rotate focus across product strategy, consumer insight, regulatory navigation, and AI — not always AI.",
 }}
 
 Guidance:
