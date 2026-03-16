@@ -385,6 +385,12 @@
                   {% if row.sr_grounding_reason %}
                   <div><strong>SR Grounding:</strong> {{ row.sr_grounding_reason }}</div>
                   {% endif %}
+                  {% if row.pc_insight_reason %}
+                  <div><strong>PM Craft Insight:</strong> {{ row.pc_insight_reason }}</div>
+                  {% endif %}
+                  {% if row.ia_relevance_reason %}
+                  <div><strong>Interview Angle Relevance:</strong> {{ row.ia_relevance_reason }}</div>
+                  {% endif %}
                 </div>
               </td>
             </tr>

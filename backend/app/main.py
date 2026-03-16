@@ -319,9 +319,11 @@ def _get_all_evals():
             "sr_grounding":        float(llm.get("sr_avg_citation_support") or 0.0),
             "sr_grounding_reason": str(llm.get("sr_grounding_reason") or ""),
             # Quality — PM Craft
-            "pc_insight":    float(pc.get("insight_depth") or 0.0),
+            "pc_insight":         float(pc.get("insight_depth") or 0.0),
+            "pc_insight_reason":  str(pc.get("insight_depth_reason") or ""),
             # Quality — IA
-            "ia_relevance":  float(ia.get("relevance") or 0.0),
+            "ia_relevance":        float(ia.get("relevance") or 0.0),
+            "ia_relevance_reason": str(ia.get("relevance_reason") or ""),
             # Guardrails — pipeline funnel (5 stages)
             "sources_configured": int(pf.get("sources_configured") or 0),
             "sources_active":     int(pf.get("sources_active") or 0),
