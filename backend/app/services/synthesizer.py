@@ -286,7 +286,9 @@ Now produce a structured JSON object with the following shape:
     "text": "single most actionable PM craft insight from today's content, drawing especially from product_craft, design_ux, and consumer_behavior themes (not just AI sources). "
             "Must be a non-obvious takeaway that a reader would NOT get from the headline alone — a specific pattern, tradeoff, or reframe that changes how a PM would approach a real decision. "
             "Avoid generic advice like 'PMs should focus on user needs' or 'test before building.' "
-            "Instead name the specific insight: what assumption does it challenge, what decision does it change, or what pattern does it reveal?",
+            "Instead name the specific insight: what assumption does it challenge, what decision does it change, or what pattern does it reveal? "
+            "Write for a reader who has NOT read the source — do not reference source-specific names, characters, or proprietary frameworks without briefly explaining them in plain language first. "
+            "The insight must stand alone without requiring the reader to know the source material.",
     "source_indices": [3]
   }},
   "interview_angle": "one specific thing a PM should have a prepared opinion on before interviews this week. "
