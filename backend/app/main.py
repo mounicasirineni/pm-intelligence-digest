@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Tuple
 
 import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
-from flask import Flask, redirect, render_template, url_for, abort
+from flask import Flask, redirect, render_template, url_for, abort, send_from_directory
 import pytz
 
 from .config import load_settings
@@ -28,6 +28,19 @@ app = Flask(
     template_folder=str(BASE_DIR / "templates"),
     static_folder=str(BASE_DIR / "static"),
 )
+
+
+@app.after_request
+def _add_noindex_headers(response):
+    # Ensure pages and API responses are not indexed by search engines.
+    response.headers.setdefault("X-Robots-Tag", "noindex, nofollow, noarchive")
+    return response
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    # Serve a crawl-disallowing robots file even if static routing isn't configured.
+    return send_from_directory(app.static_folder, "robots.txt")
 
 # Ensure the digests table exists before serving requests.
 init_db()
