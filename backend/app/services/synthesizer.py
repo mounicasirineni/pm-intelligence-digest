@@ -322,7 +322,7 @@ Guidance:
     try:
         response = client.messages.create(
             model=settings.claude_model,
-            max_tokens=4000,
+            max_tokens=8000,
             temperature=0.3,
             system=SYSTEM_PROMPT,
             messages=[
@@ -351,7 +351,7 @@ Guidance:
         try:
             parsed = json.loads(cleaned)
         except Exception:
-            logger.warning("Claude synthesis response was not valid JSON, returning wrapper.")
+            logger.warning(f"Claude synthesis response was not valid JSON, returning wrapper. Raw response (first 500 chars): {text[:500]}")
             parsed = {
                 "raw_text": text,
                 "whats_shifting": [],
