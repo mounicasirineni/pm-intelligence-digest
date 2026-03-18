@@ -198,7 +198,15 @@ Now produce a structured JSON object with the following shape:
                    "The implication must be directly derivable from the cited sources — do not introduce external facts, statistics, historical claims, or general knowledge not present in the items list. "
                    "If you cannot ground the implication in a specific cited item, state it as a logical inference from the evidence rather than as a fact. "
                    "Balance AI/tech signals WITH business model shifts, consumer behavior changes, regulatory moves, and design/UX trends. "
-                   "Each sentence ends with inline [n] citations. Only cite [n] if a specific bullet from item [n] directly supports that sentence.",
+                   "Each sentence ends with inline [n] citations. Only cite [n] if a specific bullet from item [n] directly supports that sentence. "
+                   "READER CONTEXT RULE: Write every paragraph for a reader who has NOT seen any of the source articles. "
+                   "Before using any company name, product name, technical term, or domain-specific concept that would not be familiar to a general PM audience, provide one clause of plain-language context inline — for example, 'Kalshi, a prediction markets platform,' or 'microdramas, short serialized video episodes of 60-90 seconds popular in mobile-first markets.' "
+                   "Do not assume the reader knows what a specific company does, what a product category is, or what a cited metric represents without that context. "
+                   "If an example requires more than one clause to explain before it supports the paragraph's thesis, it is likely the wrong example — either find a cleaner one or cut it. "
+                   "EXAMPLE DISCIPLINE RULE: Each paragraph should use no more than three distinct examples. If you have four or more examples supporting the same thesis, pick the three that are most directly grounded in cited sources and most familiar to a PM audience. Do not stretch a fourth example into the paragraph to make a pattern appear more universal than the evidence supports. "
+                   "Before including any example, test it against the paragraph's opening sentence: does this example directly illustrate the named force or pattern, or does it require its own sub-argument to connect? "
+                   "If it requires a sub-argument, it belongs in a different paragraph or should be cut entirely. "
+                   "Examples drawn from wildly different domains — for instance, US financial regulation, broadcast licensing, and Indian digital identity all in one paragraph — may each be valid individually but collectively signal that the thesis is too broad. When this happens, either narrow the thesis to fit the strongest two examples, or split into two paragraphs each with a tighter claim.",
       "source_indices": [1, 3]
     }}
   ],
