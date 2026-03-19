@@ -275,17 +275,30 @@ async def llm_judge(
 
         user_prompt = (
             f"Rate this {section_context} paragraph on three dimensions:\n\n"
-            "1. COHERENCE (1-5): Do all sentences support a single unified insight? "
-            "1=completely disconnected, 5=tight single thread throughout\n\n"
-            "2. INSIGHT_DEPTH (1-5): Is this a genuine synthesis revealing something non-obvious? "
-            "1=pure summary, 5=genuine insight a reader wouldn't get from any single source\n\n"
+            "1. COHERENCE (1-5): Do all sentences support a single unified insight, and does the paragraph deliver what the opening sentence promises? "
+            "Check two things: (a) internal consistency — do all sentences build toward one claim without introducing disconnected threads? "
+            "(b) lede fidelity — does the evidence in the paragraph actually support the strength of the opening claim? "
+            "If the lede says 'X is collapsing' but the evidence only shows 'X is under pressure,' that is a lede precision failure. "
+            "If the lede says 'X is destroying value' but the evidence shows only 'X is failing to create value,' that is overclaiming. "
+            "1=completely disconnected or lede is substantially overclaiming; "
+            "3=sentences are consistent but lede is slightly stronger than evidence supports; "
+            "5=tight single thread throughout and lede matches exactly what the evidence delivers\n\n"
+            "2. INSIGHT_DEPTH (1-5): Is this a genuine synthesis revealing something non-obvious, and does the closing implication commit to a single sharp claim? "
+            "Check two things: (a) synthesis quality — would a reader get this insight from any single source, or does it only emerge from combining signals? "
+            "(b) implication focus — does the closing PM implication make exactly one specific claim (a decision, risk, or opportunity), "
+            "or does it make two or three claims that dilute each other? "
+            "A closing sentence structured as 'meaning A, B, and C' should score no higher than 3 on this dimension regardless of insight quality, "
+            "because unfocused implications reduce actionability. "
+            "1=pure summary or closing implication is three or more generic claims; "
+            "3=genuine synthesis but closing implication is split across two claims; "
+            "5=genuine insight a reader wouldn't get from any single source AND closing implication commits to exactly one sharp, specific consequence\n\n"
             "3. CITATION_SUPPORT (1-5): Does the cited source actually contain evidence for each claim? "
             "1=multiple sentences are unsupported inferences, 5=every claim is directly evidenced\n\n"
             f"Paragraph: {paragraph}\n\n"
             f"{evidence_block}\n\n"
             'Return only valid JSON: '
-            '{"coherence": N, "coherence_reason": "one sentence", '
-            '"insight_depth": N, "insight_depth_reason": "one sentence", '
+            '{"coherence": N, "coherence_reason": "one sentence identifying either a lede precision issue or confirming tight delivery", '
+            '"insight_depth": N, "insight_depth_reason": "one sentence identifying either an implication focus issue or confirming sharp single claim", '
             '"citation_support": N, "citation_support_reason": "one sentence"}'
         )
 
@@ -295,7 +308,9 @@ async def llm_judge(
             temperature=0.0,
             system=(
                 "You are an expert evaluator of product management intelligence briefs. "
-                "You assess synthesis quality with precision and consistency."
+                "You assess synthesis quality with precision and consistency. "
+                "You are skeptical by default — a paragraph must earn high scores by meeting explicit criteria, "
+                "not by sounding confident or well-written."
             ),
             messages=[{"role": "user", "content": user_prompt}],
         )
