@@ -27,10 +27,12 @@ SYSTEM_PROMPT = (
     "practitioners haven't yet articulated. Avoid insights that merely restate a trend with a PM gloss — "
     "'companies are investing in AI' is not an insight. 'AI investment is accelerating consolidation around "
     "infrastructure players while commoditizing application-layer differentiation' is an insight. "
-    "CRITICAL: In your whats_shifting paragraphs, maintain a strict 60/40 balance — at least 60% grounded primarily in non-AI themes "
-    "(business model shifts, consumer behavior changes, regulatory moves, market dynamics, or design/UX trends) and approximately 40% "
-    "covering AI/tech developments. Both directions matter: do not let AI dominate, but do not drop AI coverage entirely either. "
-    "An insight that mentions AI as a secondary factor is acceptable as non-AI. A paragraph whose central claim is an AI development counts as AI coverage. "
+    "CRITICAL: In your whats_shifting paragraphs, distribute central claims across the five eligible themes: "
+    "AI & technology, market behavior, consumer behavior, regulation & policy, and design & UX. "
+    "No single theme should be the central claim of more than one paragraph in a five-paragraph brief. "
+    "A paragraph that mentions a theme as supporting context does not count against that theme's allocation — "
+    "only the central claim of the opening sentence determines the theme. "
+    "Company strategy, product craft, and startup disruption belong in their dedicated sections and should not anchor a whats_shifting paragraph."
     "A sharp PM should be able to walk into any interview and have a prepared "
     "opinion on the insights you surface."
 )
@@ -320,7 +322,7 @@ Guidance:
 - COMPANY WATCH GROUNDING RULE: Do not connect two separate signals for the same company into a causal narrative unless that connection is explicitly made in the sources. If OpenAI is mentioned in one source for military contracts and another for enterprise strategy, do not imply these are causally related unless a source makes that link. Each sentence in a company entry must be traceable to a specific cited source — do not use one source to reinterpret another.
 - For company_watch, only include companies (from Google, Microsoft, Apple, Meta, Amazon, OpenAI, Anthropic, NVIDIA, Uber) that have clear signal today; omit or set null for companies without signal.
 - Do not restate per-source summaries; always combine signals across sources and themes. The test: if you removed all but one citation from a paragraph and it still made sense, you have summarized, not synthesized. A synthesized paragraph requires at least two sources because the insight only emerges from their combination.
-- Ensure at least 60% of whats_shifting paragraphs have a non-AI theme as their central claim (business model shifts, consumer behavior, regulatory moves, market dynamics, design/UX). With 4 paragraphs that means 3 non-AI; with 5 paragraphs that means 3 non-AI. A paragraph that mentions AI as context but leads with a non-AI insight counts. A paragraph whose main point is an AI development does not count.
+- THEME DIVERSITY RULE: Before finalizing whats_shifting, audit the central claim of each paragraph's opening sentence against these five themes: AI & technology, market behavior, consumer behavior, regulation & policy, and design & UX. No theme should appear as the central claim more than once. If two paragraphs share the same central theme, either reframe the weaker one around a different theme or cut it and replace it with a paragraph from an underrepresented theme. A five-paragraph brief should ideally touch all five themes; a four-paragraph brief should cover at least four. Themes appearing only as supporting examples do not count toward a theme's allocation.
 - For pm_craft_today, favor insights grounded in product_craft, design_ux, and consumer_behavior themes, even when they intersect with AI.
 - For startup_radar, each bullet must contain a genuine 'so what' — the strategic implication, competitive threat, or market pattern revealed, not just a description of the event. A bullet that only describes what a company did without explaining what it means strategically is insufficient.
 - For interview_angle, rotate focus across different PM skill areas (product strategy, consumer insight, regulatory navigation, AI, etc.) over time instead of defaulting to AI every time.
