@@ -89,7 +89,7 @@ Every digest run is automatically evaluated by an LLM judge across 5 quality dim
 | Utilized % | Relevant articles actually cited in the synthesis |
 | Weak % | Paragraphs scoring ≤2 on any quality dimension |
 
-Every brief on the [Evals page](https://pm-intelligence-digest-production.up.railway.app/evals) includes an inline reasons row in the table showing the judge's one-sentence reasoning per dimension — visible directly without interaction.
+Every brief on the [Evals page](https://pm-intelligence-digest-production.up.railway.app/evals) includes an inline reasons row in the table showing the judge's one-sentence reasoning per dimension.
 
 ## Source Design
 
