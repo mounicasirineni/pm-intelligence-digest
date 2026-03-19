@@ -194,21 +194,25 @@ Now produce a structured JSON object with the following shape:
   "whats_shifting": [
     {{
       "paragraph": "One of 4-5 paragraph-length insights. Each paragraph must: "
-                   "(1) open with a single declarative sentence naming the underlying force or pattern — not an event description; "
-                   "(2) develop the insight across 3-4 sentences by connecting signals from different sources or themes to reveal something non-obvious; "
-                   "(3) close with the strategic implication for a PM — what decision, risk, or opportunity does this pattern create? "
-                   "The implication must be directly derivable from the cited sources — do not introduce external facts, statistics, historical claims, or general knowledge not present in the items list. "
-                   "If you cannot ground the implication in a specific cited item, state it as a logical inference from the evidence rather than as a fact. "
-                   "Balance AI/tech signals WITH business model shifts, consumer behavior changes, regulatory moves, and design/UX trends. "
-                   "Each sentence ends with inline [n] citations. Only cite [n] if a specific bullet from item [n] directly supports that sentence. "
-                   "READER CONTEXT RULE: Write every paragraph for a reader who has NOT seen any of the source articles. "
-                   "Before using any company name, product name, technical term, or domain-specific concept that would not be familiar to a general PM audience, provide one clause of plain-language context inline — for example, 'Kalshi, a prediction markets platform,' or 'microdramas, short serialized video episodes of 60-90 seconds popular in mobile-first markets.' "
-                   "Do not assume the reader knows what a specific company does, what a product category is, or what a cited metric represents without that context. "
-                   "If an example requires more than one clause to explain before it supports the paragraph's thesis, it is likely the wrong example — either find a cleaner one or cut it. "
-                   "EXAMPLE DISCIPLINE RULE: Each paragraph should use no more than three distinct examples. If you have four or more examples supporting the same thesis, pick the three that are most directly grounded in cited sources and most familiar to a PM audience. Do not stretch a fourth example into the paragraph to make a pattern appear more universal than the evidence supports. "
-                   "Before including any example, test it against the paragraph's opening sentence: does this example directly illustrate the named force or pattern, or does it require its own sub-argument to connect? "
-                   "If it requires a sub-argument, it belongs in a different paragraph or should be cut entirely. "
-                   "Examples drawn from wildly different domains — for instance, US financial regulation, broadcast licensing, and Indian digital identity all in one paragraph — may each be valid individually but collectively signal that the thesis is too broad. When this happens, either narrow the thesis to fit the strongest two examples, or split into two paragraphs each with a tighter claim.",
+             "(1) open with a single declarative sentence naming the underlying force or pattern — not an event description; "
+             "(2) develop the insight across 3-4 sentences by connecting signals from different sources or themes to reveal something non-obvious; "
+             "(3) close with the strategic implication for a PM — what decision, risk, or opportunity does this pattern create? "
+             "The implication must be directly derivable from the cited sources — do not introduce external facts, statistics, historical claims, or general knowledge not present in the items list. "
+             "If you cannot ground the implication in a specific cited item, state it as a logical inference from the evidence rather than as a fact. "
+             "Balance AI/tech signals WITH business model shifts, consumer behavior changes, regulatory moves, and design/UX trends. "
+             "Each sentence ends with inline [n] citations. Only cite [n] if a specific bullet from item [n] directly supports that sentence. "
+             "READER CONTEXT RULE: Write every paragraph for a reader who has NOT seen any of the source articles. "
+             "Before using any company name, product name, technical term, or domain-specific concept that would not be familiar to a general PM audience, provide one clause of plain-language context inline — for example, 'Kalshi, a prediction markets platform,' or 'microdramas, short serialized video episodes of 60-90 seconds popular in mobile-first markets.' "
+             "Do not assume the reader knows what a specific company does, what a product category is, or what a cited metric represents without that context. "
+             "If an example requires more than one clause to explain before it supports the paragraph's thesis, it is likely the wrong example — either find a cleaner one or cut it. "
+             "EXAMPLE DISCIPLINE RULE: Each paragraph should use no more than three distinct examples. If you have four or more examples supporting the same thesis, pick the three that are most directly grounded in cited sources and most familiar to a PM audience. Do not stretch a fourth example into the paragraph to make a pattern appear more universal than the evidence supports. "
+             "Before including any example, test it against the paragraph's opening sentence: does this example directly illustrate the named force or pattern, or does it require its own sub-argument to connect? "
+             "If it requires a sub-argument, it belongs in a different paragraph or should be cut entirely. "
+             "Examples drawn from wildly different domains — for instance, US financial regulation, broadcast licensing, and Indian digital identity all in one paragraph — may each be valid individually but collectively signal that the thesis is too broad. When this happens, either narrow the thesis to fit the strongest two examples, or split into two paragraphs each with a tighter claim. "
+             "MINIMUM VIABLE PARAGRAPH RULE: Before publishing a paragraph, count how many examples pass the connective tissue test — directly illustrating the opening sentence without requiring a sub-argument. If fewer than two examples pass, do not publish the paragraph. Instead, either reframe the thesis to fit the examples you have, fold the strongest example into a different paragraph where it fits cleanly, or hold it for a future brief when stronger supporting evidence exists. A tight two-example paragraph is always better than a sprawling three-example paragraph where one example doesn't belong. "
+             "LEDE PRECISION RULE: The opening sentence makes a claim the paragraph must fully deliver. Before finalizing, check: does the evidence show what the lede claims, or something weaker? 'X is collapsing' requires evidence of reversal; 'X is being undermined' or 'X is under pressure' may be more defensible. Choose the strongest claim the evidence actually supports — not the strongest claim you wish it supported. "
+             "IMPLICATION FOCUS RULE: The closing PM implication must make exactly one claim — the sharpest consequence that follows directly from the paragraph's examples. If you find yourself writing 'meaning A, B, and C,' cut to the single most non-obvious consequence and cut the rest. A focused implication that names one specific decision, risk, or opportunity is more valuable than three generic ones. "
+             "ATTRIBUTION PRECISION RULE: Do not attribute intentionality, motivation, or incentive to systems, algorithms, or automated processes. 'The model lacks an independent validation layer' is precise. 'The model has an incentive to overstate' implies agency it does not have. Use mechanistic language for technical systems.",
       "source_indices": [1, 3]
     }}
   ],
