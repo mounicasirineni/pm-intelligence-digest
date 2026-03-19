@@ -316,45 +316,50 @@ async def llm_judge(
     def _score_topical_breadth(ws_paragraphs: List[str]) -> Dict[str, Any]:
         if not ws_paragraphs:
             return {"topical_breadth": 0, "topical_breadth_reason": "No paragraphs to evaluate."}
-
         client = _build_llm_client()
         combined = "\n\n".join(ws_paragraphs)
         response = client.messages.create(
             model=EVAL_MODEL,
-            max_tokens=128,
+            max_tokens=256,
             temperature=0.0,
             system=(
                 "You are an expert evaluator of product management intelligence briefs. "
-                "You assess whether synthesis achieves a balanced mix of AI and non-AI industry topics."
+                "You assess whether synthesis achieves genuine thematic diversity across industry topics."
             ),
             messages=[{"role": "user", "content": (
                 "Evaluate the TOPICAL BREADTH of this What's Shifting section.\n\n"
-                "First, count the paragraphs by their central claim:\n"
-                "- AI/tech paragraphs: central claim is an AI capability, AI product, AI adoption, or AI safety/policy\n"
-                "- Non-AI paragraphs: central claim is business model shifts, consumer behavior, regulatory moves, "
-                "market dynamics, supply chain, competitive strategy, design/UX, or financial markets\n"
-                "A paragraph that mentions AI as secondary context but leads with a non-AI insight counts as non-AI. "
-                "If a paragraph's opening claim and primary example are non-AI (e.g. hardware cost reduction, regulatory compliance, market dynamics) "
-                "but references AI as an enabling technology or secondary factor, classify it as non-AI. "
-                "Only classify as AI if the central argument depends on an AI capability, AI product launch, or AI adoption pattern.\n\n"
-                "The ideal balance is 60% non-AI and 40% AI. Score based on distance from this ideal:\n"
-                "1 = All AI or all non-AI (0% or 100% non-AI) — completely unbalanced\n"
-                "2 = Heavily skewed either way (less than 20% or more than 80% non-AI)\n"
-                "3 = Moderately skewed (20-39% non-AI, or 76-80% non-AI)\n"
-                "4 = Close to balanced (40-59% non-AI — slight AI skew but acceptable)\n"
-                "5 = Ideal balance (60-75% non-AI with meaningful AI coverage) — matches the 60/40 target\n\n"
+                "The five eligible themes for What's Shifting are:\n"
+                "1. AI & technology — central claim depends on an AI capability, product, adoption pattern, or AI safety/policy\n"
+                "2. Market behavior — central claim is about market dynamics, competitive shifts, pricing, supply/demand, or financial markets\n"
+                "3. Consumer behavior — central claim is about how end users are changing what they want, do, or expect\n"
+                "4. Regulation & policy — central claim is about regulatory moves, compliance requirements, or government policy\n"
+                "5. Design & UX — central claim is about product design patterns, user experience shifts, or interface paradigms\n\n"
+                "For each paragraph, identify its central theme based solely on the opening sentence's primary claim. "
+                "A theme appearing only as a supporting example does not count — only the central claim determines the theme.\n\n"
+                "Score based on theme diversity across paragraphs:\n"
+                "1 = One theme dominates all or nearly all paragraphs (e.g. 4-5 regulation paragraphs)\n"
+                "2 = Only two distinct themes represented across all paragraphs\n"
+                "3 = Three distinct themes represented, but one theme appears in 2+ paragraphs\n"
+                "4 = Four distinct themes represented with no theme appearing more than once\n"
+                "5 = Five distinct themes each represented exactly once — ideal spread\n\n"
+                "A five-paragraph brief scoring 5 must have each paragraph covering a different theme. "
+                "A four-paragraph brief scoring 5 must cover at least four distinct themes.\n\n"
                 f"What's Shifting section:\n{combined}\n\n"
                 'Return only valid JSON: '
-                '{"topical_breadth": N, "topical_breadth_reason": "one sentence stating the count of AI vs non-AI paragraphs and how close it is to the 60/40 ideal"}'
+                '{"topical_breadth": N, "topical_breadth_reason": "one sentence listing the central theme of each paragraph and how many distinct themes are represented"}'
             )}],
         )
-        block = response.content[0]
-        text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
-        parsed = json.loads(_extract_json(text))
-        return {
-            "topical_breadth": int(parsed.get("topical_breadth") or 0),
-            "topical_breadth_reason": str(parsed.get("topical_breadth_reason") or ""),
-        }
+        # parse response
+        try:
+            content_block = response.content[0]
+            text = getattr(content_block, "text", None) or content_block.get("text")
+            parsed = json.loads(text.strip())
+        except Exception:
+            return {"topical_breadth": 3, "topical_breadth_reason": "Could not parse breadth evaluation."}
+
+        score = parsed.get("topical_breadth", 3)
+        reason = parsed.get("topical_breadth_reason", "")
+        return {"topical_breadth": score, "topical_breadth_reason": reason}
 
     # ── Score each section ────────────────────────────────────────────────────
 
