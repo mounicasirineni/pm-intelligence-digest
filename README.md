@@ -21,7 +21,7 @@ Built for product managers who want a prepared opinion on what's shifting — ac
 
 Every day the brief generates:
 
-* **What's Shifting** — 4-5 cross-source insights with inline citations, balanced 60/40 across non-AI topics (business strategy, consumer behavior, regulation, design) and AI/tech developments
+* **What's Shifting** — 4-5 cross-source insights with inline citations, distributed across five themes: AI & technology, market behavior, consumer behavior, regulation & policy, and design & UX — no single theme dominates more than one paragraph per brief
 * **Interview Angle** — one specific thing to have a prepared opinion on, rotated across product strategy, consumer insight, regulatory navigation, and AI
 * **PM Craft Today** — the most actionable PM craft insight from the day's content, grounded in a specific source
 * **Company Watch** — strategic signal for Google, Microsoft, Apple, Meta, Amazon, OpenAI, Anthropic, NVIDIA, and Uber — what's strategically shifting, not just what they announced
@@ -76,7 +76,7 @@ Every digest run is automatically evaluated by an LLM judge across 5 quality dim
 | **Coherence** | Do all sentences support a single unified insight? |
 | **Insight Depth** | Is this a genuine synthesis revealing something non-obvious, or just a summary? |
 | **Grounding** | Does the cited source actually contain evidence for each claim? |
-| **Topical Breadth** | Does What's Shifting maintain the 60/40 non-AI/AI balance? Penalizes both AI-dominated and non-AI-dominated digests. |
+| **Topical Breadth** | Does What's Shifting distribute central claims across the five eligible themes (AI & technology, market behavior, consumer behavior, regulation & policy, design & UX)? Penalizes theme clustering — scoring is based on number of distinct themes represented, not AI vs non-AI ratio. |
 | **PM Relevance** | Can a PM use this insight to demonstrate strategic thinking in an interview? |
 
 **Pipeline guardrails** (diagnostic, not scored):
@@ -89,7 +89,7 @@ Every digest run is automatically evaluated by an LLM judge across 5 quality dim
 | Utilized % | Relevant articles actually cited in the synthesis |
 | Weak % | Paragraphs scoring ≤2 on any quality dimension |
 
-Every score cell on the [Evals page](https://pm-intelligence-digest-production.up.railway.app/evals) has a hover tooltip showing the judge's reasoning for that dimension.
+Every brief on the [Evals page](https://pm-intelligence-digest-production.up.railway.app/evals) includes an inline reasons row in the table showing the judge's one-sentence reasoning per dimension — visible directly without interaction.
 
 **Score progression since deployment:**
 
@@ -211,13 +211,11 @@ pm-intelligence-digest/
 
 **Type mismatches cause silent eval failures.** The grounding score was 1.00 (floor) on day one because `source_index_lookup` used integer keys in the synthesizer but the evaluator looked up string keys. Every lookup failed silently, so the judge had no evidence to verify claims against. The fix was one character: `source_index_lookup[str(idx)]`.
 
-**Citation grounding changes how you trust AI output.** Once every claim has a traceable source, hallucination becomes visible and checkable rather than hidden. The grounding eval dimension enforces this programmatically.
-
 **Caching strategy matters for cost.** Without date-based SQLite caching, every page reload would re-run ~$0.10 in API calls. The evaluator alone makes 10-15 LLM calls per digest run.
 
-**Prompt calibration requires an eval loop.** The topical breadth prompt went through 3 iterations — from "reward non-AI" to "penalize both extremes" to "score distance from 60/40 ideal" — before it matched what the synthesizer was actually producing. Without the eval framework, these mismatches would be invisible.
-
 **Production deployment reveals bugs local testing misses.** Railway's ephemeral filesystem wiped the SQLite DB on every deploy until a persistent volume was mounted. The `digest_by_date` route crashed with `citation_index_map is undefined` because only the index route passed that variable to the template.
+
+**Prompts and evals improve together.** The synthesizer prompt and the eval scorers have been in continuous co-evolution since deployment. Topical breadth went through three rewrites — from "reward non-AI" to "penalize both extremes" to "score distance from 60/40 ideal" to a five-theme diversity model — each time because the eval revealed a pattern the current rule couldn't catch (regulation clustering, for instance, passed the AI/non-AI check cleanly). Coherence and insight depth scorers were extended mid-project to explicitly check lede fidelity and implication focus after paragraph-level review identified overclaiming and multi-part implications the original rubric scored as fine. Citation grounding changed how the whole system is trusted: once every claim has a traceable source, hallucination becomes visible and checkable rather than hidden — and the grounding dimension enforces this programmatically. The eval reasons UI — judge reasoning displayed inline in the evals table per dimension — made all of this debuggable in production rather than opaque.
 
 ## Roadmap
 
