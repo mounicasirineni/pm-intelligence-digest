@@ -368,8 +368,9 @@ async def llm_judge(
         try:
             content_block = response.content[0]
             text = getattr(content_block, "text", None) or content_block.get("text")
-            parsed = json.loads(text.strip())
-        except Exception:
+            parsed = json.loads(_extract_json(text))
+        except Exception as e:
+            logger.warning("Could not parse breadth evaluation response: %s | raw text: %s", e, text[:200] if text else "None")
             return {"topical_breadth": 3, "topical_breadth_reason": "Could not parse breadth evaluation."}
 
         score = parsed.get("topical_breadth", 3)
