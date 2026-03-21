@@ -1,0 +1,3 @@
+# Used by mise on Railway; keep in sync with nixpacks.toml / .python-version
+[tools]
+python = "3.12.8"

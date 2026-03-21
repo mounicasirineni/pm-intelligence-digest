@@ -168,6 +168,10 @@ Open `http://127.0.0.1:8000` — the first load triggers the full pipeline. Runt
 
 > **Note for production deployments:** The pipeline runs too long for a synchronous HTTP request. Use the built-in scheduler instead — it runs the pipeline in the background at the configured time. Avoid triggering `/refresh` manually in production.
 
+### Railway / Nixpacks (Python version)
+
+The repo pins **Python 3.12.8** via `nixpacks.toml`, `mise.toml`, and `.python-version` so Railway’s build does not pull **Python 3.13.x** builds that can fail under `mise` with *“Python installation is missing a `lib` directory”* (often tied to experimental freethreaded installers). If you deploy elsewhere, use Python **3.12.x** or **3.11.x** for the same reason.
+
 ### Configuration
 
 All settings are in `.env`:
