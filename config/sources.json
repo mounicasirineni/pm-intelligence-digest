@@ -99,7 +99,7 @@
     {
       "id": "simon_willison_blog",
       "type": "rss",
-      "name": "Simon Willison’s Blog",
+      "name": "Simon Willison's Blog",
       "url": "https://simonwillison.net/atom/everything/",
       "theme": "ai_technology",
       "verified": false
@@ -137,10 +137,10 @@
       "verified": false
     },
     {
-      "id": "verge_transportation",
+      "id": "verge",
       "type": "rss",
-      "name": "The Verge — Transportation",
-      "url": "https://www.theverge.com/rss/transportation/index.xml",
+      "name": "The Verge",
+      "url": "https://www.theverge.com/rss/index.xml",
       "theme": "market_behavior",
       "verified": false
     },
@@ -165,7 +165,7 @@
       "type": "rss",
       "name": "NVIDIA Blog",
       "url": "https://blogs.nvidia.com/feed/",
-      "theme": "ai_technology",
+      "theme": "company_strategy",
       "verified": false
     },
     {
@@ -240,14 +240,6 @@
       "verified": false
     },
     {
-      "id": "acquired",
-      "type": "podcast",
-      "name": "Acquired",
-      "url": "https://feeds.transistor.fm/acquired",
-      "theme": "company_strategy",
-      "verified": false
-    },
-    {
       "id": "dwarkesh",
       "type": "podcast",
       "name": "Dwarkesh Podcast",
@@ -310,7 +302,14 @@
       "url": "https://vulcanpost.com/feed",
       "theme": "market_behavior",
       "verified": false
+    },
+    {
+      "id": "netflix_techblog",
+      "type": "rss",
+      "name": "Netflix Tech Blog",
+      "url": "https://netflixtechblog.com/feed",
+      "theme": "company_strategy",
+      "verified": false
     }
   ]
 }
-

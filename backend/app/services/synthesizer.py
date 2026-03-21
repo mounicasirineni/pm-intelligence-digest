@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import traceback
+from datetime import date
 from typing import Any, Dict, List
 
 from anthropic import Anthropic
@@ -12,10 +13,31 @@ from ..config import load_settings
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Theme routing constants
+# Controls which themes are eligible for each brief section.
+# ---------------------------------------------------------------------------
+WHATS_SHIFTING_THEMES = {
+    "ai_technology",
+    "market_behavior",
+    "consumer_behavior",
+    "regulation_policy",
+    "design_ux",
+}
+
+DEDICATED_SECTION_THEMES = {
+    "company_strategy",
+    "startup_disruption",
+    "product_craft",
+}
+
+# ---------------------------------------------------------------------------
+# System prompt
+# ---------------------------------------------------------------------------
 SYSTEM_PROMPT = (
     "You are a senior intelligence analyst briefing a Product Manager who is "
     "actively interviewing at top tech companies including Google, Microsoft, "
-    "Apple, Meta, Amazon, OpenAI, Anthropic, NVIDIA, and Uber. Your job is to "
+    "Apple, Meta, Amazon, Netflix, NVIDIA, and OpenAI. Your job is to "
     "reason across multiple sources covering 8 themes: AI & technology, company "
     "strategy, product craft, startup disruption, market behavior, consumer "
     "behavior, regulation & policy, and design & UX. Surface what is actually "
@@ -32,7 +54,24 @@ SYSTEM_PROMPT = (
     "No single theme should be the central claim of more than one paragraph in a five-paragraph brief. "
     "A paragraph that mentions a theme as supporting context does not count against that theme's allocation — "
     "only the central claim of the opening sentence determines the theme. "
-    "Company strategy, product craft, and startup disruption belong in their dedicated sections and should not anchor a whats_shifting paragraph."
+    "Company strategy, product craft, and startup disruption belong in their dedicated sections and should not anchor a whats_shifting paragraph. "
+    "SOURCE ROUTING RULE: The items list is partitioned into two labeled sections: "
+    "WHATS_SHIFTING_ELIGIBLE and DEDICATED_SECTION_ELIGIBLE. "
+    "whats_shifting paragraphs must ONLY cite items from the WHATS_SHIFTING_ELIGIBLE section. "
+    "company_watch, startup_radar, and pm_craft_today must ONLY cite items from the DEDICATED_SECTION_ELIGIBLE section. "
+    "Do not cite a WHATS_SHIFTING_ELIGIBLE item in company_watch or startup_radar. "
+    "Do not cite a DEDICATED_SECTION_ELIGIBLE item in whats_shifting. "
+    "This is a hard constraint — not a preference. Violating it will cause the brief to recycle "
+    "the same source across multiple sections, degrading breadth and introducing repetition. "
+    "PM ACTIONABILITY STANDARD: Across all sections — whats_shifting, company_watch, startup_radar, and pm_craft_today — "
+    "when choosing between a strategic observation and a concrete product design consequence, always prefer the latter. "
+    "A specific mechanical implication that tells a PM what decision to make, what assumption to test, or what design pattern to apply "
+    "is always stronger than a generalizable pattern observation. "
+    "Test every closing implication sentence: could a PM walk into a meeting tomorrow and use this to change a decision? "
+    "If the answer is 'it depends on context' or 'it is a useful frame,' the implication is too abstract — rewrite it. "
+    "Not 'product teams must balance accuracy and convenience' but "
+    "'the revenue model only works if conversion rates justify the subsidy — validate this before committing to the pricing architecture.' "
+    "The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. "
     "A sharp PM should be able to walk into any interview and have a prepared "
     "opinion on the insights you surface."
 )
@@ -84,21 +123,19 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             - pm_relevance_score: "high" | "medium" | "low"
 
     Returns:
-        Structured JSON with source attribution.
+        Structured JSON with source attribution and editorial warnings.
     """
     client = _build_client()
 
     # Two-step filter before synthesis:
     # Step 1 — confidence: drop items the model couldn't summarize reliably
     # Step 2 — pm_relevance_score: drop items that aren't relevant to PM interviews
-    # Order matters: no point evaluating relevance on an unreliable summary.
     filtered_items: List[Dict[str, Any]] = []
     dropped_low_confidence = 0
     dropped_low_relevance = 0
 
     for theme, items in grouped_summaries.items():
         for item in items:
-            # Step 1: confidence check
             conf_raw = str(item.get("confidence") or "medium").lower()
             if conf_raw not in {"high", "medium"}:
                 dropped_low_confidence += 1
@@ -108,7 +145,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 )
                 continue
 
-            # Step 2: PM relevance check (only reached if confidence passes)
             relevance_raw = str(item.get("pm_relevance_score") or "medium").lower()
             if relevance_raw not in {"high", "medium"}:
                 dropped_low_relevance += 1
@@ -140,50 +176,102 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             "whats_shifting": [],
             "company_watch": {},
             "startup_radar": [],
-            "pm_craft_today": "",
+            "pm_craft_today": {"text": "", "source_indices": []},
             "interview_angle": "",
             "source_index_lookup": {},
+            "editorial_warnings": {
+                "multi_thread_violations": [],
+                "date_warnings": [],
+                "coherence_warnings": [],
+                "routing_warnings": [],
+            },
         }
 
-    # Build compact prompt content: title + insights bullets only, with explicit indices.
-    lines: List[str] = []
-    lines.append("You are given a set of analyzed content items with high/medium confidence.")
-    lines.append("Each item includes a title, source, theme, and 3–5 insight bullets.")
-    lines.append(
-        "Themes span AI & technology, company strategy, product craft, startup disruption, "
-        "market behavior, consumer behavior, regulation & policy, and design & UX."
-    )
-    lines.append("Use these to reason across sources and produce a single weekly brief.")
-    lines.append("")
-    lines.append("Items:")
+    # ---------------------------------------------------------------------------
+    # Partition filtered items by routing eligibility
+    # ---------------------------------------------------------------------------
+    whats_shifting_items: List[Dict[str, Any]] = []
+    dedicated_section_items: List[Dict[str, Any]] = []
 
-    indexed_items: List[Dict[str, Any]] = []
-    for idx, item in enumerate(filtered_items, start=1):
+    for item in filtered_items:
+        theme = item.get("theme", "")
+        if theme in WHATS_SHIFTING_THEMES:
+            whats_shifting_items.append(item)
+        else:
+            dedicated_section_items.append(item)
+
+    # ---------------------------------------------------------------------------
+    # Build context block with routing-aware numbered sections
+    # ---------------------------------------------------------------------------
+    lines: List[str] = []
+    lines.append("You are given a set of analyzed content items partitioned by routing eligibility.")
+    lines.append("")
+
+    lines.append("=== WHATS_SHIFTING_ELIGIBLE ITEMS ===")
+    lines.append("Use ONLY these items for whats_shifting paragraphs.")
+    lines.append("")
+
+    ws_indexed: List[Dict[str, Any]] = []
+    idx = 1
+    for item in whats_shifting_items:
         insights = item["insights"]
         if not isinstance(insights, list):
             insights = [str(insights)]
 
-        lines.append(f"\nItem [{idx}]:")
+        lines.append(f"Item [{idx}]:")
         lines.append(f"- Theme: {item['theme']}")
         lines.append(f"- Source: {item['source_name']}")
         lines.append(f"- Title: {item['title']}")
         lines.append("- Insights:")
         for bullet in insights:
             lines.append(f"  - {bullet}")
+        lines.append("")
 
-        indexed_items.append(
-            {
-                "index": idx,
-                "theme": item["theme"],
-                "title": item["title"],
-                "source_name": item["source_name"],
-            }
-        )
+        ws_indexed.append({
+            "index": idx,
+            "theme": item["theme"],
+            "title": item["title"],
+            "source_name": item["source_name"],
+        })
+        idx += 1
 
+    lines.append("=== DEDICATED_SECTION_ELIGIBLE ITEMS ===")
+    lines.append("Use ONLY these items for company_watch, startup_radar, and pm_craft_today.")
+    lines.append("")
+
+    dedicated_indexed: List[Dict[str, Any]] = []
+    for item in dedicated_section_items:
+        insights = item["insights"]
+        if not isinstance(insights, list):
+            insights = [str(insights)]
+
+        lines.append(f"Item [{idx}]:")
+        lines.append(f"- Theme: {item['theme']}")
+        lines.append(f"- Source: {item['source_name']}")
+        lines.append(f"- Title: {item['title']}")
+        lines.append("- Insights:")
+        for bullet in insights:
+            lines.append(f"  - {bullet}")
+        lines.append("")
+
+        dedicated_indexed.append({
+            "index": idx,
+            "theme": item["theme"],
+            "title": item["title"],
+            "source_name": item["source_name"],
+        })
+        idx += 1
+
+    indexed_items = ws_indexed + dedicated_indexed
     context_block = "\n".join(lines)
 
+    # ---------------------------------------------------------------------------
+    # User prompt
+    # ---------------------------------------------------------------------------
+    today = date.today().strftime("%B %d, %Y")
     user_prompt = f"""
 You are reasoning across multiple high/medium confidence items that a Senior PM is tracking.
+Today's date is {today}.
 
 Use only the information in the items list below.
 
@@ -202,162 +290,92 @@ Now produce a structured JSON object with the following shape:
                    "Balance AI/tech signals WITH business model shifts, consumer behavior changes, regulatory moves, and design/UX trends. "
                    "Each sentence ends with inline [n] citations. Only cite [n] if a specific bullet from item [n] directly supports that sentence. "
                    "READER CONTEXT RULE: Write every paragraph for a reader who has NOT seen any of the source articles. "
-                   "Before using any company name, product name, technical term, or domain-specific concept that would not be familiar to a general PM audience, provide one clause of plain-language context inline — for example, 'Kalshi, a prediction markets platform,' or 'microdramas, short serialized video episodes of 60-90 seconds popular in mobile-first markets.' "
-                   "Do not assume the reader knows what a specific company does, what a product category is, or what a cited metric represents without that context. "
-                   "If an example requires more than one clause to explain before it supports the paragraph's thesis, it is likely the wrong example — either find a cleaner one or cut it. "
-                   "EXAMPLE DISCIPLINE RULE: Each paragraph should use no more than three distinct examples. If you have four or more examples supporting the same thesis, pick the three that are most directly grounded in cited sources and most familiar to a PM audience. Do not stretch a fourth example into the paragraph to make a pattern appear more universal than the evidence supports. "
-                   "Before including any example, test it against the paragraph's opening sentence: does this example directly illustrate the named force or pattern, or does it require its own sub-argument to connect? "
-                   "If it requires a sub-argument, it belongs in a different paragraph or should be cut entirely. "
-                   "Examples drawn from wildly different domains — for instance, US financial regulation, broadcast licensing, and Indian digital identity all in one paragraph — may each be valid individually but collectively signal that the thesis is too broad. When this happens, either narrow the thesis to fit the strongest two examples, or split into two paragraphs each with a tighter claim. "
-                   "MINIMUM VIABLE PARAGRAPH RULE: Before publishing a paragraph, count how many examples pass the connective tissue test — directly illustrating the opening sentence without requiring a sub-argument. If fewer than two examples pass, do not publish the paragraph. Instead, either reframe the thesis to fit the examples you have, fold the strongest example into a different paragraph where it fits cleanly, or hold it for a future brief when stronger supporting evidence exists. A tight two-example paragraph is always better than a sprawling three-example paragraph where one example doesn't belong. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the paragraph must fully deliver. Before finalizing, check: does the evidence show what the lede claims, or something weaker? "
-                   "Avoid absolute framing — words like 'primary', 'fundamental', 'definitive', 'repositioning', 'institutional' — unless a source explicitly uses that framing. "
-                   "Two examples in two markets do not establish a company-wide repositioning. One incident and one monitoring system do not establish that a risk category has become the primary risk. "
-                   "Replace absolutes with relative claims: 'an emerging risk' instead of 'the primary risk', 'prioritizing X over Y in specific markets' instead of 'repositioning as X'. "
-                   "Choose the strongest claim the evidence actually supports — not the strongest claim you wish it supported. "
-                   "IMPLICATION FOCUS RULE: The closing PM implication must make exactly one claim — the sharpest consequence that follows directly from the paragraph's examples. "
-                   "If you find yourself writing a closing sentence with 'and' or 'but also' connecting two separate consequences, you have two claims — cut one. "
-                   "When choosing which claim to keep, apply this test: which claim is more specific and more directly grounded in the cited sources? "
-                   "A specific mechanical consequence ('the revenue model only works if conversion rates justify the subsidy') is always stronger than a broad generalizable observation ('product teams must balance accuracy and convenience'). "
-                   "The broad observation is usually derivable from the headline — the specific mechanical consequence requires reading the full content. Keep the latter, cut the former. "
-                   "Do not close by covering both a generalizable insight AND a company-specific observation — pick the one that is more non-obvious and let it stand alone. "
-                   "ATTRIBUTION PRECISION RULE: Do not attribute intentionality, motivation, or incentive to systems, algorithms, or automated processes. 'The model lacks an independent validation layer' is precise. 'The model has an incentive to overstate' implies agency it does not have. Use mechanistic language for technical systems.",
+                   "Before using any company name, product name, technical term, or domain-specific concept that would not be familiar to a general PM audience, provide one clause of plain-language context inline. "
+                   "EXAMPLE DISCIPLINE RULE: Each paragraph should use no more than three distinct examples. "
+                   "MINIMUM VIABLE PARAGRAPH RULE: If fewer than two examples pass the connective tissue test, do not publish the paragraph. "
+                   "LEDE PRECISION RULE: The opening sentence makes a claim the paragraph must fully deliver. Avoid absolute framing unless a source explicitly uses it. "
+                   "IMPLICATION FOCUS RULE: The closing PM implication must make exactly one claim — the sharpest consequence that follows directly from the paragraph's examples. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources. "
+                   "ATTRIBUTION PRECISION RULE: Do not attribute intentionality, motivation, or incentive to systems, algorithms, or automated processes.",
       "source_indices": [1, 3]
     }}
   ],
   "company_watch": {{
     "Google": {{
       "paragraph": "2-3 sentences of strategic signal. "
-                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
+                   "Sentence 1: name what is strategically changing for this company. "
                    "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
-                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
+                   "Sentence 3 (optional): name the implication — one claim only, the most specific and directly grounded. "
                    "Only include this company if there is genuine signal today. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the evidence must fully support. Avoid absolute framing — words like 'repositioning', 'fundamental shift', 'primary', 'definitive' — unless a source explicitly uses that framing. One product move or one market does not establish a company-wide strategic shift. Replace absolutes with relative claims: 'prioritizing X in specific markets' instead of 'repositioning as X'. Choose the strongest claim the evidence actually supports. "
-                   "IMPLICATION FOCUS RULE: If sentence 3 is present, it must make exactly one claim. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources.",
-      "source_indices": [2, 4]
-    }},
-    "Microsoft": {{
-      "paragraph": "2-3 sentences of strategic signal. "
-                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
-                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
-                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
-                   "Only include this company if there is genuine signal today. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the evidence must fully support. Avoid absolute framing — words like 'repositioning', 'fundamental shift', 'primary', 'definitive' — unless a source explicitly uses that framing. One product move or one market does not establish a company-wide strategic shift. Replace absolutes with relative claims: 'prioritizing X in specific markets' instead of 'repositioning as X'. Choose the strongest claim the evidence actually supports. "
-                   "IMPLICATION FOCUS RULE: If sentence 3 is present, it must make exactly one claim. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources.",
-      "source_indices": [2, 4]
-    }},
-    "Apple": {{
-      "paragraph": "2-3 sentences of strategic signal. "
-                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
-                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
-                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
-                   "Only include this company if there is genuine signal today. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the evidence must fully support. Avoid absolute framing — words like 'repositioning', 'fundamental shift', 'primary', 'definitive' — unless a source explicitly uses that framing. One product move or one market does not establish a company-wide strategic shift. Replace absolutes with relative claims: 'prioritizing X in specific markets' instead of 'repositioning as X'. Choose the strongest claim the evidence actually supports. "
-                   "IMPLICATION FOCUS RULE: If sentence 3 is present, it must make exactly one claim. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources.",
-      "source_indices": [2, 4]
+                   "LEDE PRECISION RULE: Avoid absolute framing unless a source explicitly uses it. "
+                   "IMPLICATION FOCUS RULE: Sentence 3 must make exactly one claim. Cut any 'and' connecting two consequences. "
+                   "COMPANY WATCH SINGLE THESIS RULE: One connecting thesis through all sentences. Pick the strongest single source. If a second source introduces a second thread, discard it.",
+      "source_indices": []
     }},
     "Meta": {{
-      "paragraph": "2-3 sentences of strategic signal. "
-                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
-                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
-                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
-                   "Only include this company if there is genuine signal today. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the evidence must fully support. Avoid absolute framing — words like 'repositioning', 'fundamental shift', 'primary', 'definitive' — unless a source explicitly uses that framing. One product move or one market does not establish a company-wide strategic shift. Replace absolutes with relative claims: 'prioritizing X in specific markets' instead of 'repositioning as X'. Choose the strongest claim the evidence actually supports. "
-                   "IMPLICATION FOCUS RULE: If sentence 3 is present, it must make exactly one claim. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources.",
-      "source_indices": [2, 4]
+      "paragraph": "2-3 sentences of strategic signal. Same rules as Google.",
+      "source_indices": []
+    }},
+    "Apple": {{
+      "paragraph": "2-3 sentences of strategic signal. Same rules as Google.",
+      "source_indices": []
     }},
     "Amazon": {{
-      "paragraph": "2-3 sentences of strategic signal. "
-                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
-                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
-                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
-                   "Only include this company if there is genuine signal today. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the evidence must fully support. Avoid absolute framing — words like 'repositioning', 'fundamental shift', 'primary', 'definitive' — unless a source explicitly uses that framing. One product move or one market does not establish a company-wide strategic shift. Replace absolutes with relative claims: 'prioritizing X in specific markets' instead of 'repositioning as X'. Choose the strongest claim the evidence actually supports. "
-                   "IMPLICATION FOCUS RULE: If sentence 3 is present, it must make exactly one claim. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources.",
-      "source_indices": [2, 4]
+      "paragraph": "2-3 sentences of strategic signal. Same rules as Google.",
+      "source_indices": []
     }},
-    "OpenAI": {{
-      "paragraph": "2-3 sentences of strategic signal. "
-                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
-                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
-                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
-                   "Only include this company if there is genuine signal today. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the evidence must fully support. Avoid absolute framing — words like 'repositioning', 'fundamental shift', 'primary', 'definitive' — unless a source explicitly uses that framing. One product move or one market does not establish a company-wide strategic shift. Replace absolutes with relative claims: 'prioritizing X in specific markets' instead of 'repositioning as X'. Choose the strongest claim the evidence actually supports. "
-                   "IMPLICATION FOCUS RULE: If sentence 3 is present, it must make exactly one claim. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources.",
-      "source_indices": [2, 4]
+    "Netflix": {{
+      "paragraph": "2-3 sentences of strategic signal. Same rules as Google.",
+      "source_indices": []
     }},
-    "Anthropic": {{
-      "paragraph": "2-3 sentences of strategic signal. "
-                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
-                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
-                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
-                   "Only include this company if there is genuine signal today. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the evidence must fully support. Avoid absolute framing — words like 'repositioning', 'fundamental shift', 'primary', 'definitive' — unless a source explicitly uses that framing. One product move or one market does not establish a company-wide strategic shift. Replace absolutes with relative claims: 'prioritizing X in specific markets' instead of 'repositioning as X'. Choose the strongest claim the evidence actually supports. "
-                   "IMPLICATION FOCUS RULE: If sentence 3 is present, it must make exactly one claim. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources.",
-      "source_indices": [2, 4]
+    "Microsoft": {{
+      "paragraph": "2-3 sentences of strategic signal. Same rules as Google.",
+      "source_indices": []
     }},
     "NVIDIA": {{
-      "paragraph": "2-3 sentences of strategic signal. "
-                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
-                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
-                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
-                   "Only include this company if there is genuine signal today. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the evidence must fully support. Avoid absolute framing — words like 'repositioning', 'fundamental shift', 'primary', 'definitive' — unless a source explicitly uses that framing. One product move or one market does not establish a company-wide strategic shift. Replace absolutes with relative claims: 'prioritizing X in specific markets' instead of 'repositioning as X'. Choose the strongest claim the evidence actually supports. "
-                   "IMPLICATION FOCUS RULE: If sentence 3 is present, it must make exactly one claim. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources.",
-      "source_indices": [2, 4]
+      "paragraph": "2-3 sentences of strategic signal. Same rules as Google.",
+      "source_indices": []
     }},
-    "Uber": {{
-      "paragraph": "2-3 sentences of strategic signal. "
-                   "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
-                   "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
-                   "Sentence 3 (optional): name the implication — what does this mean for competitors, partners, or PMs building on or against this platform? "
-                   "Only include this company if there is genuine signal today. "
-                   "LEDE PRECISION RULE: The opening sentence makes a claim the evidence must fully support. Avoid absolute framing — words like 'repositioning', 'fundamental shift', 'primary', 'definitive' — unless a source explicitly uses that framing. One product move or one market does not establish a company-wide strategic shift. Replace absolutes with relative claims: 'prioritizing X in specific markets' instead of 'repositioning as X'. Choose the strongest claim the evidence actually supports. "
-                   "IMPLICATION FOCUS RULE: If sentence 3 is present, it must make exactly one claim. If you find yourself writing 'and' or 'but also' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in the cited sources.",
-      "source_indices": [2, 4]
+    "OpenAI": {{
+      "paragraph": "2-3 sentences of strategic signal. Same rules as Google.",
+      "source_indices": []
     }}
   }},
   "startup_radar": [
     {{
-      "bullet": "2-3 items on early-stage or emerging companies making unexpected moves. Each bullet MUST go beyond describing what happened — it must explain the strategic pattern it reveals, the incumbent it threatens, or the market shift it signals. Structure each bullet as: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. Avoid restating facts without synthesis. Exclude established research labs, geopolitical incidents, and large-cap company moves — those belong in company_watch or whats_shifting. "
-                "IMPLICATION FOCUS RULE: Each bullet must close with exactly one strategic consequence — the sharpest 'so what' that follows from the company's move. If your closing clause contains 'and' connecting two separate consequences, cut one. Keep the claim that is more specific and more directly grounded in what the company actually did. A specific mechanical consequence ('the revenue model depends on conversion rates justifying the testing subsidy') is stronger than a broad pattern observation ('product teams must balance accuracy and convenience').",
-      "source_indices": [1, 2]
+      "bullet": "2-3 items on early-stage or emerging companies making unexpected moves. "
+                "Structure: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. "
+                "IMPLICATION FOCUS RULE: Each bullet must close with exactly one strategic consequence. Cut any 'and' connecting two separate consequences.",
+      "source_indices": []
     }}
   ],
   "pm_craft_today": {{
-    "text": "single most actionable PM craft insight from today's content, drawing especially from product_craft, design_ux, and consumer_behavior themes (not just AI sources). "
-            "Must be a non-obvious takeaway that a reader would NOT get from the headline alone — a specific pattern, tradeoff, or reframe that changes how a PM would approach a real decision. "
-            "Avoid generic advice like 'PMs should focus on user needs' or 'test before building.' "
-            "Instead name the specific insight: what assumption does it challenge, what decision does it change, or what pattern does it reveal? "
-            "Write for a reader who has NOT read the source — do not reference source-specific names, characters, or proprietary frameworks without briefly explaining them in plain language first. "
-            "The insight must stand alone without requiring the reader to know the source material.",
-    "source_indices": [3]
+    "text": "Single most actionable PM craft insight from today's content. "
+            "Must be non-obvious — a specific pattern, tradeoff, or reframe that changes how a PM would approach a real decision. "
+            "Avoid generic advice. Name the specific insight: what assumption does it challenge, what decision does it change, or what pattern does it reveal? "
+            "Write for a reader who has NOT read the source.",
+    "source_indices": []
   }},
-  "interview_angle": "one specific thing a PM should have a prepared opinion on before interviews this week. "
-                     "Must be anchored to a specific named company, case, or development from today's sources — not a general theme. "
-                     "Frame it as a debatable claim or tradeoff a PM would be asked to reason through, not a fact to recite. "
-                     "Rotate focus across product strategy, consumer insight, regulatory navigation, and AI — not always AI.",
+  "interview_angle": "One specific thing a PM should have a prepared opinion on before interviews this week. "
+                     "Anchored to a specific named company, case, or development from today's sources. "
+                     "Frame as a debatable claim or tradeoff, not a fact to recite. "
+                     "Rotate focus across product strategy, consumer insight, regulatory navigation, and AI."
 }}
 
 Guidance:
-- INSIGHT DEPTH RULE: Every whats_shifting paragraph must reveal something a reader could NOT get from any single source. Ask yourself: am I naming an underlying force that connects multiple signals, or am I just describing what happened with a PM gloss? 'Platforms are degrading quality' is a description. 'Market dominance removes the competitive pressure that originally forced quality — creating a predictable degradation lifecycle that PMs can use to time competitive entry' is an insight. If your paragraph could have been written from a single source, rewrite it.
-- REFRAMING RULE: If a source already contains sharp analysis or a named framework (e.g. 'binary compliance cliff', 'enshittification', 'agency paradox'), do NOT reproduce that framework as your insight — the reader can get that from the source directly. Instead, ask: what does this framework reveal when placed alongside signals from other sources? What assumption does it challenge that the source author didn't explicitly address? What is the second-order consequence that follows from combining this framework with a different domain's signal? Your insight should be one step of reasoning beyond the sharpest thing in your sources, not a restatement of it.
-- GROUNDING RULE FOR IMPLICATIONS: The closing PM implication sentence in each paragraph is the most common source of ungrounded claims. Do not introduce external statistics, historical references, or general knowledge claims in implication sentences — these cannot be cited and will fail grounding checks. If your implication relies on external knowledge (e.g. 'decades of research show...', 'historically...', 'studies suggest...'), rewrite it as a logical inference from the sources you have cited: 'this suggests...' or 'this implies...' rather than asserting it as established fact.
-- When making a claim in whats_shifting, you MUST cite which item numbers support it using [n] notation at the end of each sentence. Every sentence in whats_shifting must have at least one citation.
-- CRITICAL CITATION RULE: Only cite item [n] if a specific insight bullet from that item directly supports the exact claim you are making in that sentence. Do not cite an item merely because it is thematically related or appeared in the same section. If you cannot point to a specific bullet from item [n] that supports the claim, do not cite it.
-- The source_indices array for each whats_shifting entry must list all item numbers that meaningfully support that paragraph.
-- For company_watch entries, also include inline [n] citations and a matching source_indices array for each company you populate.
-- Apply the same citation rule to company_watch: only cite an item if its insight bullets directly support the specific claim made about that company.
-- COMPANY WATCH INSIGHT RULE: Each company paragraph must answer 'what is strategically shifting for this company today' — not just 'what did they do.' A paragraph that only describes a product launch or announcement without explaining the strategic positioning, competitive implication, or market signal it represents is insufficient. Ask: does this paragraph tell a PM something they could use to form an opinion about this company's direction in an interview? If not, either deepen it or omit the company.
-- COMPANY WATCH SINGLE THESIS RULE: Each company entry must have one connecting thesis that runs through all sentences. If you have signal from two unrelated sources for the same company, pick the stronger one rather than combining them into a paragraph with two disconnected threads. A focused paragraph covering one strategic shift cleanly is better than a sprawling paragraph that covers two unrelated moves — the latter will read as incoherent and fail the coherence check. Test: can you state the paragraph's central claim in one sentence? If not, it has too many threads.
-- COMPANY WATCH REFRAMING RULE: If a source already names a strategic shift for a company, do not reproduce that framing as your insight. Ask: what does this move reveal about the company's broader competitive positioning that the source didn't explicitly connect? What does it mean for PMs building on or against this platform that isn't stated in the article?
-- COMPANY WATCH GROUNDING RULE: Do not connect two separate signals for the same company into a causal narrative unless that connection is explicitly made in the sources. If OpenAI is mentioned in one source for military contracts and another for enterprise strategy, do not imply these are causally related unless a source makes that link. Each sentence in a company entry must be traceable to a specific cited source — do not use one source to reinterpret another.
-- For company_watch, only include companies (from Google, Microsoft, Apple, Meta, Amazon, OpenAI, Anthropic, NVIDIA, Uber) that have clear signal today; omit or set null for companies without signal.
-- Do not restate per-source summaries; always combine signals across sources and themes. The test: if you removed all but one citation from a paragraph and it still made sense, you have summarized, not synthesized. A synthesized paragraph requires at least two sources because the insight only emerges from their combination.
-- THEME DIVERSITY RULE: Before finalizing whats_shifting, audit the central claim of each paragraph's opening sentence against these five themes: AI & technology, market behavior, consumer behavior, regulation & policy, and design & UX. No theme should appear as the central claim more than once. If two paragraphs share the same central theme, either reframe the weaker one around a different theme or cut it and replace it with a paragraph from an underrepresented theme. A five-paragraph brief should ideally touch all five themes; a four-paragraph brief should cover at least four. Themes appearing only as supporting examples do not count toward a theme's allocation.
-- For pm_craft_today, favor insights grounded in product_craft, design_ux, and consumer_behavior themes, even when they intersect with AI.
-- For startup_radar, each bullet must contain a genuine 'so what' — the strategic implication, competitive threat, or market pattern revealed, not just a description of the event. A bullet that only describes what a company did without explaining what it means strategically is insufficient.
-- For interview_angle, rotate focus across different PM skill areas (product strategy, consumer insight, regulatory navigation, AI, etc.) over time instead of defaulting to AI every time.
+- INSIGHT DEPTH RULE: Every whats_shifting paragraph must reveal something a reader could NOT get from any single source. If your paragraph could have been written from a single source, rewrite it.
+- PM ACTIONABILITY RULE: When finalizing closing implication sentences in any section, apply this test: does this tell a PM what to do differently, or does it tell them something interesting? Prefer bullets that name a specific architectural decision, pricing tradeoff, measurement approach, or design pattern over bullets that name a market trend without a concrete action attached. This applies to whats_shifting implications, company_watch sentence 3, startup_radar 'so what' clauses, and pm_craft_today. When choosing between a strategic observation and a concrete product design consequence, always prefer the latter.
+- REFRAMING RULE: Do not reproduce a named framework from a source as your insight. Ask: what does this framework reveal when placed alongside signals from other sources?
+- GROUNDING RULE FOR IMPLICATIONS: Do not introduce external statistics, historical references, or general knowledge in implication sentences. Rewrite as logical inference: 'this suggests...' or 'this implies...' rather than asserting as established fact.
+- DATE VALIDATION RULE: Today's date is {today}. Before finalizing any paragraph, check every date, milestone, or timeline claim against today's date. If a cited milestone date is earlier than today, flag it inline with [DATE CHECK: this date may already have passed] rather than stating it as a future event. Do not silently reproduce a past date as if it were upcoming.
+- CITATION RULE: Only cite item [n] if a specific insight bullet from that item directly supports the exact claim you are making. Do not cite thematically related items.
+- COMPANY WATCH SINGLE THESIS RULE: Each company entry must have exactly one connecting thesis. Before writing, identify the single strongest source for that company. If a second source introduces a second thread, discard it — do not combine. Thread count test: if you can count more than one distinct strategic claim in your draft, cut down to one. Example of multiple threads (WRONG): 'Company X is rolling back AI features AND pursuing a super app strategy AND taking Pentagon contracts.' Three claims = rewrite required.
+- COMPANY WATCH GROUNDING RULE: Do not connect two separate signals for the same company into a causal narrative unless that connection is explicitly made in the sources.
+- CROSS-COMPANY CONSISTENCY RULE: Before finalizing company_watch, check whether any source index appears in more than one company entry. If the same source feeds two company entries, those entries must not present contradictory interpretations of the same event. When a source contains multiple interpretations, pick one and apply it consistently. If two sources genuinely support different interpretations, acknowledge the difference explicitly rather than presenting both as established facts in different paragraphs.
+- THEME DIVERSITY RULE: Audit the central claim of each whats_shifting paragraph against five themes: AI & technology, market behavior, consumer behavior, regulation & policy, design & UX. No theme should appear as the central claim more than once.
+- SOURCE ROUTING ENFORCEMENT: whats_shifting must only cite WHATS_SHIFTING_ELIGIBLE item numbers. company_watch, startup_radar, pm_craft_today must only cite DEDICATED_SECTION_ELIGIBLE item numbers. Violation = same source recycled across sections.
+- For company_watch, only include companies that have clear signal today from DEDICATED_SECTION_ELIGIBLE items; omit or set null for companies without signal.
+- For startup_radar, each bullet must contain a genuine 'so what' — not just a description of what happened.
+- For interview_angle, rotate focus across different PM skill areas over time instead of defaulting to AI every time.
 """.strip()
 
     settings = load_settings()
@@ -382,7 +400,7 @@ Guidance:
         try:
             content_block = response.content[0]
             text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:
             logger.exception("Unexpected Claude response format in synthesizer: %s", exc)
             raise
 
@@ -404,7 +422,9 @@ Guidance:
                 "interview_angle": "",
             }
 
+        # ---------------------------------------------------------------------------
         # Normalize whats_shifting
+        # ---------------------------------------------------------------------------
         raw_whats_shifting = parsed.get("whats_shifting") or []
         normalized_whats_shifting: List[Dict[str, Any]] = []
         if isinstance(raw_whats_shifting, list):
@@ -419,9 +439,9 @@ Guidance:
                 if not isinstance(indices, list):
                     indices = [indices]
                 cleaned_indices: List[int] = []
-                for idx in indices:
+                for i in indices:
                     try:
-                        cleaned_indices.append(int(idx))
+                        cleaned_indices.append(int(i))
                     except Exception:
                         continue
 
@@ -436,7 +456,9 @@ Guidance:
                 {"paragraph": str(raw_whats_shifting), "source_indices": []}
             )
 
+        # ---------------------------------------------------------------------------
         # Normalize company_watch
+        # ---------------------------------------------------------------------------
         raw_company_watch = parsed.get("company_watch") or {}
         if not isinstance(raw_company_watch, dict):
             raw_company_watch = {"_raw": str(raw_company_watch)}
@@ -459,9 +481,9 @@ Guidance:
             if not isinstance(indices, list):
                 indices = [indices]
             cleaned_indices_cw: List[int] = []
-            for idx in indices:
+            for i in indices:
                 try:
-                    cleaned_indices_cw.append(int(idx))
+                    cleaned_indices_cw.append(int(i))
                 except Exception:
                     continue
 
@@ -470,7 +492,9 @@ Guidance:
                 "source_indices": cleaned_indices_cw,
             }
 
+        # ---------------------------------------------------------------------------
         # Normalize startup_radar
+        # ---------------------------------------------------------------------------
         raw_startup_radar = parsed.get("startup_radar") or []
         if not isinstance(raw_startup_radar, list):
             raw_startup_radar = [str(raw_startup_radar)]
@@ -486,9 +510,9 @@ Guidance:
             if not isinstance(indices, list):
                 indices = [indices]
             cleaned_indices_sr = []
-            for idx in indices:
+            for i in indices:
                 try:
-                    cleaned_indices_sr.append(int(idx))
+                    cleaned_indices_sr.append(int(i))
                 except Exception:
                     continue
             normalized_startup_radar.append({
@@ -496,7 +520,9 @@ Guidance:
                 "source_indices": cleaned_indices_sr,
             })
 
+        # ---------------------------------------------------------------------------
         # Normalize pm_craft_today
+        # ---------------------------------------------------------------------------
         raw_pm_craft = parsed.get("pm_craft_today") or {}
         if isinstance(raw_pm_craft, dict):
             pm_craft_text = str(raw_pm_craft.get("text") or raw_pm_craft.get("pm_craft_today") or "")
@@ -507,9 +533,9 @@ Guidance:
         if not isinstance(pm_craft_indices, list):
             pm_craft_indices = [pm_craft_indices]
         cleaned_pm_craft_indices = []
-        for idx in pm_craft_indices:
+        for i in pm_craft_indices:
             try:
-                cleaned_pm_craft_indices.append(int(idx))
+                cleaned_pm_craft_indices.append(int(i))
             except Exception:
                 continue
         pm_craft_today = {
@@ -519,16 +545,175 @@ Guidance:
 
         interview_angle = parsed.get("interview_angle") or ""
 
-        # Build lookup table for UI citation resolution
-        source_index_lookup: Dict[int, Dict[str, Any]] = {}
+        # ---------------------------------------------------------------------------
+        # Build source index lookup
+        # ---------------------------------------------------------------------------
+        source_index_lookup: Dict[str, Dict[str, Any]] = {}
         for entry in indexed_items:
-            idx = entry["index"]
-            source_index_lookup[str(idx)] = {
+            source_index_lookup[str(entry["index"])] = {
                 "title": entry["title"],
                 "source_name": entry["source_name"],
                 "theme": entry["theme"],
             }
 
+        # ---------------------------------------------------------------------------
+        # Post-processing validators
+        # ---------------------------------------------------------------------------
+
+        # 1. Single thesis rule: flag company entries citing more than 2 source indices
+        # or with high conjunction counts suggesting multiple threads
+        multi_thread_warnings = []
+        for company, value in normalized_company_watch.items():
+            indices = value.get("source_indices", [])
+            if len(indices) > 2:
+                multi_thread_warnings.append({
+                    "company": company,
+                    "source_count": len(indices),
+                    "source_indices": indices,
+                    "warning": "More than 2 sources cited — review for multiple threads"
+                })
+            paragraph = value.get("paragraph", "")
+            and_count = paragraph.upper().count(" AND ")
+            if and_count >= 3:
+                multi_thread_warnings.append({
+                    "company": company,
+                    "and_count": and_count,
+                    "warning": "High conjunction count — review for multiple threads"
+                })
+
+        if multi_thread_warnings:
+            logger.warning("SINGLE THESIS VIOLATIONS: %s", json.dumps(multi_thread_warnings, indent=2))
+            print("SINGLE THESIS WARNINGS:")
+            for w in multi_thread_warnings:
+                print(json.dumps(w, indent=2))
+
+        # 2. Date validation: scan all paragraphs for past month+year references
+        current_year = date.today().year
+        current_month = date.today().month
+        date_warnings = []
+
+        all_paragraphs = []
+        for ws in normalized_whats_shifting:
+            all_paragraphs.append(("whats_shifting", ws.get("paragraph", "")))
+        for company, value in normalized_company_watch.items():
+            all_paragraphs.append((f"company_watch.{company}", value.get("paragraph", "")))
+        for sr in normalized_startup_radar:
+            all_paragraphs.append(("startup_radar", sr.get("bullet", "")))
+        all_paragraphs.append(("pm_craft_today", pm_craft_today.get("text", "")))
+
+        month_year_pattern = re.compile(
+            r'\b(January|February|March|April|May|June|July|August|September|October|November|December)'
+            r'\s+(20\d{2})\b'
+        )
+        months_map = {
+            "January": 1, "February": 2, "March": 3, "April": 4,
+            "May": 5, "June": 6, "July": 7, "August": 8,
+            "September": 9, "October": 10, "November": 11, "December": 12
+        }
+
+        for section, paragraph in all_paragraphs:
+            for match in month_year_pattern.finditer(paragraph):
+                month_str, year_str = match.group(1), match.group(2)
+                year = int(year_str)
+                month = months_map.get(month_str, 0)
+                if year < current_year or (year == current_year and month < current_month):
+                    date_warnings.append({
+                        "section": section,
+                        "date_found": match.group(0),
+                        "warning": "Date appears to be in the past — verify if stated as future milestone"
+                    })
+
+        if date_warnings:
+            logger.warning("DATE WARNINGS: %s", json.dumps(date_warnings, indent=2))
+            print("DATE WARNINGS:")
+            for w in date_warnings:
+                print(json.dumps(w, indent=2))
+
+        # 3. Cross-paragraph coherence: flag sources shared across multiple company entries
+        # and sources shared between whats_shifting and company_watch
+        source_to_companies: Dict[int, List[str]] = {}
+        for company, value in normalized_company_watch.items():
+            for i in value.get("source_indices", []):
+                if i not in source_to_companies:
+                    source_to_companies[i] = []
+                source_to_companies[i].append(company)
+
+        ws_all_indices: List[int] = []
+        for ws in normalized_whats_shifting:
+            ws_all_indices.extend(ws.get("source_indices", []))
+
+        coherence_warnings = []
+
+        for i, companies in source_to_companies.items():
+            if len(companies) > 1:
+                source_info = source_index_lookup.get(str(i), {})
+                coherence_warnings.append({
+                    "source_index": i,
+                    "source_title": source_info.get("title", "unknown"),
+                    "companies": companies,
+                    "warning": "Same source cited in multiple company entries — review for contradictory framings"
+                })
+
+        cw_all_indices = set()
+        for value in normalized_company_watch.values():
+            cw_all_indices.update(value.get("source_indices", []))
+
+        shared_cw_ws = set(ws_all_indices) & cw_all_indices
+        for i in shared_cw_ws:
+            source_info = source_index_lookup.get(str(i), {})
+            companies_using = source_to_companies.get(i, [])
+            coherence_warnings.append({
+                "source_index": i,
+                "source_title": source_info.get("title", "unknown"),
+                "also_in_company_watch": companies_using,
+                "warning": "Source used in both whats_shifting and company_watch — review for routing violation or contradictory framing"
+            })
+
+        if coherence_warnings:
+            logger.warning("COHERENCE WARNINGS: %s", json.dumps(coherence_warnings, indent=2))
+            print("COHERENCE WARNINGS:")
+            for w in coherence_warnings:
+                print(json.dumps(w, indent=2))
+
+        # 4. Routing violation check: whats_shifting should not cite dedicated section indices
+        ws_eligible_indices = {entry["index"] for entry in ws_indexed}
+        dedicated_eligible_indices = {entry["index"] for entry in dedicated_indexed}
+
+        routing_warnings = []
+
+        for i, ws in enumerate(normalized_whats_shifting):
+            for idx_val in ws.get("source_indices", []):
+                if idx_val in dedicated_eligible_indices:
+                    source_info = source_index_lookup.get(str(idx_val), {})
+                    routing_warnings.append({
+                        "section": f"whats_shifting[{i}]",
+                        "source_index": idx_val,
+                        "source_title": source_info.get("title", "unknown"),
+                        "source_theme": source_info.get("theme", "unknown"),
+                        "warning": "DEDICATED_SECTION source cited in whats_shifting — routing violation"
+                    })
+
+        for company, value in normalized_company_watch.items():
+            for idx_val in value.get("source_indices", []):
+                if idx_val in ws_eligible_indices:
+                    source_info = source_index_lookup.get(str(idx_val), {})
+                    routing_warnings.append({
+                        "section": f"company_watch.{company}",
+                        "source_index": idx_val,
+                        "source_title": source_info.get("title", "unknown"),
+                        "source_theme": source_info.get("theme", "unknown"),
+                        "warning": "WHATS_SHIFTING source cited in company_watch — routing violation"
+                    })
+
+        if routing_warnings:
+            logger.warning("ROUTING VIOLATIONS: %s", json.dumps(routing_warnings, indent=2))
+            print("ROUTING VIOLATIONS:")
+            for w in routing_warnings:
+                print(json.dumps(w, indent=2))
+
+        # ---------------------------------------------------------------------------
+        # Return
+        # ---------------------------------------------------------------------------
         return {
             "whats_shifting": normalized_whats_shifting,
             "company_watch": normalized_company_watch,
@@ -536,6 +721,12 @@ Guidance:
             "pm_craft_today": pm_craft_today,
             "interview_angle": str(interview_angle),
             "source_index_lookup": source_index_lookup,
+            "editorial_warnings": {
+                "multi_thread_violations": multi_thread_warnings,
+                "date_warnings": date_warnings,
+                "coherence_warnings": coherence_warnings,
+                "routing_warnings": routing_warnings,
+            },
         }
 
     except Exception as exc:

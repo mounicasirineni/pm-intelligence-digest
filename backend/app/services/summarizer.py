@@ -108,6 +108,11 @@ Guidance:
 - Insights should be 3–5 bullets.
 - Go beyond what happened; explain why it matters in terms of product strategy, AI/tech direction, company moves, and market behavior. Each bullet must pass this test: could a reader have written this bullet from the headline and first paragraph alone? If yes, rewrite it. Surface the implication, tradeoff, or pattern that only emerges from reading the full content.
 - Avoid generic PM glosses like 'this has implications for product strategy' or 'PMs should pay attention to this trend.' Instead, name the specific implication: what decision does this change, what assumption does it challenge, or what risk does it reveal?
+- INSIGHT PRIORITIZATION RULE: When you have more than 3 insight bullets and must choose which to include, rank them in this order:
+    (1) Bullets naming a specific product design consequence, architectural decision, or measurable tradeoff — what should a PM build differently, test differently, or price differently as a result of this?
+    (2) Bullets naming a strategic pattern or competitive dynamic with a named mechanism.
+    (3) Bullets naming a market observation or trend without a concrete action attached.
+  A bullet that tells a PM what to build or decide differently outranks a bullet that tells them what is happening. Both are valuable, but the synthesizer will select from your bullets — give it your most actionable ones first. When in doubt, ask: could a PM use this bullet to change a decision in a meeting tomorrow? If yes, it ranks above bullets where the answer is 'it depends' or 'it's a useful frame.'
 - "pm_relevance_score" should be a categorical assessment of how useful this item is for PM interview preparation:
     high   = directly relevant to product strategy, company moves, or market shifts a PM interviewer would ask about
     medium = tangentially relevant; useful context but not a likely interview topic

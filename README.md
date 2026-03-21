@@ -24,7 +24,7 @@ Every day the brief generates:
 * **What's Shifting** — 4-5 cross-source insights with inline citations, distributed across five themes: AI & technology, market behavior, consumer behavior, regulation & policy, and design & UX — no single theme dominates more than one paragraph per brief
 * **Interview Angle** — one specific thing to have a prepared opinion on, rotated across product strategy, consumer insight, regulatory navigation, and AI
 * **PM Craft Today** — the most actionable PM craft insight from the day's content, grounded in a specific source
-* **Company Watch** — strategic signal for Google, Microsoft, Apple, Meta, Amazon, OpenAI, Anthropic, NVIDIA, and Uber — what's strategically shifting, not just what they announced
+* **Company Watch** — strategic signal for Google, Microsoft, Apple, Meta, Amazon, Netflix, NVIDIA, and OpenAI — what's strategically shifting, not just what they announced, sourced exclusively from first-party official feeds
 * **Startup Radar** — 2-3 disruption moves worth knowing about, each with a "so what" — the competitive threat or market pattern it reveals
 * **Source Details** — every underlying article with confidence score, relevance score, and insight bullets
 
@@ -40,8 +40,10 @@ RSS/Podcast Sources (39)
   Claude extracts signal per item
   scores confidence + PM relevance
   non-obvious insight test applied
+  PM actionability ranking applied
         ↓
   Synthesizer (Pass 2)
+  Sources partitioned by routing eligibility
   Claude reasons across all items
   adds inline citations [n]
   builds source_index_lookup
@@ -49,6 +51,12 @@ RSS/Podcast Sources (39)
   Evaluator (Pass 3)
   LLM-as-judge scores quality
   5 dimensions, 100pt weighted scale
+        ↓
+  Post-processing Validators
+  multi-thread violations
+  date warnings
+  coherence warnings
+  routing violations
         ↓
   SQLite Cache
   (date-keyed, Railway Volume)
@@ -89,6 +97,15 @@ Every digest run is automatically evaluated by an LLM judge across 5 quality dim
 | Utilized % | Relevant articles actually cited in the synthesis |
 | Weak % | Paragraphs scoring ≤2 on any quality dimension |
 
+**Post-processing editorial warnings** (logged per run, not scored):
+
+| Warning | What it catches |
+|---|---|
+| Multi-thread violations | Company Watch entries citing more than 2 sources or with high conjunction counts suggesting multiple disconnected claims |
+| Date warnings | Milestone or timeline claims where the cited date is earlier than today — catches past dates stated as future events |
+| Coherence warnings | Same source cited in multiple company entries (risk of contradictory framings) or shared between What's Shifting and Company Watch (routing violation) |
+| Routing violations | What's Shifting paragraphs citing dedicated-section sources, or Company Watch citing What's Shifting sources |
+
 Every brief on the [Evals page](https://pm-intelligence-digest-production.up.railway.app/evals) includes an inline reasons row in the table showing the judge's one-sentence reasoning per dimension.
 
 ## Source Design
@@ -97,14 +114,16 @@ Every brief on the [Evals page](https://pm-intelligence-digest-production.up.rai
 
 | Theme | Sources |
 |---|---|
-| AI & Technology | Import AI, Simon Willison, Benedict Evans, AI Snake Oil, NVIDIA, a16z, Dwarkesh |
-| Company Strategy | Google, Meta, Apple, Amazon, OpenAI, Microsoft Research, Verge Transportation |
-| Product Craft | Shreyas Doshi, Gibson Biddle, Lenny's Podcast, Stratechery, Acquired |
-| Startup Disruption | TechCrunch, Y Combinator, Hacker News |
-| Market Behavior | Platformer, MIT Technology Review, Rest of World, Hard Fork |
+| AI & Technology | Import AI, Simon Willison, Benedict Evans, AI Snake Oil, a16z, Dwarkesh |
+| Company Strategy | Google, Meta, Apple, Amazon, OpenAI, Microsoft Research, NVIDIA, Netflix Tech Blog |
+| Product Craft | Shreyas Doshi, SVPG, Lenny's Podcast, Lenny's Newsletter, How I AI |
+| Startup Disruption | TechCrunch, Y Combinator, Hacker News, YourStory |
+| Market Behavior | Platformer, Stratechery, Rest of World, Hard Fork, Sifted, The Verge, Vulcan Post |
 | Consumer Behavior | Quartz, Axios, Pivot |
 | Regulation & Policy | Politico Tech, EFF, Medianama |
 | Design & UX | Nielsen Norman Group, UX Collective |
+
+**Source routing:** Company Watch is sourced exclusively from first-party official feeds (company blogs and newsrooms). What's Shifting, Startup Radar, and PM Craft draw from third-party sources only — ensuring Company Watch and What's Shifting never recycle the same source across sections.
 
 Sources were chosen to balance AI-optimist vs. skeptic voices, US vs. global perspective, and primary sources vs. independent analysis.
 
@@ -179,8 +198,8 @@ pm-intelligence-digest/
 │   ├── config.py           # Settings from .env
 │   ├── services/
 │   │   ├── rss.py          # RSS + podcast fetcher
-│   │   ├── summarizer.py   # Pass 1: per-item signal extraction
-│   │   ├── synthesizer.py  # Pass 2: cross-source reasoning + citations
+│   │   ├── summarizer.py   # Pass 1: per-item signal extraction + PM actionability ranking
+│   │   ├── synthesizer.py  # Pass 2: cross-source reasoning + citations + routing + validators
 │   │   ├── evaluator.py    # Pass 3: LLM-as-judge quality scoring
 │   │   └── cache.py        # SQLite date-based caching
 │   └── templates/
@@ -188,7 +207,7 @@ pm-intelligence-digest/
 │       ├── evals.html      # Evals dashboard
 │       └── history.html    # Archive
 ├── config/
-│   └── sources.json        # 39 curated sources
+│   └── sources.json        # 39 curated sources with theme-based routing
 ├── data/                   # SQLite digest + evals storage
 ├── validate_sources.py     # Source health checker
 ├── test_fetcher.py         # Pipeline test script
@@ -207,7 +226,11 @@ pm-intelligence-digest/
 
 **Production deployment reveals bugs local testing misses.** Railway's ephemeral filesystem wiped the SQLite DB on every deploy until a persistent volume was mounted. The `digest_by_date` route crashed with `citation_index_map is undefined` because only the index route passed that variable to the template.
 
-**Prompt and eval design improve together.** The synthesizer prompt and the eval scorers have been in continuous co-evolution since deployment. Topical breadth went through three rewrites — from "reward non-AI" to "penalize both extremes" to "score distance from 60/40 ideal" to a five-theme diversity model — each time because the eval revealed a pattern the current rule couldn't catch (regulation clustering, for instance, passed the AI/non-AI check cleanly). Coherence and insight depth scorers were extended mid-project to explicitly check lede fidelity and implication focus after paragraph-level review identified overclaiming and multi-part implications the original rubric scored as fine. Citation grounding changed how the whole system is trusted: once every claim has a traceable source, hallucination becomes visible and checkable rather than hidden — and the grounding dimension enforces this programmatically. The eval reasons UI — judge reasoning displayed inline in the evals table per dimension — made all of this debuggable in production rather than opaque.
+**Prompt and eval design improve together.** The synthesizer prompt and the eval scorers have been in continuous co-evolution since deployment. Topical breadth went through three rewrites — from "reward non-AI" to "penalize both extremes" to "score distance from 60/40 ideal" to "a five-theme diversity model" — each time because the eval revealed a pattern the current rule couldn't catch. Coherence and insight depth scorers were extended to explicitly check lede fidelity and implication focus after paragraph-level review identified overclaiming and multi-part implications the original rubric scored as fine. The eval reasons UI — judge reasoning displayed inline in the evals table per dimension — made all of this debuggable in production rather than opaque.
+
+**Source routing prevents cross-section recycling.** Early versions of What's Shifting consistently recycled the strongest Company Watch insights at a higher abstraction level — the same Nvidia GTC or Apple India source appearing in both sections. The fix was architectural: partition the 39 sources into routing buckets at the synthesizer level, so Company Watch only sees first-party company feeds and What's Shifting only sees third-party market, consumer, regulation, and design sources. The breadth eval now checks theme diversity; a future version will check source independence across sections.
+
+**Post-processing validators catch what prompts miss.** Prompt rules alone don't reliably enforce structural constraints — a model under a long context will occasionally violate a rule it was given 3,000 tokens earlier. Adding deterministic post-processing validators (multi-thread detection, date validation, cross-source coherence checks, routing violation flags) creates a second enforcement layer that runs after every synthesis pass and logs warnings before anything reaches the frontend.
 
 ## Roadmap
 
@@ -217,6 +240,8 @@ pm-intelligence-digest/
 * [ ] Mobile-optimized layout
 * [ ] Async pipeline — background refresh so `/refresh` returns immediately
 * [ ] Timestamp localization — show IST instead of UTC
+* [ ] Scraper support for Anthropic and Uber newsrooms (no native RSS feeds available)
+* [ ] Editorial warnings surfaced in the Evals UI alongside judge scores
 
 ## Built With
 
