@@ -428,6 +428,18 @@ def evals_page():
     return render_template("evals.html", eval_rows=eval_rows)
 
 
+# TEMP DEBUG ROUTE: trigger evaluator.run with the debug flag for a given digest date.
+@app.route("/debug-eval/<date_str>")
+def debug_eval(date_str: str):
+    result = _get_digest_for_date(date_str)
+    if result is None:
+        return "No digest found", 404
+    synthesis, items_by_theme, generated_at, fetch_metadata = result
+    from .services import evaluator
+    evaluator.run(date_str + "-debug", synthesis, items_by_theme, fetch_metadata=fetch_metadata)
+    return "Done — check Railway logs"
+
+
 @app.route("/<date_str>")
 def digest_by_date(date_str: str):
     # Expect YYYY-MM-DD

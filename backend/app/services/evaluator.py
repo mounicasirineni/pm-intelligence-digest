@@ -390,6 +390,8 @@ async def llm_judge(
 
     async def score_cw_one(company: str, value: Any) -> Dict[str, Any] | None:
         paragraph = str(value.get("paragraph") or "").strip() if isinstance(value, dict) else str(value).strip()
+        # TEMP DEBUG: log which paragraph is being scored.
+        print("score_cw_one received paragraph:", paragraph)
         indices = value.get("source_indices") or [] if isinstance(value, dict) else []
         if not paragraph:
             return None
