@@ -316,7 +316,6 @@ async def llm_judge(
         )
         block = response.content[0]
         text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
-        print(f"_score_paragraph raw Haiku response for '{section_context}':", repr(text))  # TEMP DEBUG
         parsed = json.loads(_extract_json(text))
 
         return {
@@ -391,20 +390,16 @@ async def llm_judge(
 
     async def score_cw_one(company: str, value: Any) -> Dict[str, Any] | None:
         paragraph = str(value.get("paragraph") or "").strip() if isinstance(value, dict) else str(value).strip()
-        # TEMP DEBUG: log which paragraph is being scored.
-        print("score_cw_one received paragraph:", paragraph)
         indices = value.get("source_indices") or [] if isinstance(value, dict) else []
         if not paragraph:
             return None
         loop = asyncio.get_running_loop()
         try:
             scored = await loop.run_in_executor(None, lambda: _score_paragraph(paragraph, indices, f"company_watch ({company})"))
-            print(f"score_cw_one result for {company}:", scored)  # TEMP DEBUG
             if scored:
                 scored["company"] = company
             return scored
         except Exception as e:
-            print(f"score_cw_one EXCEPTION for {company}:", e)  # TEMP DEBUG
             return None
 
     async def score_sr_one(bullet: Any) -> Dict[str, Any] | None:
@@ -703,16 +698,59 @@ def run(
     pc_insight   = float(pm_craft_result.get("insight_depth") or 0.0)
     ia_relevance = float(interview_angle_result.get("relevance") or 0.0)
 
-    overall_score = (
-        (ws_coherence / 5.0 * 10.0) + (ws_insight / 5.0 * 10.0)
-        + (ws_grounding / 5.0 * 10.0) + (ws_breadth / 5.0 * 10.0)
-        + (cw_coherence / 5.0 * 8.3) + (cw_insight / 5.0 * 8.3)
-        + (cw_grounding / 5.0 * 8.4)
-        + (sr_coherence / 5.0 * 6.7) + (sr_insight / 5.0 * 6.7)
-        + (sr_grounding / 5.0 * 6.6)
-        + (pc_insight / 5.0 * 10.0)
-        + (ia_relevance / 5.0 * 5.0)
-    )
+    # Build score components only for sections that produced output
+    score_components: List[float] = []
+    score_weights: List[float] = []
+
+    ws_scores = llm_judge_result.get("ws_paragraph_scores") or []
+    cw_scores = llm_judge_result.get("cw_paragraph_scores") or []
+    sr_scores = llm_judge_result.get("sr_paragraph_scores") or []
+
+    # What's Shifting — always included if paragraphs exist
+    if ws_scores:
+        score_components.extend([
+            ws_coherence / 5.0 * 10.0,
+            ws_insight / 5.0 * 10.0,
+            ws_grounding / 5.0 * 10.0,
+            ws_breadth / 5.0 * 10.0,
+        ])
+        score_weights.extend([10.0, 10.0, 10.0, 10.0])
+
+    # Company Watch — only include if at least one company was scored
+    if cw_scores:
+        score_components.extend([
+            cw_coherence / 5.0 * 8.3,
+            cw_insight / 5.0 * 8.3,
+            cw_grounding / 5.0 * 8.4,
+        ])
+        score_weights.extend([8.3, 8.3, 8.4])
+
+    # Startup Radar — only include if bullets were scored
+    if sr_scores:
+        score_components.extend([
+            sr_coherence / 5.0 * 6.7,
+            sr_insight / 5.0 * 6.7,
+            sr_grounding / 5.0 * 6.6,
+        ])
+        score_weights.extend([6.7, 6.7, 6.6])
+
+    # PM Craft — only include if text exists
+    if pc_insight > 0:
+        score_components.append(pc_insight / 5.0 * 10.0)
+        score_weights.append(10.0)
+
+    # Interview Angle — only include if scored
+    if ia_relevance > 0:
+        score_components.append(ia_relevance / 5.0 * 5.0)
+        score_weights.append(5.0)
+
+    # Normalize to 100 based on weights actually present
+    total_weight = sum(score_weights)
+    if total_weight > 0:
+        raw_score = sum(score_components)
+        overall_score = raw_score / total_weight * 100.0
+    else:
+        overall_score = 0.0
 
     flags = {
         "flagged_paragraphs": llm_judge_result.get("flagged_paragraphs") or [],
