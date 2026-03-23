@@ -304,7 +304,7 @@ async def llm_judge(
 
         response = client.messages.create(
             model=EVAL_MODEL,
-            max_tokens=256,
+            max_tokens=512,
             temperature=0.0,
             system=(
                 "You are an expert evaluator of product management intelligence briefs. "
