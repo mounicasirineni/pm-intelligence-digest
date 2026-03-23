@@ -398,10 +398,12 @@ async def llm_judge(
         loop = asyncio.get_running_loop()
         try:
             scored = await loop.run_in_executor(None, lambda: _score_paragraph(paragraph, indices, f"company_watch ({company})"))
+            print(f"score_cw_one result for {company}:", scored)  # TEMP DEBUG
             if scored:
                 scored["company"] = company
             return scored
-        except Exception:
+        except Exception as e:
+            print(f"score_cw_one EXCEPTION for {company}:", e)  # TEMP DEBUG
             return None
 
     async def score_sr_one(bullet: Any) -> Dict[str, Any] | None:
