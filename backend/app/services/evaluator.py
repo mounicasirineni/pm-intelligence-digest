@@ -316,6 +316,7 @@ async def llm_judge(
         )
         block = response.content[0]
         text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+        print(f"_score_paragraph raw Haiku response for '{section_context}':", repr(text))  # TEMP DEBUG
         parsed = json.loads(_extract_json(text))
 
         return {
