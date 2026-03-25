@@ -1,4 +1,4 @@
-# PM Intelligence Brief
+# PM Intelligence Digest
 
 > A daily AI-powered intelligence digest that surfaces what's actually shifting in the industry — not just what happened, but what it means.
 
@@ -10,7 +10,7 @@
 
 Most news digests summarize. This one synthesizes.
 
-The brief runs every morning at 7am, pulls from 39 curated sources across 8 themes, and uses Claude to do two things most digest tools don't:
+The brief runs every morning at 7am, pulls from 40 curated sources across 8 themes, and uses Claude to do two things most digest tools don't:
 
 1. **Extract signal, not summaries** — each article is analyzed for what it means, not just what happened. Every insight bullet must pass a non-obvious test: would a reader get this from the headline alone? If yes, it's not an insight.
 2. **Reason across sources** — a second AI pass connects signals across multiple sources to surface patterns that don't appear in any single article.
@@ -24,14 +24,14 @@ Every day the brief generates:
 * **What's Shifting** — 4-5 cross-source insights with inline citations, distributed across five themes: AI & technology, market behavior, consumer behavior, regulation & policy, and design & UX — no single theme dominates more than one paragraph per brief
 * **Interview Angle** — one specific thing to have a prepared opinion on, rotated across product strategy, consumer insight, regulatory navigation, and AI
 * **PM Craft Today** — the most actionable PM craft insight from the day's content, grounded in a specific source
-* **Company Watch** — strategic signal for Google, Microsoft, Apple, Meta, Amazon, Netflix, NVIDIA, and OpenAI — what's strategically shifting, not just what they announced, sourced exclusively from first-party official feeds
+* **Company Watch** — strategic signal for Google, Microsoft, Apple, Meta, Amazon, Netflix, NVIDIA, OpenAI, and Anthropic — what's strategically shifting, not just what they announced, sourced exclusively from first-party official feeds
 * **Startup Radar** — 2-3 disruption moves worth knowing about, each with a "so what" — the competitive threat or market pattern it reveals
 * **Source Details** — every underlying article with confidence score, relevance score, and insight bullets
 
 ## How It Works
 
 ```
-RSS/Podcast Sources (39)
+RSS/Podcast Sources (40)
         ↓
     Fetcher
     (24hr lookback window)
@@ -110,12 +110,12 @@ Every brief on the [Evals page](https://pm-intelligence-digest-production.up.rai
 
 ## Source Design
 
-39 sources across 8 themes, curated for balance:
+40 sources across 8 themes, curated for balance:
 
 | Theme | Sources |
 |---|---|
 | AI & Technology | Import AI, Simon Willison, Benedict Evans, AI Snake Oil, a16z, Dwarkesh |
-| Company Strategy | Google, Meta, Apple, Amazon, OpenAI, Microsoft Research, NVIDIA, Netflix Tech Blog |
+| Company Strategy | Google, Meta, Apple, Amazon, OpenAI, Microsoft Research, NVIDIA, Netflix Tech Blog, Anthropic News |
 | Product Craft | Shreyas Doshi, SVPG, Lenny's Podcast, Lenny's Newsletter, How I AI |
 | Startup Disruption | TechCrunch, Y Combinator, Hacker News, YourStory |
 | Market Behavior | Platformer, Stratechery, Rest of World, Hard Fork, Sifted, The Verge, Vulcan Post |
@@ -131,7 +131,7 @@ Sources were chosen to balance AI-optimist vs. skeptic voices, US vs. global per
 
 Every claim in the synthesis is grounded in cited source items. The `source_index_lookup` maps each `[n]` citation back to the original article title and source name, making it easy to verify any claim in seconds.
 
-The evaluator's **Grounding** dimension specifically checks whether cited sources actually contain evidence for each claim — not just whether citations are present. This caught a critical bug on day one: integer vs. string key mismatch in `source_index_lookup` caused the grounding judge to always return 1.00 (floor score) because lookups always failed silently.
+The evaluator's **Grounding** dimension specifically checks whether cited sources actually contain evidence for each claim. The grounding rubric requires passage-level traceability — for each synthesis claim, the evaluator must identify the specific source sentence or data point that supports it. Plausibility and topic consistency are explicitly excluded as proxies for evidence. Claims that contradict an explicit source statement (e.g. scope inversions) or assert specific numbers not present in the source are scored as grounding failures regardless of how well-written they appear.
 
 Only high and medium confidence items (scored by Claude in Pass 1) are fed into the synthesis pass.
 
@@ -211,7 +211,7 @@ pm-intelligence-digest/
 │       ├── evals.html      # Evals dashboard
 │       └── history.html    # Archive
 ├── config/
-│   └── sources.json        # 39 curated sources with theme-based routing
+│   └── sources.json        # 40 curated sources with theme-based routing
 ├── data/                   # SQLite digest + evals storage
 ├── validate_sources.py     # Source health checker
 ├── test_fetcher.py         # Pipeline test script
@@ -220,7 +220,7 @@ pm-intelligence-digest/
 
 ## What I Learned Building This
 
-**RSS feeds are unreliable at scale.** 30%+ of URLs I tried were dead, blocked, or redirected. Built a validation script to catch this systematically. Even with 39 configured sources, ~46% are silent on any given day — the digest runs on 20-25 active sources.
+**RSS feeds are unreliable at scale.** 30%+ of URLs I tried were dead, blocked, or redirected. Built a validation script to catch this systematically. Even with 40 configured sources, ~46% are silent on any given day — the digest runs on 20-25 active sources.
 
 **LLM output needs token budgets.** The synthesizer was silently truncating JSON until I diagnosed it and increased `max_tokens` to 4000.
 
@@ -232,9 +232,11 @@ pm-intelligence-digest/
 
 **Prompt and eval design improve together.** The synthesizer prompt and the eval scorers have been in continuous co-evolution since deployment. Topical breadth went through three rewrites — from "reward non-AI" to "penalize both extremes" to "score distance from 60/40 ideal" to "a five-theme diversity model" — each time because the eval revealed a pattern the current rule couldn't catch. Coherence and insight depth scorers were extended to explicitly check lede fidelity and implication focus after paragraph-level review identified overclaiming and multi-part implications the original rubric scored as fine. The eval reasons UI — judge reasoning displayed inline in the evals table per dimension — made all of this debuggable in production rather than opaque.
 
-**Source routing prevents cross-section recycling.** Early versions of What's Shifting consistently recycled the strongest Company Watch insights at a higher abstraction level — the same Nvidia GTC or Apple India source appearing in both sections. The fix was architectural: partition the 39 sources into routing buckets at the synthesizer level, so Company Watch only sees first-party company feeds and What's Shifting only sees third-party market, consumer, regulation, and design sources. The breadth eval now checks theme diversity; a future version will check source independence across sections.
+**Source routing prevents cross-section recycling.** Early versions of What's Shifting consistently recycled the strongest Company Watch insights at a higher abstraction level — the same Nvidia GTC or Apple India source appearing in both sections. The fix was architectural: partition the 40 sources into routing buckets at the synthesizer level, so Company Watch only sees first-party company feeds and What's Shifting only sees third-party market, consumer, regulation, and design sources. The breadth eval now checks theme diversity; a future version will check source independence across sections.
 
 **Post-processing validators catch what prompts miss.** Prompt rules alone don't reliably enforce structural constraints — a model under a long context will occasionally violate a rule it was given 3,000 tokens earlier. Adding deterministic post-processing validators (multi-thread detection, date validation, cross-source coherence checks, routing violation flags) creates a second enforcement layer that runs after every synthesis pass and logs warnings before anything reaches the frontend.
+
+**QA and prompt co-evolution requires source verification.** Automated eval scores can mask factual inversions — the grounding evaluator gave 5.0 to a paragraph that directly contradicted its source (scope limited to non-safety functions, synthesis claimed safety-critical competition). Manual source verification caught three categories the evaluator missed: claims that contradicted explicit source statements, specific numbers generated by the summarizer with no source basis, and strategic framings inferred from thin sources (4-sentence press releases). The fix was architectural: rewrite the grounding rubric to require passage-level citation traceability, rewrite the confidence definition to measure source depth rather than topic interest, and add section routing tags so the model cannot misroute third-party articles into first-party-only sections.
 
 ## Roadmap
 
@@ -244,7 +246,7 @@ pm-intelligence-digest/
 * [ ] Mobile-optimized layout
 * [ ] Async pipeline — background refresh so `/refresh` returns immediately
 * [ ] Timestamp localization — show IST instead of UTC
-* [ ] Scraper support for Anthropic and Uber newsrooms (no native RSS feeds available)
+* [ ] Scraper support for Uber newsrooms (no native RSS feeds available)
 * [ ] Editorial warnings surfaced in the Evals UI alongside judge scores
 
 ## Built With

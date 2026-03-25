@@ -310,6 +310,14 @@
       "url": "https://netflixtechblog.com/feed",
       "theme": "company_strategy",
       "verified": false
+    },
+    {
+      "id": "anthropic_news",
+      "type": "rss",
+      "name": "Anthropic News",
+      "url": "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml",
+      "theme": "company_strategy",
+      "verified": false
     }
   ]
 }

@@ -292,14 +292,29 @@ async def llm_judge(
             "1=pure summary or closing implication is three or more generic claims; "
             "3=genuine synthesis but closing implication is split across two claims; "
             "5=genuine insight a reader wouldn't get from any single source AND closing implication commits to exactly one sharp, specific consequence\n\n"
-            "3. CITATION_SUPPORT (1-5): Does the cited source actually contain evidence for each claim? "
-            "1=multiple sentences are unsupported inferences, 5=every claim is directly evidenced\n\n"
+            "3. CITATION_SUPPORT (1-5): Can every specific claim in the paragraph be traced to a specific passage or data point in the source evidence below? "
+            "Apply this test to each claim individually:\n"
+            "  (a) Identify the claim\n"
+            "  (b) Find the exact source sentence or data point that supports it\n"
+            "  (c) If you cannot find one, the claim fails\n\n"
+            "Scoring:\n"
+            "  5 = every claim traces to a specific source passage — no exceptions\n"
+            "  4 = one minor inference tightly constrained by the source\n"
+            "  3 = one moderate inference presented as fact, or one specific number with no source basis\n"
+            "  2 = multiple inferences presented as sourced facts, or one claim that contradicts the source\n"
+            "  1 = paragraph's central claim or a key specific figure has no source basis, or directly contradicts the source\n\n"
+            "CRITICAL RULES:\n"
+            "  - Plausibility is NOT evidence. A claim that sounds consistent with the source topic but is not stated in the source evidence is an unsourced inference.\n"
+            "  - Any specific number (ratio, percentage, dollar figure, multiplier, timeline) not appearing verbatim in the source evidence must be treated as unsourced.\n"
+            "  - A claim that contradicts an explicit statement in the source scores 1 regardless of how well-written it is.\n"
+            "    Example: if source says 'non-safety functions' but synthesis says 'core vehicle functions competing with safety-critical vendors', that is a contradiction, score 1.\n"
+            "    Example: if source shows a 1.75x fund size increase but synthesis claims '3-5x capital requirements', that specific multiplier is unsourced, score 2 or lower.\n\n"
             f"Paragraph: {paragraph}\n\n"
             f"{evidence_block}\n\n"
             'Return only valid JSON: '
             '{"coherence": N, "coherence_reason": "one sentence identifying either a lede precision issue or confirming tight delivery", '
             '"insight_depth": N, "insight_depth_reason": "one sentence identifying either an implication focus issue or confirming sharp single claim", '
-            '"citation_support": N, "citation_support_reason": "one sentence"}'
+            '"citation_support": N, "citation_support_reason": "one sentence identifying the weakest claim and whether it is sourced, inferred, or contradicts the source"}'
         )
 
         response = client.messages.create(

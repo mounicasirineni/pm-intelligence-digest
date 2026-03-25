@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive" />
-  <title>PM Intelligence Brief</title>
+  <title>PM Intelligence Digest</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -450,7 +450,7 @@
   <div class="page">
     <!-- Header -->
     <header class="header">
-      <h1 class="header-title">PM Intelligence Brief</h1>
+      <h1 class="header-title">PM Intelligence Digest</h1>
       <div class="header-subtitle">
         {{ generated_at.strftime('%A, %B %d, %Y') if generated_at else '' }}
       </div>
@@ -522,7 +522,7 @@
           </article>
         {% endfor %}
       {% else %}
-        <p>No cross-source shifts identified yet. Run today&rsquo;s brief to populate this section.</p>
+        <p>No cross-source shifts identified yet. Run today&rsquo;s digest to populate this section.</p>
       {% endif %}
     </section>
 
@@ -578,7 +578,7 @@
       </div>
 
       {% if not cw %}
-        <p>No company-specific signals surfaced today. As the brief matures, company moves will appear here.</p>
+        <p>No company-specific signals surfaced today. As the digest matures, company moves will appear here.</p>
       {% endif %}
 
       {% for name in companies %}

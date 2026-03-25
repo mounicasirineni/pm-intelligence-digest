@@ -107,18 +107,29 @@ Please respond in strict JSON with the following structure:
 Guidance:
 - Insights should be 3–5 bullets.
 - Go beyond what happened; explain why it matters in terms of product strategy, AI/tech direction, company moves, and market behavior. Each bullet must pass this test: could a reader have written this bullet from the headline and first paragraph alone? If yes, rewrite it. Surface the implication, tradeoff, or pattern that only emerges from reading the full content.
+- SPECIFICITY-FIRST RULE: Structure your bullets from most specific to most abstract. Put bullets naming specific mechanisms, named products, concrete tradeoffs, or verifiable numbers first. Put bullets naming broader patterns or strategic observations last. This ordering helps the synthesizer find your most grounded content quickly rather than defaulting to the first bullet which is often the most abstract framing.
 - Avoid generic PM glosses like 'this has implications for product strategy' or 'PMs should pay attention to this trend.' Instead, name the specific implication: what decision does this change, what assumption does it challenge, or what risk does it reveal?
 - INSIGHT PRIORITIZATION RULE: When you have more than 3 insight bullets and must choose which to include, rank them in this order:
     (1) Bullets naming a specific product design consequence, architectural decision, or measurable tradeoff — what should a PM build differently, test differently, or price differently as a result of this?
     (2) Bullets naming a strategic pattern or competitive dynamic with a named mechanism.
     (3) Bullets naming a market observation or trend without a concrete action attached.
   A bullet that tells a PM what to build or decide differently outranks a bullet that tells them what is happening. Both are valuable, but the synthesizer will select from your bullets — give it your most actionable ones first. When in doubt, ask: could a PM use this bullet to change a decision in a meeting tomorrow? If yes, it ranks above bullets where the answer is 'it depends' or 'it's a useful frame.'
+- SOURCE FIDELITY RULE: Every bullet must be traceable to a specific claim, data point, or quote in the content body above. You may reason one logical step beyond the source (e.g. identifying an implication), but you may not:
+    (a) Introduce named entities (companies, products, people, technologies) that do not appear in the content body
+    (b) Assert specific numbers (multipliers, percentages, dollar figures, timelines) that do not appear in the content body
+    (c) Assign strategic motivations to a company that the source does not state
+  If you find yourself writing "this is similar to how X did Y" or "this follows the pattern of Z" using a company or event not mentioned in the content — stop. That bullet is from your training knowledge, not from the source. Either ground it in the source or cut it.
+  HALLUCINATION TEST: Before finalizing each bullet, ask: "Is the specific company name, product name, number, or causal claim I am asserting actually in the content body above?" If no, rewrite without it.
 - "pm_relevance_score" should be a categorical assessment of how useful this item is for PM interview preparation:
     high   = directly relevant to product strategy, company moves, or market shifts a PM interviewer would ask about
     medium = tangentially relevant; useful context but not a likely interview topic
     low    = not relevant to PM interview prep (e.g. sports tech, celebrity news, off-topic content)
 - "pm_interview_relevance" should be a one-line text explanation supporting your pm_relevance_score judgment.
-- "confidence" should reflect how much genuine signal (vs. noise) you believe this item contains for a Senior PM tracking the space — high means rich, substantive content; low means thin, paywalled, or off-topic.
+- "confidence" should reflect how well the content body above supports producing accurate, grounded insight bullets — it is a self-assessment of source quality, NOT a judgment of topic interest. Ask: how much of what I would write comes from the content body vs. from my own training knowledge?
+    high   = content body is substantive (300+ words of original reporting, analysis, or primary source material) and provides enough specific detail to write 3-5 grounded bullets without drawing on outside knowledge
+    medium = content body is adequate but thin (100-300 words, or partially paywalled) — can produce 2-3 grounded bullets but some inference required
+    low    = content body is too thin to support grounded bullets (under 100 words, pure press release boilerplate, "In Brief" stub, or heavily paywalled with only a lede visible) — any bullets would be primarily inference from training knowledge, not from the source
+  IMPORTANT: A thin source on an interesting topic still gets low confidence. Topic relevance is measured by pm_relevance_score, not confidence. These are independent judgments.
 - If this article is a newsletter containing multiple unrelated stories, focus your analysis exclusively on the lead story — the one reflected in the article title. Ignore secondary stories, roundups, and link digests further in the body.
 """.strip()
 

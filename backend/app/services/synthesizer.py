@@ -102,8 +102,20 @@ def _build_context_block(
         if not isinstance(insights, list):
             insights = [str(insights)]
 
+        # Derive allowed section from theme
+        theme = item["theme"]
+        if theme == "company_strategy":
+            allowed_section = "company_watch ONLY"
+        elif theme == "startup_disruption":
+            allowed_section = "startup_radar ONLY"
+        elif theme == "product_craft":
+            allowed_section = "pm_craft_today ONLY"
+        else:
+            allowed_section = "any dedicated section"
+
         lines.append(f"Item [{idx}]:")
         lines.append(f"- Theme: {item['theme']}")
+        lines.append(f"- Allowed section: {allowed_section}")
         lines.append(f"- Source: {item['source_name']}")
         lines.append(f"- Title: {item['title']}")
         lines.append("- Insights:")
@@ -267,7 +279,26 @@ Produce a structured JSON object:
   "interview_angle": "One specific thing a PM should have a prepared opinion on before interviews this week. "
                      "Anchor to a specific named company, case, or development from today's sources. "
                      "Frame as a debatable claim or tradeoff, not a fact to recite. "
-                     "Rotate focus across product strategy, consumer insight, regulatory navigation, and AI."
+                     "Rotate focus across product strategy, consumer insight, regulatory navigation, and AI. "
+                     "PM DECISION LEVEL RULE: The angle must be grounded in a decision a PM actually owns — "
+                     "feature prioritization, product architecture, safety design, retention mechanics, "
+                     "compliance strategy, pricing tradeoffs, or go-to-market sequencing. "
+                     "Do not anchor to decisions owned by executives, infrastructure teams, or investors "
+                     "(e.g. compute allocation, M&A timing, fundraising strategy, CEO org changes). "
+                     "If the most interesting story today is an exec-level decision, reframe it as: "
+                     "what should a PM building on that platform or in that market decide differently as a result? "
+                     "VERIFIED MOTIVATION RULE: Only assert a company's strategic motivation if it is explicitly "
+                     "stated in the source. Do not infer why a company made a decision and present it as fact. "
+                     "If the motivation is unclear, frame the angle around the observable outcome and the "
+                     "PM-level tradeoff it reveals, not the company's presumed intent. "
+                     "STRONG ANCHOR PREFERENCE: Prefer stories where the source explicitly names a product "
+                     "decision, design tradeoff, or architectural choice over stories where the PM implication "
+                     "must be inferred from a business event. "
+                     "Good anchors from today's typical sources: permission model design tradeoffs, "
+                     "content moderation architecture, safety-as-product-surface decisions, "
+                     "platform protocol design, compliance-as-feature tradeoffs. "
+                     "Weak anchors: company shutdowns where motivation is unconfirmed, exec org changes, "
+                     "fundraising rounds without product detail."
 }}
 
 Guidance:
@@ -276,6 +307,8 @@ Guidance:
 - GROUNDING RULE: Do not introduce external statistics, historical references, or general knowledge in implication sentences. Use 'this suggests...' or 'this implies...' rather than asserting as established fact.
 - CITATION RULE: Only cite item [n] if a specific insight bullet from that item directly supports the exact claim. Every sentence in whats_shifting must have at least one citation.
 - REFRAMING RULE: Do not reproduce a named framework from a source as your insight. Ask what it reveals when placed alongside other signals.
+- MULTI-SOURCE DEPTH RULE: When a paragraph draws from 3+ sources, verify that at least one source contributes content from beyond its first insight bullet. If all evidence comes from bullet 1 of each source, the paragraph is missing the most specific and verifiable content.
+- REGULATORY CLUSTER RULE: When multiple regulatory sources (municipal, national, international) are grouped into a single paragraph, they must share a mechanistic connection beyond surface theme similarity. Different enforcement mechanisms, different legal theories, and different compliance surfaces are not unified by the label 'regulation.' If three regulatory sources do not share a single mechanistic implication for product teams, split into two paragraphs or drop the weakest story.
 """.strip()
 
     response = client.messages.create(
@@ -341,7 +374,15 @@ Produce a structured JSON object:
                    "COMPANY WATCH CONVERGENCE RULE: Multiple threads allowed only if all threads converge on a single closing implication. "
                    "If the closing sentence does not follow from all threads, cut to the strongest single thread. "
                    "LEDE PRECISION RULE: Avoid absolute framing unless a source explicitly uses it. "
-                   "IMPLICATION FOCUS RULE: Sentence 3 must make exactly one claim. Cut any 'and' connecting two consequences.",
+                   "IMPLICATION FOCUS RULE: Sentence 3 must make exactly one claim. Cut any 'and' connecting two consequences. "
+                   "BULLET DEPTH RULE: Do not build this entry from the first insight bullet alone. Read all insight bullets for this company's sources before writing. "
+                   "The most specific and verifiable content (named products, specific numbers, architectural details) is often in bullets 2-4, not bullet 1. "
+                   "METRICS PRESERVATION RULE: If a source contains a specific number (dollar amount, percentage, named product, date), include it if it supports the entry. Named companies, products, and dollar figures ground the entry. "
+                   "SCOPE FIDELITY RULE: Reflect the actual scope stated in the source. If a source explicitly limits scope (e.g. 'non-safety parts only'), the entry must reflect that limit, not expand it. "
+                   "INFERENCE BOUNDARY RULE: Do not assert competitive framings, strategic motivations, or market positions not explicitly stated in the source. "
+                   "If the source says 'open infrastructure for non-safety functions,' do not write 'competing with safety-critical vendors.' "
+                   "If the source says 'minority investment participant,' do not write 'vertically integrating' or 'infrastructure ownership.' "
+                   "If a source shows a 1.75x fund size increase, do not assert '3-5x capital requirements' — that multiplier is not in the source.",
       "source_indices": []
     }},
     "Meta": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
@@ -350,14 +391,17 @@ Produce a structured JSON object:
     "Netflix": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
     "Microsoft": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
     "NVIDIA": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
-    "OpenAI": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}}
+    "OpenAI": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
+    "Anthropic": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}}
   }},
   "startup_radar": [
     {{
       "bullet": "2-3 items on early-stage or emerging companies making unexpected moves. "
                 "Structure each bullet as: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. "
                 "Only include early-stage or emerging companies — do not include established large-cap companies. "
-                "IMPLICATION FOCUS RULE: Each bullet must close with exactly one strategic consequence. Cut any 'and' connecting two separate consequences.",
+                "IMPLICATION FOCUS RULE: Each bullet must close with exactly one strategic consequence. Cut any 'and' connecting two separate consequences. "
+                "METRICS PRESERVATION RULE: Include the funding amount, round size, or key metric from the source. Do not omit specific numbers that ground the strategic claim. "
+                "INFERENCE BOUNDARY RULE: Do not assert a specific multiplier, ratio, or benchmark unless it appears verbatim in the source. Inferred benchmarks must use 'suggests' or 'implies' framing, never assertion.",
       "source_indices": []
     }}
   ],
@@ -373,7 +417,12 @@ Produce a structured JSON object:
 }}
 
 Guidance:
-- COMPANY WATCH GROUNDING RULE: Do not connect two separate signals for the same company into a causal narrative unless that connection is explicitly made in the sources. Each sentence must be traceable to a specific cited source.
+- SECTION ROUTING RULE: Each item is tagged with an "Allowed section" field. This is a hard constraint, not a suggestion.
+    Items tagged "company_watch ONLY" (theme: company_strategy) may ONLY appear in company_watch entries.
+    Items tagged "startup_radar ONLY" (theme: startup_disruption) may ONLY appear in startup_radar bullets.
+    Items tagged "pm_craft_today ONLY" (theme: product_craft) may ONLY appear in pm_craft_today.
+  A TechCrunch article about Amazon is tagged startup_disruption → startup_radar ONLY. Do not use it in company_watch even if it describes a major company's strategy. Company Watch entries must be built exclusively from company_strategy sources (official company blogs, newsrooms, first-party announcements). If no company_strategy item covers a given company today, set that company's paragraph to empty string — do not substitute a startup_disruption item.
+- COMPANY WATCH GROUNDING RULE: Do not connect two separate signals for the same company into a causal narrative unless that connection is explicitly made in the sources. Each sentence must be traceable to a specific cited source. Do not infer competitive intent, strategic motivation, or market position that the source does not explicitly state. Scope fidelity is required: if a source limits a product to 'non-safety functions,' do not frame it as competing with safety-critical vendors. If a source describes a minority VC investment, do not frame it as vertical integration or infrastructure ownership. If a source shows a fund grew 1.75x, do not assert industry-wide capital requirements are 3-5x higher.
 - COMPANY WATCH INSIGHT RULE: Each company paragraph must answer 'what is strategically shifting for this company today' — not just 'what did they do.'
 - STARTUP RADAR RULE: Each bullet must contain a genuine 'so what' — the strategic implication, competitive threat, or market pattern revealed, not just a description of the event.
 - PM CRAFT OMIT RULE: If no item contains a craft-relevant insight, set pm_craft_today text to empty string rather than forcing a weak insight.
@@ -441,7 +490,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
     for theme, items in grouped_summaries.items():
         for item in items:
-            conf_raw = str(item.get("confidence") or "medium").lower()
+            conf_raw = str(item.get("confidence") or "low").lower()
             if conf_raw not in {"high", "medium"}:
                 dropped_low_confidence += 1
                 logger.info(
@@ -450,7 +499,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 )
                 continue
 
-            relevance_raw = str(item.get("pm_relevance_score") or "medium").lower()
+            relevance_raw = str(item.get("pm_relevance_score") or "low").lower()
             if relevance_raw not in {"high", "medium"}:
                 dropped_low_relevance += 1
                 logger.info(
