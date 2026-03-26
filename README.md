@@ -57,6 +57,7 @@ RSS/Podcast Sources (40)
   date warnings
   coherence warnings
   routing violations
+  CW source integrity checks
         ↓
   SQLite Cache
   (date-keyed, Railway Volume)
@@ -81,11 +82,11 @@ Every digest run is automatically evaluated by an LLM judge across 5 quality dim
 
 | Dimension | What it measures |
 |---|---|
-| **Coherence** | Do all sentences in a paragraph support a single unified insight? |
-| **Insight Depth** | Is this a genuine synthesis revealing something non-obvious, or just a summary? |
-| **Grounding** | Does the cited source actually contain evidence for each claim? |
-| **Topical Breadth (What's Shifting)** | Does this section distribute central claims across the five eligible themes (AI & technology, market behavior, consumer behavior, regulation & policy, design & UX)? |
-| **Relevance (Interview Angle)** | Can a PM use this insight to demonstrate strategic thinking in an interview? |
+| **Coherence** | Do all sentences support a single unified insight, and is that unity emergent from the sources or constructed by the synthesizer? Paragraphs that ignore complicating source evidence to preserve narrative coherence score lower even if internally consistent. |
+| **Insight Depth** | Is this a genuine synthesis revealing something non-obvious, does the closing implication commit to one sharp claim, and is that implication traceable to a source bullet rather than synthesizer reasoning? |
+| **Grounding** | Two-component check: (1) forward traceability — can every specific claim be traced to a source passage? (2) backward completeness — did the synthesis fairly represent the full source evidence, including contradictions and complicating bullets? Selective omission that distorts the conclusion is scored as a grounding failure even if every included claim is correctly sourced. |
+| **Topical Breadth (What's Shifting)** | Does this section distribute central claims across the five eligible themes (AI & technology, market behavior, consumer behavior, regulation & policy, design & UX)? No single theme should anchor more than one paragraph. |
+| **Relevance (Interview Angle)** | Can a PM use this insight to demonstrate strategic thinking in an interview? Domain specificity is not penalized if the underlying principle is transferable across PM roles. |
 
 **Pipeline guardrails** (diagnostic, not scored):
 
@@ -105,6 +106,7 @@ Every digest run is automatically evaluated by an LLM judge across 5 quality dim
 | Date warnings | Milestone or timeline claims where the cited date is earlier than today — catches past dates stated as future events |
 | Coherence warnings | Same source cited in multiple company entries (risk of contradictory framings) or shared between What's Shifting and Company Watch (routing violation) |
 | Routing violations | What's Shifting paragraphs citing dedicated-section sources, or Company Watch citing What's Shifting sources |
+| CW source integrity violations | Company Watch entries citing non-company_strategy sources (e.g. a third-party article about a major company routed incorrectly); entry is automatically cleared and logged |
 
 Every brief on the [Evals page](https://pm-intelligence-digest-production.up.railway.app/evals) includes an inline reasons row in the table showing the judge's one-sentence reasoning per dimension.
 
@@ -123,7 +125,7 @@ Every brief on the [Evals page](https://pm-intelligence-digest-production.up.rai
 | Regulation & Policy | Politico Tech, EFF, Medianama |
 | Design & UX | Nielsen Norman Group, UX Collective |
 
-**Source routing:** Company Watch is sourced exclusively from first-party official feeds (company blogs and newsrooms). What's Shifting, Startup Radar, and PM Craft draw from third-party sources only — ensuring Company Watch and What's Shifting never recycle the same source across sections.
+**Source routing:** Company Watch is sourced exclusively from first-party official feeds (company blogs and newsrooms). A post-processing validator enforces this at runtime — any Company Watch entry whose cited source is not tagged `company_strategy` is automatically cleared before the digest is stored or displayed. What's Shifting, Startup Radar, and PM Craft draw from third-party sources only — ensuring Company Watch and What's Shifting never recycle the same source across sections.
 
 Sources were chosen to balance AI-optimist vs. skeptic voices, US vs. global perspective, and primary sources vs. independent analysis.
 
@@ -131,9 +133,9 @@ Sources were chosen to balance AI-optimist vs. skeptic voices, US vs. global per
 
 Every claim in the synthesis is grounded in cited source items. The `source_index_lookup` maps each `[n]` citation back to the original article title and source name, making it easy to verify any claim in seconds.
 
-The evaluator's **Grounding** dimension specifically checks whether cited sources actually contain evidence for each claim. The grounding rubric requires passage-level traceability — for each synthesis claim, the evaluator must identify the specific source sentence or data point that supports it. Plausibility and topic consistency are explicitly excluded as proxies for evidence. Claims that contradict an explicit source statement (e.g. scope inversions) or assert specific numbers not present in the source are scored as grounding failures regardless of how well-written they appear.
+The evaluator's **Grounding** dimension applies a two-component check. Forward traceability requires that every specific claim traces to a specific source passage or data point — plausibility and topic consistency are explicitly excluded as proxies for evidence, and specific numbers not appearing verbatim in the source are treated as unsourced. Backward completeness requires that the synthesis fairly represents the full source evidence: omitting a named expert contradiction, suppressing a bullet that challenges the paragraph's central claim, or building a conclusion from 1-2 bullets while ignoring stronger ones all constitute grounding failures regardless of how well-cited the included claims are.
 
-Only high and medium confidence items (scored by Claude in Pass 1) are fed into the synthesis pass.
+Only high and medium confidence items (scored by Claude in Pass 1) are fed into the synthesis pass. Confidence is defined as source depth — how much of a bullet could be written from the content body itself — not topic interest. A thin source on an interesting topic scores low confidence.
 
 ## Setup
 
@@ -170,7 +172,7 @@ Open `http://127.0.0.1:8000` — the first load triggers the full pipeline. Runt
 
 ### Railway / Nixpacks (Python version)
 
-The repo pins **Python 3.12.8** via `nixpacks.toml`, `mise.toml`, and `.python-version` so Railway’s build does not pull **Python 3.13.x** builds that can fail under `mise` with *“Python installation is missing a `lib` directory”* (often tied to experimental freethreaded installers). If you deploy elsewhere, use Python **3.12.x** or **3.11.x** for the same reason.
+The repo pins **Python 3.12.8** via `nixpacks.toml`, `mise.toml`, and `.python-version` so Railway's build does not pull **Python 3.13.x** builds that can fail under `mise` with *"Python installation is missing a `lib` directory"* (often tied to experimental freethreaded installers). If you deploy elsewhere, use Python **3.12.x** or **3.11.x** for the same reason.
 
 ### Configuration
 
@@ -232,11 +234,15 @@ pm-intelligence-digest/
 
 **Prompt and eval design improve together.** The synthesizer prompt and the eval scorers have been in continuous co-evolution since deployment. Topical breadth went through three rewrites — from "reward non-AI" to "penalize both extremes" to "score distance from 60/40 ideal" to "a five-theme diversity model" — each time because the eval revealed a pattern the current rule couldn't catch. Coherence and insight depth scorers were extended to explicitly check lede fidelity and implication focus after paragraph-level review identified overclaiming and multi-part implications the original rubric scored as fine. The eval reasons UI — judge reasoning displayed inline in the evals table per dimension — made all of this debuggable in production rather than opaque.
 
-**Source routing prevents cross-section recycling.** Early versions of What's Shifting consistently recycled the strongest Company Watch insights at a higher abstraction level — the same Nvidia GTC or Apple India source appearing in both sections. The fix was architectural: partition the 40 sources into routing buckets at the synthesizer level, so Company Watch only sees first-party company feeds and What's Shifting only sees third-party market, consumer, regulation, and design sources. The breadth eval now checks theme diversity; a future version will check source independence across sections.
+**Synthesizers optimize for narrative coherence over source fidelity.** Manual QA against raw source bullets revealed a consistent failure mode: the synthesizer selects 1-2 bullets that support its central thesis and drops the rest — including named expert contradictions, complicating evidence, and often stronger PM insights than the ones it leads with. Prompt rules alone don't fully fix this. The synthesizer needs an explicit omission check (review all bullets per source before finalizing, assess whether dropping any distorts the conclusion) and a contradiction mandate (named challenges to the central claim must appear). The evaluator needs a matching backward completeness check — otherwise it rewards well-constructed arguments built on selectively chosen evidence with perfect grounding scores.
 
-**Post-processing validators catch what prompts miss.** Prompt rules alone don't reliably enforce structural constraints — a model under a long context will occasionally violate a rule it was given 3,000 tokens earlier. Adding deterministic post-processing validators (multi-thread detection, date validation, cross-source coherence checks, routing violation flags) creates a second enforcement layer that runs after every synthesis pass and logs warnings before anything reaches the frontend.
+**Source routing prevents cross-section recycling but needs two enforcement layers.** Early versions of What's Shifting consistently recycled the strongest Company Watch insights at a higher abstraction level. The fix was architectural: partition the 40 sources into routing buckets at the synthesizer level. But prompt-level routing rules can still be violated when a third-party article about a major company reaches the synthesizer in the same call as first-party sources. A deterministic post-processing validator — checking that every Company Watch citation index maps to a `company_strategy`-themed source and clearing violations before storage — provides the second enforcement layer that prompt rules alone cannot guarantee.
 
-**QA and prompt co-evolution requires source verification.** Automated eval scores can mask factual inversions — the grounding evaluator gave 5.0 to a paragraph that directly contradicted its source (scope limited to non-safety functions, synthesis claimed safety-critical competition). Manual source verification caught three categories the evaluator missed: claims that contradicted explicit source statements, specific numbers generated by the summarizer with no source basis, and strategic framings inferred from thin sources (4-sentence press releases). The fix was architectural: rewrite the grounding rubric to require passage-level citation traceability, rewrite the confidence definition to measure source depth rather than topic interest, and add section routing tags so the model cannot misroute third-party articles into first-party-only sections.
+**Post-processing validators catch what prompts miss.** Prompt rules alone don't reliably enforce structural constraints — a model under a long context will occasionally violate a rule it was given 3,000 tokens earlier. Adding deterministic post-processing validators (multi-thread detection, date validation, cross-source coherence checks, routing violation flags, CW source integrity checks) creates a second enforcement layer that runs after every synthesis pass and logs warnings before anything reaches the frontend.
+
+**QA and prompt co-evolution requires source verification.** Automated eval scores can mask systematic omission bias — the grounding evaluator gave 5.0 to paragraphs that suppressed named contradictions and dropped stronger insights, because it only checked forward traceability. Manual source verification caught three failure categories the automated eval missed: contradiction suppression (named expert challenges dropped to preserve narrative), selective bullet use (1-2 bullets padded into a paragraph while 3-4 stronger bullets were ignored), and thematic forced combination (mechanistically unrelated stories grouped under a broad theme label). The fix required both a synthesizer-side omission check and an evaluator-side backward completeness rubric — neither alone is sufficient.
+
+**Roundup articles are a source integrity problem.** Multi-story roundup articles (single URLs containing 4-5 unrelated stories) produce citation title mismatches and cross-section content bleed. The synthesizer's instruction to "focus on the lead story" doesn't hold reliably — all stories get extracted as bullets and can be cited under a source title that doesn't reflect the content. Current workaround: treat roundup sources with awareness that citation titles may not match cited content. Proper fix requires splitting roundup articles into discrete story units at ingestion before scoring and routing.
 
 ## Roadmap
 
@@ -248,6 +254,7 @@ pm-intelligence-digest/
 * [ ] Timestamp localization — show IST instead of UTC
 * [ ] Scraper support for Uber newsrooms (no native RSS feeds available)
 * [ ] Editorial warnings surfaced in the Evals UI alongside judge scores
+* [ ] Roundup article splitting — detect multi-story roundup articles at ingestion and split into discrete story units before scoring and routing, eliminating citation title mismatches and cross-section bleed
 
 ## Built With
 

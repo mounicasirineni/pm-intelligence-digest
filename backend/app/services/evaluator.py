@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import sqlite3
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from anthropic import Anthropic
 from ..config import load_settings
 from .summarizer import _extract_json
 
+
+logger = logging.getLogger(__name__)
 
 EVAL_MODEL = "claude-haiku-4-5-20251001"
 
@@ -268,53 +271,83 @@ async def llm_judge(
 
         source_summaries = _build_source_summaries(indices)
         evidence_block = (
-            "Source evidence:\n" + "\n".join(f"{s}: {' | '.join(b)}" for s, b in source_summaries.items())
+            "Source evidence (ALL bullets for each cited source — not just the ones used in synthesis):\n"
+            + "\n".join(
+                f"{s}:\n" + "\n".join(f"  [{i+1}] {b}" for i, b in enumerate(bullets))
+                for s, bullets in source_summaries.items()
+            )
             if source_summaries else
             "Source evidence:\n(none found in underlying items)"
         )
 
         user_prompt = (
-            f"Rate this {section_context} paragraph on three dimensions:\n\n"
-            "1. COHERENCE (1-5): Do all sentences support a single unified insight, and does the paragraph deliver what the opening sentence promises? "
-            "Check two things: (a) internal consistency — do all sentences build toward one claim without introducing disconnected threads? "
-            "(b) lede fidelity — does the evidence in the paragraph actually support the strength of the opening claim? "
-            "If the lede says 'X is collapsing' but the evidence only shows 'X is under pressure,' that is a lede precision failure. "
-            "If the lede says 'X is destroying value' but the evidence shows only 'X is failing to create value,' that is overclaiming. "
-            "1=completely disconnected or lede is substantially overclaiming; "
-            "3=sentences are consistent but lede is slightly stronger than evidence supports; "
-            "5=tight single thread throughout and lede matches exactly what the evidence delivers\n\n"
-            "2. INSIGHT_DEPTH (1-5): Is this a genuine synthesis revealing something non-obvious, and does the closing implication commit to a single sharp claim? "
-            "Check two things: (a) synthesis quality — would a reader get this insight from any single source, or does it only emerge from combining signals? "
-            "(b) implication focus — does the closing PM implication make exactly one specific claim (a decision, risk, or opportunity), "
-            "or does it make two or three claims that dilute each other? "
-            "A closing sentence structured as 'meaning A, B, and C' should score no higher than 3 on this dimension regardless of insight quality, "
-            "because unfocused implications reduce actionability. "
-            "1=pure summary or closing implication is three or more generic claims; "
-            "3=genuine synthesis but closing implication is split across two claims; "
-            "5=genuine insight a reader wouldn't get from any single source AND closing implication commits to exactly one sharp, specific consequence\n\n"
-            "3. CITATION_SUPPORT (1-5): Can every specific claim in the paragraph be traced to a specific passage or data point in the source evidence below? "
-            "Apply this test to each claim individually:\n"
-            "  (a) Identify the claim\n"
-            "  (b) Find the exact source sentence or data point that supports it\n"
-            "  (c) If you cannot find one, the claim fails\n\n"
+            f"Rate this {section_context} paragraph on three dimensions. "
+            "All source bullets for each cited source are provided — not just the ones the synthesis used.\n\n"
+            "1. COHERENCE (1-5): Does the paragraph deliver a unified insight, AND is that unity emergent from the sources or constructed by the synthesizer?\n\n"
+            "Check two things:\n"
+            "  (a) Internal consistency — do all sentences build toward one claim without disconnected threads?\n"
+            "  (b) Source-emergent unity — does the unifying claim actually appear in any source, or did the synthesizer impose it?\n"
+            "      A paragraph that selects only narrative-supporting bullets and ignores complicating evidence from the same sources "
+            "is not coherent — it is selectively constructed. If the synthesis ignores bullets that challenge or complicate its central claim, "
+            "that is a coherence failure even if the included sentences are internally consistent.\n"
+            "  (c) Lede fidelity — does the evidence support the strength of the opening claim?\n\n"
             "Scoring:\n"
-            "  5 = every claim traces to a specific source passage — no exceptions\n"
-            "  4 = one minor inference tightly constrained by the source\n"
-            "  3 = one moderate inference presented as fact, or one specific number with no source basis\n"
-            "  2 = multiple inferences presented as sourced facts, or one claim that contradicts the source\n"
-            "  1 = paragraph's central claim or a key specific figure has no source basis, or directly contradicts the source\n\n"
+            "1 = completely disconnected OR lede substantially overclaims OR unity is fully synthesizer-imposed with no source support\n"
+            "2 = sentences are consistent but unifying claim contradicts or ignores major source evidence\n"
+            "3 = sentences are consistent but lede is slightly stronger than evidence, or unity is synthesizer-constructed from loosely related sources\n"
+            "4 = tight thread, lede matches evidence, unity is grounded but one source has a complicating bullet the synthesis omitted\n"
+            "5 = tight single thread throughout, lede matches exactly what evidence delivers, AND the unifying claim is present in at least one source (not purely synthesizer construction)\n\n"
+            "2. INSIGHT_DEPTH (1-5): Is this a genuine synthesis revealing something non-obvious, does the closing implication commit to one sharp claim, AND is that implication grounded in the sources?\n\n"
+            "Check three things:\n"
+            "  (a) Synthesis quality — would a reader get this from any single source?\n"
+            "  (b) Implication focus — does the closing PM implication make exactly one specific claim?\n"
+            "  (c) Inference discipline — is the closing implication traceable to a specific bullet in the cited sources, "
+            "or is it the synthesizer's own reasoning presented as a source-supported conclusion? "
+            "A well-written implication that goes beyond what any source states must be scored down. "
+            "Framing like 'these cases suggest...' is acceptable inference. "
+            "Framing like 'this demonstrates that PMs should...' when no source makes that claim is an inference boundary violation.\n"
+            "Also check: are there bullets in the source evidence that contain a sharper or more actionable PM insight "
+            "than what the synthesis leads with? If the synthesis chose a weaker insight while a stronger one was available in the source bullets, "
+            "that is an insight selection failure and should reduce this score.\n\n"
+            "Scoring:\n"
+            "1 = pure summary, or closing implication is generic and unsourced, or a sharper available insight was ignored\n"
+            "2 = some synthesis but closing implication is an unsourced assertion, or meaningfully stronger insight was available and dropped\n"
+            "3 = genuine synthesis but closing implication is split across two claims, or slightly overstates what sources support\n"
+            "4 = genuine insight, single sharp implication, tightly grounded — minor inference acceptable\n"
+            "5 = genuine insight a reader wouldn't get from any single source, closing implication commits to exactly one sharp specific consequence traceable to a source bullet\n\n"
+            "3. CITATION_SUPPORT (1-5): Can every specific claim trace to a source passage AND did the synthesis fairly represent what the sources contain?\n\n"
+            "This dimension has TWO components:\n\n"
+            "  FORWARD TRACEABILITY: Can every specific claim in the paragraph be traced to a specific passage or data point?\n"
+            "    Apply to each claim: (a) identify the claim, (b) find the exact source sentence, (c) if none exists, claim fails.\n\n"
+            "  BACKWARD COMPLETENESS: Did the synthesis fairly represent the sources, or did it selectively omit evidence?\n"
+            "    For each cited source, review ALL bullets provided above. Ask:\n"
+            "    - Did the synthesis omit a bullet containing a named contradiction or named expert challenge to the paragraph's central claim?\n"
+            "    - Did the synthesis omit a bullet containing a sharper, more specific, or more actionable insight than what was included?\n"
+            "    - Did the synthesis build its conclusion primarily from 1-2 bullets while ignoring 3+ equally relevant bullets from the same source?\n"
+            "    Selective omission that distorts the paragraph's conclusion is a citation integrity failure, "
+            "even if every included claim is correctly sourced.\n\n"
+            "Scoring:\n"
+            "5 = every claim traces to a specific source passage AND synthesis fairly represents the full source evidence with no distorting omissions\n"
+            "4 = one minor inference tightly constrained by source, no significant omissions\n"
+            "3 = one moderate inference presented as fact, OR one high-value bullet omitted that would complicate but not reverse the conclusion\n"
+            "2 = multiple unsourced inferences OR a named contradiction/expert challenge was omitted OR conclusion built from 1-2 bullets while ignoring stronger ones\n"
+            "1 = paragraph's central claim has no source basis, directly contradicts the source, OR a named source bullet explicitly refutes the central claim and was suppressed\n\n"
             "CRITICAL RULES:\n"
-            "  - Plausibility is NOT evidence. A claim that sounds consistent with the source topic but is not stated in the source evidence is an unsourced inference.\n"
-            "  - Any specific number (ratio, percentage, dollar figure, multiplier, timeline) not appearing verbatim in the source evidence must be treated as unsourced.\n"
-            "  - A claim that contradicts an explicit statement in the source scores 1 regardless of how well-written it is.\n"
-            "    Example: if source says 'non-safety functions' but synthesis says 'core vehicle functions competing with safety-critical vendors', that is a contradiction, score 1.\n"
-            "    Example: if source shows a 1.75x fund size increase but synthesis claims '3-5x capital requirements', that specific multiplier is unsourced, score 2 or lower.\n\n"
-            f"Paragraph: {paragraph}\n\n"
+            "  - Plausibility is NOT evidence. A claim consistent with the source topic but not stated is an unsourced inference.\n"
+            "  - Any specific number not appearing verbatim in source evidence must be treated as unsourced.\n"
+            "  - A claim contradicting an explicit source statement scores 1 regardless of writing quality.\n"
+            "  - Omitting a bullet that explicitly challenges the synthesis conclusion scores 1 or 2 depending on severity.\n\n"
+            f"Paragraph:\n{paragraph}\n\n"
             f"{evidence_block}\n\n"
-            'Return only valid JSON: '
-            '{"coherence": N, "coherence_reason": "one sentence identifying either a lede precision issue or confirming tight delivery", '
-            '"insight_depth": N, "insight_depth_reason": "one sentence identifying either an implication focus issue or confirming sharp single claim", '
-            '"citation_support": N, "citation_support_reason": "one sentence identifying the weakest claim and whether it is sourced, inferred, or contradicts the source"}'
+            'Return only valid JSON:\n'
+            '{\n'
+            '  "coherence": N,\n'
+            '  "coherence_reason": "one sentence — identify whether unity is source-emergent or synthesizer-constructed, and note any ignored complicating evidence",\n'
+            '  "insight_depth": N,\n'
+            '  "insight_depth_reason": "one sentence — identify whether closing implication is sourced or inferred, and whether a stronger available insight was dropped",\n'
+            '  "citation_support": N,\n'
+            '  "citation_support_reason": "one sentence — identify the weakest forward traceability claim AND whether any significant source bullet was omitted that distorts the conclusion"\n'
+            '}'
         )
 
         response = client.messages.create(
@@ -325,7 +358,10 @@ async def llm_judge(
                 "You are an expert evaluator of product management intelligence briefs. "
                 "You assess synthesis quality with precision and consistency. "
                 "You are skeptical by default — a paragraph must earn high scores by meeting explicit criteria, "
-                "not by sounding confident or well-written."
+                "not by sounding confident or well-written. "
+                "You have access to ALL source bullets for each cited source, not just the ones the synthesis used. "
+                "Your job is to check both what the synthesis included AND what it omitted. "
+                "A well-constructed argument built on selectively chosen evidence does not earn a high score."
             ),
             messages=[{"role": "user", "content": user_prompt}],
         )
@@ -379,7 +415,6 @@ async def llm_judge(
                 '{"topical_breadth": N, "topical_breadth_reason": "one sentence listing the central theme of each paragraph and how many distinct themes are represented"}'
             )}],
         )
-        # parse response
         try:
             content_block = response.content[0]
             text = getattr(content_block, "text", None) or content_block.get("text")
@@ -414,7 +449,7 @@ async def llm_judge(
             if scored:
                 scored["company"] = company
             return scored
-        except Exception as e:
+        except Exception:
             return None
 
     async def score_sr_one(bullet: Any) -> Dict[str, Any] | None:
@@ -565,8 +600,12 @@ async def interview_angle_quality(
                 "PM RELEVANCE: Would a strong PM candidate use this insight to demonstrate strategic thinking "
                 "in a product sense, system design, or product strategy interview? "
                 "Is it grounded in a real, recent development rather than generic PM advice? "
+                "Does it test a transferable architectural or strategic principle, not just surface-domain knowledge? "
+                "A fintech example that tests a general product architecture tradeoff should score as highly as a broadly applicable example — "
+                "domain specificity is not a penalty if the underlying principle is transferable across PM roles. "
+                "Penalize only when the insight is useful only for a single narrow domain and the principle does not transfer. "
                 "1=generic advice any PM book would give, 5=sharply tied to a current development "
-                "that reveals genuine product strategy thinking\n\n"
+                "that reveals genuine product strategy thinking applicable across PM contexts\n\n"
                 f"Interview Angle: {interview_angle}\n\n"
                 'Return only valid JSON: {"relevance": N, "relevance_reason": "one sentence"}'
             )}],
