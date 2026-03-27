@@ -85,7 +85,7 @@ Every digest run is automatically evaluated by an LLM judge across 5 quality dim
 | **Coherence** | Do all sentences support a single unified insight, and is that unity emergent from the sources or constructed by the synthesizer? Paragraphs that ignore complicating source evidence to preserve narrative coherence score lower even if internally consistent. |
 | **Insight Depth** | Is this a genuine synthesis revealing something non-obvious, does the closing implication commit to one sharp claim, and is that implication traceable to a source bullet rather than synthesizer reasoning? |
 | **Grounding** | Two-component check: (1) forward traceability — can every specific claim be traced to a source passage? (2) backward completeness — did the synthesis fairly represent the full source evidence, including contradictions and complicating bullets? Selective omission that distorts the conclusion is scored as a grounding failure even if every included claim is correctly sourced. |
-| **Topical Breadth (What's Shifting)** | Does this section distribute central claims across the five eligible themes (AI & technology, market behavior, consumer behavior, regulation & policy, design & UX)? No single theme should anchor more than one paragraph. |
+| **Topical Breadth (What's Shifting)** | Does this section distribute central claims across the five eligible themes (AI & technology, market behavior, consumer behavior, regulation & policy, design & UX)? No single theme should anchor more than one paragraph. Scored against available source material — if a theme had 2+ eligible items and does not appear in any paragraph, that is a breadth failure. |
 | **Relevance (Interview Angle)** | Can a PM use this insight to demonstrate strategic thinking in an interview? Domain specificity is not penalized if the underlying principle is transferable across PM roles. |
 
 **Pipeline guardrails** (diagnostic, not scored):
@@ -97,6 +97,7 @@ Every digest run is automatically evaluated by an LLM judge across 5 quality dim
 | Relevant % | Articles with high/medium PM relevance |
 | Utilized % | Relevant articles actually cited in the synthesis |
 | Weak % | Paragraphs scoring ≤2 on any quality dimension |
+| Sections scored | Which sections contributed to the overall score that day — makes day-over-day score comparisons interpretable when section availability varies |
 
 **Post-processing editorial warnings** (logged per run, not scored):
 
@@ -107,6 +108,8 @@ Every digest run is automatically evaluated by an LLM judge across 5 quality dim
 | Coherence warnings | Same source cited in multiple company entries (risk of contradictory framings) or shared between What's Shifting and Company Watch (routing violation) |
 | Routing violations | What's Shifting paragraphs citing dedicated-section sources, or Company Watch citing What's Shifting sources |
 | CW source integrity violations | Company Watch entries citing non-company_strategy sources (e.g. a third-party article about a major company routed incorrectly); entry is automatically cleared and logged |
+| PM Craft source violations | PM Craft entries citing non-product_craft or non-design_ux sources; logged as a violation since PM Craft draws exclusively from dedicated craft sources |
+| Source concentration warnings | Any single source contributing 3+ items to the filtered pool in a single run — flags potential source diversity risk without dropping items |
 
 Every brief on the [Evals page](https://pm-intelligence-digest-production.up.railway.app/evals) includes an inline reasons row in the table showing the judge's one-sentence reasoning per dimension.
 
@@ -242,7 +245,9 @@ pm-intelligence-digest/
 
 **QA and prompt co-evolution requires source verification.** Automated eval scores can mask systematic omission bias — the grounding evaluator gave 5.0 to paragraphs that suppressed named contradictions and dropped stronger insights, because it only checked forward traceability. Manual source verification caught three failure categories the automated eval missed: contradiction suppression (named expert challenges dropped to preserve narrative), selective bullet use (1-2 bullets padded into a paragraph while 3-4 stronger bullets were ignored), and thematic forced combination (mechanistically unrelated stories grouped under a broad theme label). The fix required both a synthesizer-side omission check and an evaluator-side backward completeness rubric — neither alone is sufficient.
 
-**Roundup articles are a source integrity problem.** Multi-story roundup articles (single URLs containing 4-5 unrelated stories) produce citation title mismatches and cross-section content bleed. The synthesizer's instruction to "focus on the lead story" doesn't hold reliably — all stories get extracted as bullets and can be cited under a source title that doesn't reflect the content. Current workaround: treat roundup sources with awareness that citation titles may not match cited content. Proper fix requires splitting roundup articles into discrete story units at ingestion before scoring and routing.
+**Roundup articles require per-story extraction, not lead-story focus.** Multi-story roundup articles (single URLs containing 4-5 unrelated stories) were producing systematic backward completeness failures — the summarizer's "focus on lead story" instruction caused 75%+ of each roundup's signal to be discarded before it reached the synthesizer. The fix was to extract insights from each distinct story separately in the summarizer, giving the synthesizer the full evidence pool to work with. This resolved the downstream pattern of the synthesizer combining mechanistically unrelated stories under forced thematic labels to compensate for thin evidence per bullet.
+
+**Interview Angle must be anchored to What's Shifting content, not the broader source pool.** Manual QA identified a routing failure where the Interview Angle was sourced from a regulation_policy article that never appeared in What's Shifting — producing an angle with no connective tissue to the rest of the brief. The fix was a prompt-level restriction: the interview angle must derive from a source already cited in one of the whats_shifting paragraphs, not from any WS-eligible source. This ensures the angle feels like a natural extension of what the reader just consumed rather than an independent fifth story.
 
 ## Roadmap
 
@@ -254,7 +259,6 @@ pm-intelligence-digest/
 * [ ] Timestamp localization — show IST instead of UTC
 * [ ] Scraper support for Uber newsrooms (no native RSS feeds available)
 * [ ] Editorial warnings surfaced in the Evals UI alongside judge scores
-* [ ] Roundup article splitting — detect multi-story roundup articles at ingestion and split into discrete story units before scoring and routing, eliminating citation title mismatches and cross-section bleed
 
 ## Built With
 

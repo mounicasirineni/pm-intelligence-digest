@@ -213,6 +213,7 @@ def pm_relevance(
 async def llm_judge(
     synthesis: Dict[str, Any],
     items_by_theme: Dict[str, Any],
+    ws_available_themes: Dict[str, int] | None = None,
 ) -> Dict[str, Any]:
     """
     Quality scores for whats_shifting, company_watch, and startup_radar.
@@ -272,6 +273,9 @@ async def llm_judge(
         source_summaries = _build_source_summaries(indices)
         evidence_block = (
             "Source evidence (ALL bullets for each cited source — not just the ones used in synthesis):\n"
+            "NOTE: The bullet numbers [1], [2], [3] below are internal reference numbers for this evaluation only. "
+            "They do NOT correspond to the citation indices [n] used in the synthesis paragraph. "
+            "Match claims to sources by source name and claim content, not by index number.\n"
             + "\n".join(
                 f"{s}:\n" + "\n".join(f"  [{i+1}] {b}" for i, b in enumerate(bullets))
                 for s, bullets in source_summaries.items()
@@ -336,7 +340,10 @@ async def llm_judge(
             "  - Plausibility is NOT evidence. A claim consistent with the source topic but not stated is an unsourced inference.\n"
             "  - Any specific number not appearing verbatim in source evidence must be treated as unsourced.\n"
             "  - A claim contradicting an explicit source statement scores 1 regardless of writing quality.\n"
-            "  - Omitting a bullet that explicitly challenges the synthesis conclusion scores 1 or 2 depending on severity.\n\n"
+            "  - Omitting a bullet that explicitly challenges the synthesis conclusion scores 1 or 2 depending on severity.\n"
+            "  - MULTI-SOURCE CITATIONS: For paragraphs citing multiple sources, check each specific claim against ALL cited sources before concluding it is unsourced. "
+            "A claim may be sourced in one source even if it does not appear in another. "
+            "Do not conclude a claim is unsourced until you have checked every cited source's bullet list individually.\n\n"
             f"Paragraph:\n{paragraph}\n\n"
             f"{evidence_block}\n\n"
             'Return only valid JSON:\n'
@@ -379,11 +386,28 @@ async def llm_judge(
             "citation_support_reason": str(parsed.get("citation_support_reason") or ""),
         }
 
-    def _score_topical_breadth(ws_paragraphs: List[str]) -> Dict[str, Any]:
+    def _score_topical_breadth(
+        ws_paragraphs: List[str],
+        available_themes: Dict[str, int] | None = None,
+    ) -> Dict[str, Any]:
         if not ws_paragraphs:
             return {"topical_breadth": 0, "topical_breadth_reason": "No paragraphs to evaluate."}
         client = _build_llm_client()
         combined = "\n\n".join(ws_paragraphs)
+
+        available_themes_block = ""
+        if available_themes:
+            theme_lines = "\n".join(
+                f"  - {theme}: {count} item(s) available"
+                for theme, count in sorted(available_themes.items(), key=lambda x: -x[1])
+            )
+            available_themes_block = (
+                f"\nAvailable source material by theme today:\n{theme_lines}\n"
+                "If a theme had 2+ available items and does not appear as the central claim of any paragraph, "
+                "that is a breadth failure — the synthesizer had material to work with and chose not to use it. "
+                "Penalize accordingly.\n"
+            )
+
         response = client.messages.create(
             model=EVAL_MODEL,
             max_tokens=256,
@@ -402,6 +426,7 @@ async def llm_judge(
                 "5. Design & UX — central claim is about product design patterns, user experience shifts, or interface paradigms\n\n"
                 "For each paragraph, identify its central theme based solely on the opening sentence's primary claim. "
                 "A theme appearing only as a supporting example does not count — only the central claim determines the theme.\n\n"
+                + available_themes_block +
                 "Score based on theme diversity across paragraphs:\n"
                 "1 = One theme dominates all or nearly all paragraphs (e.g. 4-5 regulation paragraphs)\n"
                 "2 = Only two distinct themes represented across all paragraphs\n"
@@ -412,7 +437,7 @@ async def llm_judge(
                 "A four-paragraph brief scoring 5 must cover at least four distinct themes.\n\n"
                 f"What's Shifting section:\n{combined}\n\n"
                 'Return only valid JSON: '
-                '{"topical_breadth": N, "topical_breadth_reason": "one sentence listing the central theme of each paragraph and how many distinct themes are represented"}'
+                '{"topical_breadth": N, "topical_breadth_reason": "one sentence listing the central theme of each paragraph, how many distinct themes are represented, and whether any theme with available source material was omitted"}'
             )}],
         )
         try:
@@ -471,7 +496,7 @@ async def llm_judge(
         ws_paragraphs = [p for p in ws_paragraphs if p]
         loop = asyncio.get_running_loop()
         try:
-            return await loop.run_in_executor(None, lambda: _score_topical_breadth(ws_paragraphs))
+            return await loop.run_in_executor(None, lambda: _score_topical_breadth(ws_paragraphs, ws_available_themes))
         except Exception:
             return {"topical_breadth": 0, "topical_breadth_reason": "Eval failed."}
 
@@ -709,12 +734,28 @@ def run(
     pipeline_funnel_result = pipeline_funnel(items_by_theme, synthesis, fetch_metadata)
     pm_relevance_result = pm_relevance(items_by_theme)
 
+    # Compute available WS themes for breadth scorer
+    WHATS_SHIFTING_THEMES = {
+        "ai_technology", "market_behavior", "consumer_behavior", "regulation_policy", "design_ux"
+    }
+    ws_available_themes: Dict[str, int] = {}
+    for theme, items in (items_by_theme or {}).items():
+        if theme in WHATS_SHIFTING_THEMES:
+            relevant_count = sum(
+                1 for item in (items or [])
+                if isinstance(item, dict)
+                and str(item.get("confidence") or "low").lower() in {"high", "medium"}
+                and str(item.get("pm_relevance_score") or "low").lower() in {"high", "medium"}
+            )
+            if relevant_count > 0:
+                ws_available_themes[theme] = relevant_count
+
     try:
-        llm_judge_result = asyncio.run(llm_judge(synthesis, items_by_theme))
+        llm_judge_result = asyncio.run(llm_judge(synthesis, items_by_theme, ws_available_themes))
     except RuntimeError:
         loop = asyncio.new_event_loop()
         try:
-            llm_judge_result = loop.run_until_complete(llm_judge(synthesis, items_by_theme))
+            llm_judge_result = loop.run_until_complete(llm_judge(synthesis, items_by_theme, ws_available_themes))
         finally:
             loop.close()
 
@@ -806,10 +847,24 @@ def run(
     else:
         overall_score = 0.0
 
+    sections_scored = []
+    if ws_scores:
+        sections_scored.append("whats_shifting")
+    if cw_scores:
+        sections_scored.append("company_watch")
+    if sr_scores:
+        sections_scored.append("startup_radar")
+    if pc_insight > 0:
+        sections_scored.append("pm_craft")
+    if ia_relevance > 0:
+        sections_scored.append("interview_angle")
+
     flags = {
         "flagged_paragraphs": llm_judge_result.get("flagged_paragraphs") or [],
         "total_scored": int(llm_judge_result.get("total_scored") or 0),
         "weak_pct": float(llm_judge_result.get("weak_pct") or 0.0),
+        "sections_scored": sections_scored,
+        "sections_scored_count": len(sections_scored),
     }
 
     eval_result = EvalResult(

@@ -276,10 +276,17 @@ Produce a structured JSON object:
                    "MINIMUM BULLET COVERAGE RULE: Each paragraph must draw from at least 3 distinct insight bullets across its cited sources. "
                    "If you cannot find 3 distinct bullets that genuinely connect, do not publish the paragraph — it is too thin. "
                    "Count bullets used before finalizing. A paragraph built from 1-2 bullets padded with synthesizer reasoning does not qualify. "
+                   "Additionally, at least one cited source must contribute 2 or more bullets to the paragraph. "
+                   "A paragraph that uses exactly 1 bullet from each source is likely skimming the surface of each source rather than engaging deeply. "
+                   "Verify you have read all bullets for each source before concluding only 1 bullet is usable. "
                    "OMISSION CHECK RULE: Before finalizing each paragraph, review ALL insight bullets for every cited source — not just the ones you used. "
                    "For each cited source, identify the highest-value bullet you did NOT use. Ask: does omitting it distort the paragraph's conclusion or bury a stronger insight? "
                    "If yes, either incorporate it or revise the conclusion to reflect the more complete picture. "
                    "A paragraph that selects only narrative-supporting bullets while dropping complicating evidence is a synthesis failure, not a synthesis. "
+                   "OMISSION CHECK DEPTH: This check applies most critically to bullets ranked 2-4 in each source. "
+                   "The summarizer orders bullets from most specific to most abstract — bullet 1 is often the most abstract framing, "
+                   "while bullets 2-4 contain the most specific mechanisms, named products, concrete tradeoffs, and verifiable numbers. "
+                   "Do not stop reading after bullet 1. The strongest strategic insight is frequently not the first bullet. "
                    "CONTRADICTION MANDATE: If any cited source contains a named expert, named data point, or explicit claim that directly challenges the paragraph's central thesis, "
                    "it must appear in the paragraph. You may steelman your thesis against it, but you may not omit it. "
                    "Suppressing a contradiction to preserve narrative coherence is a citation integrity violation. "
@@ -289,15 +296,25 @@ Produce a structured JSON object:
                    "(b) assert that a pattern is universal or industry-wide when sources show 1-2 examples, "
                    "(c) recommend a specific PM action that no source suggests or supports. "
                    "If your implication goes beyond what sources support, frame it explicitly as inference: 'these cases suggest...' not 'this demonstrates that PMs should...' "
+                   "INFERENCE BOUNDARY SELF-CHECK: Before finalizing the closing implication, identify the specific source bullet it traces to. "
+                   "If you cannot point to a specific bullet, rewrite the implication using 'these cases suggest...' framing. "
+                   "A well-written implication that exceeds what any source states must be reframed as inference, not presented as a sourced conclusion. "
                    "THEMATIC COMBINATION RULE: Two stories may only appear in the same paragraph if they share a specific mechanism — "
                    "not just a broad theme. Sharing a theme label ('AI', 'regulation', 'platforms', 'government') is not sufficient. "
                    "Ask: do these stories share the same causal chain, the same failure mode, or the same design implication? "
                    "If the best you can say is 'both involve X category,' they belong in separate paragraphs. "
-                   "This replaces the REGULATORY CLUSTER RULE and applies to all thematic combinations.",
+                   "This replaces the REGULATORY CLUSTER RULE and applies to all thematic combinations. "
+                   "THEMATIC COMBINATION SELF-CHECK: Before finalizing each paragraph that cites 2+ sources, write one sentence naming "
+                   "the specific shared mechanism between all cited sources. If you cannot name it precisely — not 'both involve AI' "
+                   "or 'both involve regulation' but a specific causal chain, failure mode, or design implication — split into separate paragraphs. "
+                   "Do not proceed without completing this check.",
       "source_indices": [1, 2]
     }}
   ],
   "interview_angle": "One specific thing a PM should have a prepared opinion on before interviews this week. "
+                     "SOURCE RESTRICTION: The interview angle must derive from a source already cited in one of the whats_shifting paragraphs above. "
+                     "Do not introduce a new source that did not appear in whats_shifting. "
+                     "If no whats_shifting paragraph was produced, set interview_angle to empty string. "
                      "Anchor to a specific named company, case, or development from today's sources. "
                      "Frame as a debatable claim or tradeoff, not a fact to recite. "
                      "Rotate focus across product strategy, consumer insight, regulatory navigation, and AI. "
@@ -410,7 +427,11 @@ Produce a structured JSON object:
                    "If the source says 'open infrastructure for non-safety functions,' do not write 'competing with safety-critical vendors.' "
                    "If the source says 'minority investment participant,' do not write 'vertically integrating' or 'infrastructure ownership.' "
                    "If a source shows a 1.75x fund size increase, do not assert '3-5x capital requirements' — that multiplier is not in the source. "
-                   "The closing implication must be traceable to a specific bullet in a cited source. Frame synthesizer reasoning as inference: 'this suggests...' not 'this demonstrates...'",
+                   "The closing implication must be traceable to a specific bullet in a cited source. Frame synthesizer reasoning as inference: 'this suggests...' not 'this demonstrates...' "
+                   "CONTRADICTION MANDATE: If any cited source contains a named data point, explicit claim, or product detail that directly challenges or complicates "
+                   "the entry's central framing, it must appear in the entry or the framing must be revised. "
+                   "You may steelman your thesis against it, but you may not omit it. "
+                   "Suppressing a contradicting bullet to preserve a cleaner narrative is a citation integrity violation.",
       "source_indices": []
     }},
     "Meta": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
@@ -431,13 +452,21 @@ Produce a structured JSON object:
                 "METRICS PRESERVATION RULE: Include the funding amount, round size, or key metric from the source. Do not omit specific numbers that ground the strategic claim. "
                 "INFERENCE BOUNDARY RULE: Do not assert a specific multiplier, ratio, or benchmark unless it appears verbatim in the source. Inferred benchmarks must use 'suggests' or 'implies' framing, never assertion. "
                 "OMISSION CHECK RULE: Before finalizing each bullet, review ALL insight bullets for the cited source. "
-                "Identify the highest-value bullet you did NOT use. If omitting it buries the sharper strategic insight, use that one instead.",
+                "Identify the highest-value bullet you did NOT use. If omitting it buries the sharper strategic insight, use that one instead. "
+                "THEMATIC COMBINATION RULE: Each startup_radar bullet must cover a single company or a single strategic pattern. "
+                "Do not combine two unrelated companies or two unrelated stories into one bullet under a broad theme label. "
+                "If two stories share only a category ('fintech', 'EV', 'AI') but not a specific causal mechanism or shared implication, "
+                "they belong in separate bullets. "
+                "THEMATIC COMBINATION SELF-CHECK: Before finalizing any bullet citing 2+ sources, name the specific shared mechanism. "
+                "If you cannot name it precisely, split into separate bullets.",
       "source_indices": []
     }}
   ],
   "pm_craft_today": {{
     "text": "Single most actionable PM craft insight from today's content. "
-            "Draw from product_craft or design_ux items first. If none available, use startup_disruption or company_strategy items. "
+            "Draw ONLY from items tagged 'pm_craft_today ONLY' (theme: product_craft) or design_ux items. "
+            "Do NOT use startup_disruption or company_strategy items for PM Craft — even if no product_craft item is available. "
+            "If no product_craft or design_ux item is available today, set text to empty string. "
             "Must be non-obvious — a specific pattern, tradeoff, or reframe that changes how a PM would approach a real decision. "
             "Avoid generic advice. Name the specific insight: what assumption does it challenge, what decision does it change, or what pattern does it reveal? "
             "Write for a reader who has NOT read the source. "
@@ -573,12 +602,40 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             "split_implication_warnings": [],
             "theme_audit_warnings": [],
             "cw_source_integrity_violations": [],
+            "pm_craft_source_violations": [],
+            "source_concentration_warnings": [],
         },
     }
 
     if not filtered_items:
         logger.warning("No eligible items available for synthesis after filtering.")
         return empty_result
+
+    # ---------------------------------------------------------------------------
+    # Source concentration check — observational, no items dropped
+    # ---------------------------------------------------------------------------
+    source_counts: Dict[str, List[str]] = {}
+    for item in filtered_items:
+        src = item.get("source_name", "unknown")
+        if src not in source_counts:
+            source_counts[src] = []
+        source_counts[src].append(item.get("title", ""))
+
+    source_concentration_warnings = []
+    for src, titles in source_counts.items():
+        if len(titles) >= 3:
+            source_concentration_warnings.append({
+                "source_name": src,
+                "item_count": len(titles),
+                "titles": titles,
+                "warning": f"{src} contributes {len(titles)} items to today's filtered pool — review for source diversity"
+            })
+
+    if source_concentration_warnings:
+        logger.warning("SOURCE CONCENTRATION WARNINGS: %s", json.dumps(source_concentration_warnings, indent=2))
+        print("SOURCE CONCENTRATION WARNINGS:")
+        for w in source_concentration_warnings:
+            print(json.dumps(w, indent=2))
 
     # ---------------------------------------------------------------------------
     # Partition by routing eligibility
@@ -865,6 +922,41 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             for v in cw_source_integrity_violations:
                 print(json.dumps(v, indent=2))
 
+        # 5c. PM Craft source integrity check
+        # Flags pm_craft_today if it cites a non-product_craft / non-design_ux source
+        product_craft_indices = {
+            entry["index"] for entry in dedicated_indexed
+            if entry["theme"] in {"product_craft", "design_ux"}
+        }
+
+        pm_craft_source_violations = []
+        pm_craft_indices = pm_craft_today.get("source_indices", [])
+        bad_pm_craft_indices = [
+            idx_val for idx_val in pm_craft_indices
+            if idx_val not in product_craft_indices
+        ]
+        if bad_pm_craft_indices:
+            for idx_val in bad_pm_craft_indices:
+                source_info = source_index_lookup.get(str(idx_val), {})
+                pm_craft_source_violations.append({
+                    "source_index": idx_val,
+                    "source_title": source_info.get("title", "unknown"),
+                    "source_theme": source_info.get("theme", "unknown"),
+                    "action": "VIOLATION_LOGGED",
+                    "warning": (
+                        f"PM Craft cites a non-product_craft source "
+                        f"(theme: {source_info.get('theme', 'unknown')}). "
+                        "PM Craft should only draw from product_craft or design_ux sources."
+                    )
+                })
+            logger.warning(
+                "PM CRAFT SOURCE VIOLATIONS: %s",
+                json.dumps(pm_craft_source_violations, indent=2)
+            )
+            print("PM CRAFT SOURCE VIOLATIONS:")
+            for v in pm_craft_source_violations:
+                print(json.dumps(v, indent=2))
+
         # 6. Split implication detector
         SPLIT_SIGNALS = [
             " and ", " but also ", " as well as ", " while also ",
@@ -957,6 +1049,8 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "routing_warnings": routing_warnings,
                 "omit_rule_violations": omit_rule_warnings,
                 "cw_source_integrity_violations": cw_source_integrity_violations,
+                "pm_craft_source_violations": pm_craft_source_violations,
+                "source_concentration_warnings": source_concentration_warnings,
                 "split_implication_warnings": split_implication_warnings,
                 "theme_audit_warnings": theme_audit_warnings,
             },
