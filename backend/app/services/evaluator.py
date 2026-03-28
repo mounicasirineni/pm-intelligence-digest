@@ -343,7 +343,12 @@ async def llm_judge(
             "  - Omitting a bullet that explicitly challenges the synthesis conclusion scores 1 or 2 depending on severity.\n"
             "  - MULTI-SOURCE CITATIONS: For paragraphs citing multiple sources, check each specific claim against ALL cited sources before concluding it is unsourced. "
             "A claim may be sourced in one source even if it does not appear in another. "
-            "Do not conclude a claim is unsourced until you have checked every cited source's bullet list individually.\n\n"
+            "Do not conclude a claim is unsourced until you have checked every cited source's bullet list individually.\n"
+            "  - INDEX COLLISION RULE: When writing your justification text, refer to sources by their SOURCE NAME only — never by index number. "
+            "The [n] indices in the synthesis paragraph are citation markers used by the synthesis, not source identifiers for your evaluation. "
+            "The [1], [2], [3] numbers in the evidence block above are internal evaluation references only. "
+            "These two numbering systems are completely independent and must never be mixed. "
+            "Always write 'Stratechery' or 'MIT Technology Review' — never 'Stratechery [3]' or 'MIT [1]'.\n\n"
             f"Paragraph:\n{paragraph}\n\n"
             f"{evidence_block}\n\n"
             'Return only valid JSON:\n'
@@ -662,7 +667,14 @@ async def pm_craft_quality(
 ) -> Dict[str, Any]:
     """Quality: Score pm_craft_today on Insight Depth (1-5). Weighted 10pts."""
     client = _build_llm_client()
-    pm_craft = str(synthesis.get("pm_craft_today") or "").strip()
+
+    # Fix G: correctly extract text field from pm_craft_today dict
+    pm_craft_raw = synthesis.get("pm_craft_today") or {}
+    pm_craft = (
+        str(pm_craft_raw.get("text") or "").strip()
+        if isinstance(pm_craft_raw, dict)
+        else str(pm_craft_raw).strip()
+    )
 
     if not pm_craft:
         return {"paragraph_preview": "", "insight_depth": 0, "insight_depth_reason": "No pm_craft_today found."}
@@ -727,6 +739,15 @@ def run(
 
     Guardrails (diagnostic):
       pipeline_funnel, pm_relevance
+
+    Scoring is dynamic — sections with no output are excluded from both
+    score_components and score_weights, and overall_score is normalized
+    to 100 based only on the weights of sections that produced output.
+    This handles all four scenarios:
+      1. All 5 sections scored
+      2. PM Craft empty — 4 sections scored
+      3. Company Watch empty — 4 sections scored
+      4. PM Craft and Company Watch both empty — 3 sections scored
     """
     if not date_str:
         date_str = date.today().isoformat()
@@ -829,7 +850,7 @@ def run(
         ])
         score_weights.extend([6.7, 6.7, 6.6])
 
-    # PM Craft — only include if text exists
+    # PM Craft — only include if text exists and scored above 0
     if pc_insight > 0:
         score_components.append(pc_insight / 5.0 * 10.0)
         score_weights.append(10.0)

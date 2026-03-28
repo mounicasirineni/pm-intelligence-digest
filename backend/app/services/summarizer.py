@@ -69,7 +69,8 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
           "insights": [ "...", ... ],        # 3–5 bullets
           "pm_interview_relevance": "...",   # text explanation
           "pm_relevance_score": "high" | "medium" | "low",  # categorical
-          "confidence": "high" | "medium" | "low"
+          "confidence": "high" | "medium" | "low",
+          "company_maturity": "startup" | "established" | "not_applicable"
         }
     """
     client = _build_client()
@@ -101,7 +102,8 @@ Please respond in strict JSON with the following structure:
   ],
   "pm_interview_relevance": "one line explaining why this matters (or doesn't) for a PM interview",
   "pm_relevance_score": "high" | "medium" | "low",
-  "confidence": "high" | "medium" | "low"
+  "confidence": "high" | "medium" | "low",
+  "company_maturity": "startup" | "established" | "not_applicable"
 }}
 
 Guidance:
@@ -125,6 +127,11 @@ Guidance:
     medium = tangentially relevant; useful context but not a likely interview topic
     low    = not relevant to PM interview prep (e.g. sports tech, celebrity news, off-topic content)
   ROUTINE UPDATE RULE: Content that reports routine operational activity without revealing strategic intent scores low, even if published by a major company. This includes: weekly content additions (new games, new titles, new episodes), cadence-driven posts (GFN Thursday, weekly roundups), minor feature releases with no architectural significance, and event listings or award announcements. A post scores medium or high only if it explains WHY the company made a move, WHAT it reveals about competitive positioning or product direction, or WHAT new capability it demonstrates. The company name alone does not determine the score — the strategic signal does.
+- COMPANY MATURITY RULE: If this article's primary subject is a named company, assess whether that company is early-stage or established. Set "company_maturity" to:
+    startup     = primary subject is an early-stage, emerging, or privately held company without dominant market position
+    established = primary subject is a publicly traded company, a subsidiary of one, or a company with $1B+ valuation and significant market presence (e.g. Intuit, Google, Meta, Amazon, Salesforce)
+    not_applicable = article is not primarily about a named company, or covers multiple companies without a single primary subject
+  This field is used downstream to filter Startup Radar — established companies will not appear in Startup Radar regardless of feed tag.
 - "pm_interview_relevance" should be a one-line text explanation supporting your pm_relevance_score judgment.
 - "confidence" should reflect how well the content body above supports producing accurate, grounded insight bullets — it is a self-assessment of source quality, NOT a judgment of topic interest. Ask: how much of what I would write comes from the content body vs. from my own training knowledge?
     high   = content body is substantive (300+ words of original reporting, analysis, or primary source material) and provides enough specific detail to write 3-5 grounded bullets without drawing on outside knowledge
@@ -173,6 +180,7 @@ Guidance:
             "pm_interview_relevance": "",
             "pm_relevance_score": "medium",
             "confidence": "medium",
+            "company_maturity": "not_applicable",
         }
 
     # Ensure required keys exist with safe defaults.
@@ -189,9 +197,14 @@ Guidance:
     if confidence not in {"high", "medium", "low"}:
         confidence = "medium"
 
+    company_maturity = str(parsed.get("company_maturity") or "not_applicable").lower()
+    if company_maturity not in {"startup", "established", "not_applicable"}:
+        company_maturity = "not_applicable"
+
     return {
         "insights": insights,
         "pm_interview_relevance": str(pm_interview_relevance),
         "pm_relevance_score": pm_relevance_score,
         "confidence": confidence,
+        "company_maturity": company_maturity,
     }

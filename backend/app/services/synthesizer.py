@@ -272,6 +272,12 @@ Produce a structured JSON object:
                    "No theme should appear as the central claim of more than one paragraph. "
                    "If any theme appears twice, rewrite the weaker paragraph around a different theme. "
                    "A four-paragraph brief with four distinct themes is better than five paragraphs with a duplicate theme. "
+                   "THEME DIVERSITY ENFORCEMENT: Before finalizing paragraph selection, actively check the available source pool for eligible themes not yet represented. "
+                   "If consumer behavior, market behavior, or design & UX sources are available in the pool but none of those themes anchor a paragraph, that is a selection failure — not a sourcing gap. "
+                   "Eligible themes with 2+ source items available must be considered for inclusion before adding a second paragraph of any already-represented theme. "
+                   "Replace the weakest duplicate-theme paragraph with a paragraph anchored to the most underrepresented eligible theme that has sufficient source material. "
+                   "A brief where AI & technology or regulation & policy anchors 3+ paragraphs while consumer behavior and design & UX are entirely absent is a breadth failure regardless of individual paragraph quality. "
+                   "The goal is maximum theme coverage across the available pool — not maximum depth on the most obvious themes. "
                    "DATE VALIDATION RULE: Today's date is {today}. If any milestone date is earlier than today, flag it with [DATE CHECK: this date may already have passed]. "
                    "MINIMUM BULLET COVERAGE RULE: Each paragraph must draw from at least 3 distinct insight bullets across its cited sources. "
                    "If you cannot find 3 distinct bullets that genuinely connect, do not publish the paragraph — it is too thin. "
@@ -283,6 +289,9 @@ Produce a structured JSON object:
                    "For each cited source, identify the highest-value bullet you did NOT use. Ask: does omitting it distort the paragraph's conclusion or bury a stronger insight? "
                    "If yes, either incorporate it or revise the conclusion to reflect the more complete picture. "
                    "A paragraph that selects only narrative-supporting bullets while dropping complicating evidence is a synthesis failure, not a synthesis. "
+                   "HIGHEST-RISK OMISSION TYPE: Bullets that contradict the paragraph's central claim, extend it to a new domain, or apply it to a named product or company not yet mentioned in the paragraph are the most commonly dropped and the most damaging to omit. "
+                   "A bullet that complicates your thesis is more valuable than a bullet that supports it — it either strengthens the paragraph by being addressed, or reveals that the thesis needs revision. "
+                   "If you find yourself dropping a bullet because it 'doesn't quite fit,' that is a signal to stop and ask whether the paragraph's central claim is too narrow. "
                    "OMISSION CHECK DEPTH: This check applies most critically to bullets ranked 2-4 in each source. "
                    "The summarizer orders bullets from most specific to most abstract — bullet 1 is often the most abstract framing, "
                    "while bullets 2-4 contain the most specific mechanisms, named products, concrete tradeoffs, and verifiable numbers. "
@@ -299,14 +308,26 @@ Produce a structured JSON object:
                    "INFERENCE BOUNDARY SELF-CHECK: Before finalizing the closing implication, identify the specific source bullet it traces to. "
                    "If you cannot point to a specific bullet, rewrite the implication using 'these cases suggest...' framing. "
                    "A well-written implication that exceeds what any source states must be reframed as inference, not presented as a sourced conclusion. "
+                   "CLOSING SENTENCE SPECIFICITY TRAP: The most common inference boundary violation is a closing 'for PMs' sentence that adds operational details not present in any source bullet — "
+                   "specific checklists, named thresholds, implementation steps, or design directives that go beyond what the source states. "
+                   "These feel grounded because they follow logically from the paragraph, but they are synthesizer-constructed, not source-derived. "
+                   "Before finalizing: identify the exact source bullet the closing sentence extends. "
+                   "If the bullet names an observation and your closing names a specific action, ask whether the source actually supports that action or whether you constructed it. "
+                   "If constructed, replace the specific directive with 'these cases suggest PMs should consider...' framing. "
                    "THEMATIC COMBINATION RULE: Two stories may only appear in the same paragraph if they share a specific mechanism — "
-                   "not just a broad theme. Sharing a theme label ('AI', 'regulation', 'platforms', 'government') is not sufficient. "
+                   "not just a shared category label ('AI', 'regulation', 'platforms', 'government'). "
                    "Ask: do these stories share the same causal chain, the same failure mode, or the same design implication? "
                    "If the best you can say is 'both involve X category,' they belong in separate paragraphs. "
-                   "This replaces the REGULATORY CLUSTER RULE and applies to all thematic combinations. "
+                   "This replaces the REGULATORY CLUSTER RULE and applies to all source combinations. "
                    "THEMATIC COMBINATION SELF-CHECK: Before finalizing each paragraph that cites 2+ sources, write one sentence naming "
                    "the specific shared mechanism between all cited sources. If you cannot name it precisely — not 'both involve AI' "
-                   "or 'both involve regulation' but a specific causal chain, failure mode, or design implication — split into separate paragraphs. "
+                   "or 'both involve regulation' but a specific causal chain, failure mode, or design implication — do not combine. "
+                   "MECHANISM SOURCING REQUIREMENT: The shared mechanism you name must be explicitly present in at least one source bullet — not constructed by inference across bullets. "
+                   "Ask: which specific bullet uses this mechanism, causal chain, or failure mode by name or clear implication? "
+                   "If no single bullet names it, the mechanism is synthesizer-constructed and the combination is invalid. "
+                   "A mechanism that only emerges when you read all bullets together and abstract upward is not a shared mechanism — it is a category label, not a mechanism. "
+                   "In that case, do not combine: treat each source as a candidate for its own standalone paragraph, then apply the THEME AUDIT SELF-CHECK to confirm no theme appears more than once. "
+                   "If combining would create a duplicate theme, keep the stronger standalone paragraph and drop the weaker. "
                    "Do not proceed without completing this check.",
       "source_indices": [1, 2]
     }}
@@ -421,6 +442,10 @@ Produce a structured JSON object:
                    "OMISSION CHECK RULE: Before finalizing each company entry, review ALL insight bullets for every cited source. "
                    "For each cited source, identify the highest-value bullet you did NOT use. Ask: does omitting it distort the entry's conclusion or bury a stronger insight? "
                    "If yes, either incorporate it or revise the conclusion to reflect the more complete picture. "
+                   "A paragraph that selects only narrative-supporting bullets while dropping complicating evidence is a synthesis failure, not a synthesis. "
+                   "HIGHEST-RISK OMISSION TYPE: Bullets that contradict the entry's central claim, extend it to a new domain, or name a product or company not yet mentioned are the most commonly dropped and the most damaging to omit. "
+                   "A bullet that complicates your framing is more valuable than one that supports it — if it doesn't fit, ask whether your framing is too narrow. "
+                   "If you find yourself dropping a bullet because it 'doesn't quite fit,' that is a signal to stop and ask whether the entry's central claim is too narrow. "
                    "METRICS PRESERVATION RULE: If a source contains a specific number (dollar amount, percentage, named product, date), include it if it supports the entry. Named companies, products, and dollar figures ground the entry. "
                    "SCOPE FIDELITY RULE: Reflect the actual scope stated in the source. If a source explicitly limits scope (e.g. 'non-safety parts only'), the entry must reflect that limit, not expand it. "
                    "INFERENCE BOUNDARY RULE: Do not assert competitive framings, strategic motivations, or market positions not explicitly stated in the source. "
@@ -428,10 +453,23 @@ Produce a structured JSON object:
                    "If the source says 'minority investment participant,' do not write 'vertically integrating' or 'infrastructure ownership.' "
                    "If a source shows a 1.75x fund size increase, do not assert '3-5x capital requirements' — that multiplier is not in the source. "
                    "The closing implication must be traceable to a specific bullet in a cited source. Frame synthesizer reasoning as inference: 'this suggests...' not 'this demonstrates...' "
+                   "CLOSING SENTENCE SPECIFICITY TRAP: The most common inference boundary violation is a closing sentence that adds operational details not present in any source bullet — "
+                   "specific checklists, named thresholds, implementation steps, or competitive framings that go beyond what the source states. "
+                   "Before finalizing: identify the exact source bullet the closing sentence extends. "
+                   "If the bullet names an observation and your closing names a specific action or competitive position, ask whether the source actually supports it or whether you constructed it. "
+                   "If constructed, replace with 'this suggests...' framing. "
                    "CONTRADICTION MANDATE: If any cited source contains a named data point, explicit claim, or product detail that directly challenges or complicates "
                    "the entry's central framing, it must appear in the entry or the framing must be revised. "
                    "You may steelman your thesis against it, but you may not omit it. "
-                   "Suppressing a contradicting bullet to preserve a cleaner narrative is a citation integrity violation.",
+                   "Suppressing a contradicting bullet to preserve a cleaner narrative is a citation integrity violation. "
+                   "THEMATIC COMBINATION RULE: Multiple signals for the same company may only appear in the same entry if they share a specific mechanism — "
+                   "not just a shared category label ('AI', 'cloud', 'regulation', 'growth'). "
+                   "Ask: do these signals share the same causal chain, the same strategic shift, or the same product implication? "
+                   "If the best you can say is 'both involve X category,' cut to the stronger single signal. "
+                   "THEMATIC COMBINATION SELF-CHECK: Before finalizing any entry citing 2+ sources, write one sentence naming the specific shared mechanism. "
+                   "If you cannot name it precisely — not 'both involve AI' or 'both involve cloud' but a specific causal chain or strategic shift — cut to the strongest single signal. "
+                   "MECHANISM SOURCING REQUIREMENT: The shared mechanism you name must be explicitly present in at least one source bullet — not constructed by inference across bullets. "
+                   "If no single bullet names it, the mechanism is synthesizer-constructed and the combination is invalid — it is a category label, not a mechanism. Cut to the strongest single signal.",
       "source_indices": []
     }},
     "Meta": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
@@ -451,14 +489,27 @@ Produce a structured JSON object:
                 "IMPLICATION FOCUS RULE: Each bullet must close with exactly one strategic consequence. Cut any 'and' connecting two separate consequences. "
                 "METRICS PRESERVATION RULE: Include the funding amount, round size, or key metric from the source. Do not omit specific numbers that ground the strategic claim. "
                 "INFERENCE BOUNDARY RULE: Do not assert a specific multiplier, ratio, or benchmark unless it appears verbatim in the source. Inferred benchmarks must use 'suggests' or 'implies' framing, never assertion. "
+                "CLOSING SENTENCE SPECIFICITY TRAP: The most common inference boundary violation is a closing sentence that adds operational details not present in any source bullet — "
+                "specific checklists, named thresholds, implementation steps, or strategic conclusions that go beyond what the source states. "
+                "Before finalizing: identify the exact source bullet the closing sentence extends. "
+                "If the bullet names an observation and your closing names a specific action or pattern, ask whether the source actually supports it or whether you constructed it. "
+                "If constructed, replace with 'this suggests...' framing. "
                 "OMISSION CHECK RULE: Before finalizing each bullet, review ALL insight bullets for the cited source. "
                 "Identify the highest-value bullet you did NOT use. If omitting it buries the sharper strategic insight, use that one instead. "
+                "A bullet that selects only narrative-supporting content while dropping complicating evidence is a synthesis failure, not a synthesis. "
+                "HIGHEST-RISK OMISSION TYPE: Bullets that contradict the bullet's central claim, extend it to a new domain, or name a product or company not yet mentioned are the most commonly dropped and the most damaging to omit. "
+                "A bullet that complicates your framing is more valuable than one that supports it — if it doesn't fit, ask whether your framing is too narrow. "
+                "If you find yourself dropping a bullet because it 'doesn't quite fit,' that is a signal to stop and ask whether the bullet's central claim is too narrow. "
                 "THEMATIC COMBINATION RULE: Each startup_radar bullet must cover a single company or a single strategic pattern. "
-                "Do not combine two unrelated companies or two unrelated stories into one bullet under a broad theme label. "
-                "If two stories share only a category ('fintech', 'EV', 'AI') but not a specific causal mechanism or shared implication, "
+                "Do not combine two unrelated companies or two unrelated stories into one bullet under a shared category label ('fintech', 'EV', 'AI'). "
+                "If two stories share only a category but not a specific causal mechanism or shared implication, "
                 "they belong in separate bullets. "
                 "THEMATIC COMBINATION SELF-CHECK: Before finalizing any bullet citing 2+ sources, name the specific shared mechanism. "
-                "If you cannot name it precisely, split into separate bullets.",
+                "If you cannot name it precisely, do not combine. "
+                "MECHANISM SOURCING REQUIREMENT: The shared mechanism you name must be explicitly present in at least one source bullet — not constructed by inference across bullets. "
+                "Ask: which specific bullet uses this mechanism, causal chain, or failure mode by name or clear implication? "
+                "If no single bullet names it, the mechanism is synthesizer-constructed and the combination is invalid — it is a category label, not a mechanism. "
+                "In that case, treat each source as a candidate for its own standalone bullet.",
       "source_indices": []
     }}
   ],
@@ -472,6 +523,10 @@ Produce a structured JSON object:
             "Write for a reader who has NOT read the source. "
             "OMISSION CHECK RULE: Before finalizing, review ALL insight bullets for every cited source. "
             "The most actionable PM craft insight may not be the first bullet — check all of them before selecting. "
+            "A bullet that selects only the most obviously craft-relevant content while dropping complicating or extending evidence is a synthesis failure, not a synthesis. "
+            "HIGHEST-RISK OMISSION TYPE: The most actionable PM craft insight is frequently the one that contradicts a common PM assumption, extends the pattern to a decision domain not yet named, or applies to a product context not yet mentioned. "
+            "If you are defaulting to the most obviously PM-relevant bullet, check whether a less obvious bullet delivers a sharper decision-forcing insight. "
+            "A bullet that complicates your framing is more valuable than one that confirms it — if it doesn't fit, ask whether your framing is too narrow. "
             "If no craft-relevant insight exists, set text to empty string.",
     "source_indices": []
   }}
@@ -572,6 +627,16 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 )
                 continue
 
+            company_maturity = str(item.get("company_maturity") or "not_applicable").lower()
+
+            # Drop established companies from startup_disruption items
+            if theme == "startup_disruption" and company_maturity == "established":
+                logger.info(
+                    "FILTER [step=3 reason=established_company_in_startup_radar] dropped: %s — %s",
+                    item.get("source_name"), item.get("title")
+                )
+                continue
+
             filtered_items.append({
                 "theme": theme,
                 "title": item.get("title", ""),
@@ -579,6 +644,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "insights": item.get("insights") or [],
                 "confidence": conf_raw,
                 "pm_relevance_score": relevance_raw,
+                "company_maturity": company_maturity,
             })
 
     if dropped_low_confidence:
