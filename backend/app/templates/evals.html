@@ -259,16 +259,16 @@
             <span><strong>Insight Depth</strong> — is this a genuine synthesis revealing something non-obvious, or just a summary?</span>
           </div>
           <div class="legend-row" style="margin-top: 0.25rem;">
-            <span><strong>Grounding</strong> — does the cited source actually contain evidence for each claim?</span>
+            <span><strong>Grounding</strong> — two-component check: did every cited claim trace to a source passage (forward traceability), and did the synthesis fairly represent the full source evidence without distorting omissions (backward completeness)?</span>
           </div>
           <div class="legend-row" style="margin-top: 0.25rem;">
-            <span><strong>Topical Breadth (What&rsquo;s Shifting)</strong> — does this section cover all five eligible themes?</span>
+            <span><strong>Topical Breadth (What&rsquo;s Shifting)</strong> — does this section cover distinct themes across AI &amp; technology, market behavior, consumer behavior, regulation &amp; policy, and design &amp; UX — scored against available source material, not just what was published?</span>
           </div>
           <div class="legend-row" style="margin-top: 0.25rem;">
             <span><strong>Relevance (Interview Angle)</strong> — how can a strong PM candidate use this insight to demonstrate strategic thinking in an interview?</span>
           </div>
           <div class="legend-row" style="margin-top: 1rem;">
-            <span><strong>Scoring methodology:</strong> Each dimension is scored 1–5 by an LLM judge. Section scores are weighted and summed to 100: What&rsquo;s Shifting contributes 40 pts, Company Watch 25 pts, Startup Radar 20 pts, PM Craft 10 pts, and Interview Angle 5 pts.</span>
+            <span><strong>Scoring methodology:</strong> Each dimension is scored 1–5 by an LLM judge. Section scores are weighted and summed to 100: What&rsquo;s Shifting contributes 40 pts, Company Watch 25 pts, Startup Radar 20 pts, PM Craft 10 pts, and Interview Angle 5 pts. Sections with no output are excluded from both the score and the weight total — the overall score is always normalized to 100 based on sections that produced content that day.</span>
           </div>
         </div>
 
@@ -427,7 +427,7 @@
             <span><strong>Relevant %</strong> = articles with high-medium PM relevance / confident articles; low relevance means the content is not useful for PM interview prep</span>
           </div>
           <div class="legend-row" style="margin-top: 0.25rem;">
-            <span><strong>Utilized %</strong> = articles cited in the final synthesis / PM relevant articles; measures how much of the eligible pool the synthesizer used</span>
+            <span><strong>Utilized %</strong> = articles actually cited in the synthesis / PM relevant articles; only articles appearing in the synthesizer&rsquo;s source index count as utilized — articles that passed filtering but were not selected appear as &ldquo;Not Selected&rdquo; in Source Details</span>
           </div>
           <div class="legend-row" style="margin-top: 0.25rem;">
             <span><strong>Weak %</strong> = paragraphs scoring &le; 2 on any quality dimension / total paragraphs scored; high values indicate systemic synthesis quality issues</span>
