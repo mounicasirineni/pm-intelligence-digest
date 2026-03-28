@@ -545,7 +545,7 @@
       <div class="craft-block">
         {% set pm_craft_text = synthesis.pm_craft_today.text if synthesis.pm_craft_today is mapping else synthesis.pm_craft_today %}
         {% set pm_craft_indices = synthesis.pm_craft_today.source_indices if synthesis.pm_craft_today is mapping else [] %}
-        {{ pm_craft_text or "Once today's sources are summarized, your sharpest craft takeaway will appear here." }}
+        {{ pm_craft_text or "Not available today." }}
         {% if pm_craft_indices and synthesis.source_index_lookup %}
           <div class="insight-sources">
             Sources:
@@ -578,7 +578,7 @@
       </div>
 
       {% if not cw %}
-        <p>No company-specific signals surfaced today. As the digest matures, company moves will appear here.</p>
+        <p>Not available today.</p>
       {% endif %}
 
       {% for name in companies %}
@@ -656,20 +656,25 @@
       <div class="collapsible-body" id="source-details-body">
         {% if items_by_theme %}
 
-          {# ── Separate utilized vs filtered-out ── #}
-          {% set utilized_items = [] %}
-          {% set filtered_items = [] %}
-          {% for theme, items in items_by_theme.items() %}
-            {% for item in items %}
-              {% set conf = (item.confidence or 'medium') | lower %}
-              {% set rel = (item.pm_relevance_score or 'medium') | lower %}
-              {% if conf in ['high', 'medium'] and rel in ['high', 'medium'] %}
-                {% set _ = utilized_items.append(item) %}
-              {% else %}
-                {% set _ = filtered_items.append({'item': item, 'reason': 'Low Confidence' if conf not in ['high','medium'] else 'Low Relevance'}) %}
-              {% endif %}
-            {% endfor %}
+        {# ── Separate utilized vs filtered-out ── #}
+        {% set utilized_items = [] %}
+        {% set filtered_items = [] %}
+        {% for theme, items in items_by_theme.items() %}
+          {% for item in items %}
+            {% set conf = (item.confidence or 'medium') | lower %}
+            {% set rel = (item.pm_relevance_score or 'medium') | lower %}
+            {% set cite_idx = citation_index_map.get((item.source_name, item.title)) %}
+            {% if conf in ['high', 'medium'] and rel in ['high', 'medium'] and cite_idx %}
+              {% set _ = utilized_items.append(item) %}
+            {% elif conf not in ['high', 'medium'] %}
+              {% set _ = filtered_items.append({'item': item, 'reason': 'Low Confidence'}) %}
+            {% elif rel not in ['high', 'medium'] %}
+              {% set _ = filtered_items.append({'item': item, 'reason': 'Low Relevance'}) %}
+            {% else %}
+              {% set _ = filtered_items.append({'item': item, 'reason': 'Not Selected'}) %}
+            {% endif %}
           {% endfor %}
+        {% endfor %}
 
           {# ── Utilized ── #}
           <div style="margin-top: 0.75rem;">
