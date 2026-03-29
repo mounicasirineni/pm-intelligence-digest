@@ -81,6 +81,7 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     content = item.get("summary") or item.get("content") or ""
     content_word_count = len(content.split())
     logger.info("Content word count for '%s': %d words", title, content_word_count)
+    print(f"Content word count for '{title}': {content_word_count} words")
     source_name = item.get("source_name") or ""
     theme = item.get("theme") or ""
 
