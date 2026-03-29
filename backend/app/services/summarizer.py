@@ -70,7 +70,8 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
           "pm_interview_relevance": "...",   # text explanation
           "pm_relevance_score": "high" | "medium" | "low",  # categorical
           "confidence": "high" | "medium" | "low",
-          "company_maturity": "startup" | "established" | "not_applicable"
+          "company_maturity": "startup" | "established" | "not_applicable",
+          "content_word_count": int  # words in content body sent to the model
         }
     """
     client = _build_client()
@@ -78,6 +79,8 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     title = item.get("title") or ""
     url = item.get("url") or ""
     content = item.get("summary") or item.get("content") or ""
+    content_word_count = len(content.split())
+    logger.info("Content word count for '%s': %d words", title, content_word_count)
     source_name = item.get("source_name") or ""
     theme = item.get("theme") or ""
 
@@ -207,4 +210,5 @@ Guidance:
         "pm_relevance_score": pm_relevance_score,
         "confidence": confidence,
         "company_maturity": company_maturity,
+        "content_word_count": content_word_count,
     }

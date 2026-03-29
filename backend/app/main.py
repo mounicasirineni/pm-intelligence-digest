@@ -95,6 +95,7 @@ def _run_pipeline():
                     "pm_relevance_score": summary.get("pm_relevance_score", "medium"),
                     "confidence": summary.get("confidence", "medium"),
                     "company_maturity": summary.get("company_maturity", "not_applicable"),
+                    "content_word_count": summary.get("content_word_count", 0),
                 }
             )
  
