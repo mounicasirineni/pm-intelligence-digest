@@ -78,12 +78,19 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
 
     title = item.get("title") or ""
     url = item.get("url") or ""
+    source_name = item.get("source_name") or ""
+    theme = item.get("theme") or ""
     content = item.get("summary") or item.get("content") or ""
     content_word_count = len(content.split())
     logger.info("Content word count for '%s': %d words", title, content_word_count)
     print(f"Content word count for '{title}': {content_word_count} words")
-    source_name = item.get("source_name") or ""
-    theme = item.get("theme") or ""
+    logger.info(
+        "Fetch quality for '%s': %d words | url=%s",
+        source_name,
+        content_word_count,
+        url,
+    )
+    print(f"Fetch quality for '{source_name}': {content_word_count} words | url={url}")
 
     user_prompt = f"""
 You are analyzing a single content item for a Senior Product Manager.
