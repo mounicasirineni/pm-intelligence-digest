@@ -78,6 +78,7 @@
       "name": "Google Blog",
       "url": "https://blog.google/rss/",
       "theme": "company_strategy",
+      "company_id": "Google",
       "verified": false
     },
     {
@@ -86,6 +87,7 @@
       "name": "Meta Engineering",
       "url": "https://engineering.fb.com/feed/",
       "theme": "company_strategy",
+      "company_id": "Meta",
       "verified": false
     },
     {
@@ -94,6 +96,7 @@
       "name": "Microsoft Research Blog",
       "url": "https://www.microsoft.com/en-us/research/feed/",
       "theme": "company_strategy",
+      "company_id": "Microsoft",
       "verified": false
     },
     {
@@ -110,6 +113,7 @@
       "name": "OpenAI News",
       "url": "https://openai.com/news/rss.xml",
       "theme": "company_strategy",
+      "company_id": "OpenAI",
       "verified": false
     },
     {
@@ -150,6 +154,7 @@
       "name": "Apple Newsroom",
       "url": "https://www.apple.com/newsroom/rss-feed.rss",
       "theme": "company_strategy",
+      "company_id": "Apple",
       "verified": false
     },
     {
@@ -158,6 +163,7 @@
       "name": "Amazon News",
       "url": "https://www.aboutamazon.com/news/rss",
       "theme": "company_strategy",
+      "company_id": "Amazon",
       "verified": false
     },
     {
@@ -166,6 +172,7 @@
       "name": "NVIDIA Blog",
       "url": "https://blogs.nvidia.com/feed/",
       "theme": "company_strategy",
+      "company_id": "NVIDIA",
       "verified": false
     },
     {
@@ -309,6 +316,7 @@
       "name": "Netflix Tech Blog",
       "url": "https://netflixtechblog.com/feed",
       "theme": "company_strategy",
+      "company_id": "Netflix",
       "verified": false
     },
     {
@@ -317,6 +325,7 @@
       "name": "Anthropic News",
       "url": "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml",
       "theme": "company_strategy",
+      "company_id": "Anthropic",
       "verified": false
     }
   ]

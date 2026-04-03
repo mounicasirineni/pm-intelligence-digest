@@ -64,6 +64,7 @@ def _fetch_rss_items(
             {
                 "source_id": source["id"],
                 "source_name": source["name"],
+                "company_id": source.get("company_id"),
                 "theme": source.get("theme"),
                 "type": source.get("type"),
                 "title": getattr(entry, "title", ""),
@@ -134,6 +135,7 @@ def _fetch_podcast_items(
             {
                 "source_id": source["id"],
                 "source_name": source["name"],
+                "company_id": source.get("company_id"),
                 "theme": source.get("theme"),
                 "type": source.get("type"),
                 "title": getattr(entry, "title", ""),
@@ -162,7 +164,7 @@ def fetch_items_grouped_by_theme() -> Tuple[Dict[str, List[Dict[str, Any]]], Dic
           - grouped items: {theme: [item, ...], ...}
           - fetch_metadata: {
               sources_configured: int,
-              sources_active: int,       # returned ≥1 item in lookback window
+              sources_active: int,       # returned >=1 item in lookback window
               sources_empty: int,        # returned 0 items in lookback window
               empty_source_names: [...], # names of empty sources
             }

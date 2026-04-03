@@ -72,9 +72,9 @@ def _run_pipeline():
     Returns (synthesis, items_by_theme, generated_at, fetch_metadata).
     """
     grouped_raw, fetch_metadata = fetch_items_grouped_by_theme()
- 
+
     items_by_theme = {}
- 
+
     for theme, items in grouped_raw.items():
         summarized_items = []
         for item in items:
@@ -83,28 +83,34 @@ def _run_pipeline():
             except Exception as exc:
                 print(f"Summarizer failed for item '{item.get('title')}' in theme '{theme}': {exc}")
                 continue
- 
+
             summarized_items.append(
                 {
                     "title": item.get("title"),
                     "url": item.get("url"),
                     "source_name": item.get("source_name"),
+                    # company_id comes from rss.py (set from sources.json) —
+                    # used by synthesizer CW source integrity check
+                    "company_id": item.get("company_id"),
                     "theme": theme,
                     "insights": summary.get("insights", []),
                     "pm_interview_relevance": summary.get("pm_interview_relevance"),
                     "pm_relevance_score": summary.get("pm_relevance_score", "medium"),
                     "confidence": summary.get("confidence", "medium"),
                     "company_maturity": summary.get("company_maturity", "not_applicable"),
+                    # scope comes from summarizer — cross_market vs company_specific,
+                    # used by synthesizer to route regulation_policy articles correctly
+                    "scope": summary.get("scope", "cross_market"),
                     "content_word_count": summary.get("content_word_count", 0),
                 }
             )
- 
+
         if summarized_items:
             items_by_theme[theme] = summarized_items
- 
+
     synthesis = synthesize_trends(items_by_theme)
     generated_at = datetime.now()
- 
+
     return synthesis, items_by_theme, generated_at, fetch_metadata
 
 
@@ -163,7 +169,7 @@ def _get_or_run_pipeline(force_refresh: bool = False):
                 _CACHE["generated_at"],
                 _CACHE.get("fetch_metadata") or {},
             )
- 
+
         record = get_digest_for_today()
         if record is not None:
             _CACHE["synthesis"] = record.synthesis
@@ -171,15 +177,15 @@ def _get_or_run_pipeline(force_refresh: bool = False):
             _CACHE["generated_at"] = record.generated_at
             _CACHE["fetch_metadata"] = record.fetch_metadata
             return record.synthesis, record.items_by_theme, record.generated_at, record.fetch_metadata
- 
+
     synthesis, items_by_theme, generated_at, fetch_metadata = _run_pipeline()
     _CACHE["synthesis"] = synthesis
     _CACHE["items_by_theme"] = items_by_theme
     _CACHE["generated_at"] = generated_at
     _CACHE["fetch_metadata"] = fetch_metadata
- 
+
     save_digest(synthesis, items_by_theme, generated_at, fetch_metadata=fetch_metadata)
- 
+
     try:
         from .services import evaluator
         date_str = generated_at.date().isoformat() if generated_at else None
@@ -188,7 +194,7 @@ def _get_or_run_pipeline(force_refresh: bool = False):
         print(f"[evals] Completed eval for {date_str}", flush=True)
     except Exception as e:
         print(f"[evals] FAILED: {e}", flush=True)
- 
+
     return synthesis, items_by_theme, generated_at, fetch_metadata
 
 
@@ -288,24 +294,24 @@ def _get_all_evals():
         return []
     finally:
         conn.close()
- 
+
     result = []
     for row in rows:
         (date_str, pf_json, pm_json, llm_json, pc_json, ia_json, overall_score, flags_json) = row
- 
+
         try:
             d = datetime.strptime(date_str, "%Y-%m-%d")
             label = d.strftime("%B %d, %Y")
         except ValueError:
             label = date_str
- 
+
         pf    = json.loads(pf_json)    if pf_json    else {}
         pm    = json.loads(pm_json)    if pm_json    else {}
         llm   = json.loads(llm_json)   if llm_json   else {}
         pc    = json.loads(pc_json)    if pc_json    else {}
         ia    = json.loads(ia_json)    if ia_json    else {}
         flags = json.loads(flags_json) if flags_json else {}
- 
+
         result.append({
             "date":          date_str,
             "label":         label,
@@ -356,7 +362,7 @@ def _get_all_evals():
             "pm_low":    float(pm.get("low_pct") or 0.0),
             "weak_pct": float(flags.get("weak_pct") or 0.0),
         })
- 
+
     return result
 
 
@@ -479,4 +485,3 @@ def create_app() -> Flask:
 
 # When running this module directly via Flask/WSGI, ensure scheduler is considered.
 _start_scheduler_if_needed()
-

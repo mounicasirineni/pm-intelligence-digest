@@ -85,6 +85,16 @@ def _extract_json(text: str) -> str:
     return text.strip()
 
 
+def _strip_date_check_flags(text: str) -> str:
+    """
+    Strip inline [DATE CHECK: ...] flags from paragraph text.
+    These are synthesizer self-check notations that must not appear in published output.
+    """
+    if not text:
+        return text
+    return re.sub(r"\[DATE CHECK:[^\]]*\]", "", text).strip()
+
+
 def _build_context_block(
     items: List[Dict[str, Any]],
     start_idx: int = 1,
@@ -113,9 +123,15 @@ def _build_context_block(
         else:
             allowed_section = "any dedicated section"
 
+        # Include company_id in context block for company_strategy items
+        # so the model has visibility into which company this source belongs to
+        company_id = item.get("company_id")
+
         lines.append(f"Item [{idx}]:")
         lines.append(f"- Theme: {item['theme']}")
         lines.append(f"- Allowed section: {allowed_section}")
+        if company_id:
+            lines.append(f"- Company: {company_id}")
         lines.append(f"- Source: {item['source_name']}")
         lines.append(f"- Title: {item['title']}")
         lines.append("- Insights:")
@@ -128,6 +144,7 @@ def _build_context_block(
             "theme": item["theme"],
             "title": item["title"],
             "source_name": item["source_name"],
+            "company_id": company_id,
         })
         idx += 1
 
@@ -153,6 +170,8 @@ def _normalize_whats_shifting(raw: Any) -> List[Dict[str, Any]]:
                 cleaned.append(int(i))
             except Exception:
                 continue
+        # Strip DATE CHECK flags before storing
+        paragraph = _strip_date_check_flags(paragraph)
         normalized.append({"paragraph": paragraph, "source_indices": cleaned})
     return normalized
 
@@ -180,6 +199,8 @@ def _normalize_company_watch(raw: Any) -> Dict[str, Dict[str, Any]]:
                 cleaned.append(int(i))
             except Exception:
                 continue
+        # Strip DATE CHECK flags before storing
+        paragraph = _strip_date_check_flags(paragraph)
         normalized[company] = {"paragraph": paragraph, "source_indices": cleaned}
     return normalized
 
@@ -203,6 +224,8 @@ def _normalize_startup_radar(raw: Any) -> List[Dict[str, Any]]:
                 cleaned.append(int(i))
             except Exception:
                 continue
+        # Strip DATE CHECK flags before storing
+        bullet = _strip_date_check_flags(bullet)
         normalized.append({"bullet": bullet, "source_indices": cleaned})
     return normalized
 
@@ -222,6 +245,8 @@ def _normalize_pm_craft(raw: Any) -> Dict[str, Any]:
             cleaned.append(int(i))
         except Exception:
             continue
+    # Strip DATE CHECK flags before storing
+    text = _strip_date_check_flags(text)
     return {"text": text, "source_indices": cleaned}
 
 
@@ -278,7 +303,10 @@ Produce a structured JSON object:
                    "Replace the weakest duplicate-theme paragraph with a paragraph anchored to the most underrepresented eligible theme that has sufficient source material. "
                    "A brief where AI & technology or regulation & policy anchors 3+ paragraphs while consumer behavior and design & UX are entirely absent is a breadth failure regardless of individual paragraph quality. "
                    "The goal is maximum theme coverage across the available pool — not maximum depth on the most obvious themes. "
-                   "DATE VALIDATION RULE: Today's date is {today}. If any milestone date is earlier than today, flag it with [DATE CHECK: this date may already have passed]. "
+                   "SINGLE-SOURCE PRIORITY RULE: If a single source contributes 4 or more high-quality insight bullets, it should anchor its own standalone paragraph rather than being combined with a second source. "
+                   "A deep single-source paragraph that fully develops one insight is stronger than a multi-source paragraph that skims two insights. "
+                   "Only combine sources when the shared mechanism adds something neither source could deliver alone. "
+                   "If you are combining sources primarily because you prefer multi-source paragraphs, do not combine — write the single-source paragraph and move to the next theme. "
                    "MINIMUM BULLET COVERAGE RULE: Each paragraph must draw from at least 3 distinct insight bullets across its cited sources. "
                    "If you cannot find 3 distinct bullets that genuinely connect, do not publish the paragraph — it is too thin. "
                    "Count bullets used before finalizing. A paragraph built from 1-2 bullets padded with synthesizer reasoning does not qualify. "
@@ -296,21 +324,25 @@ Produce a structured JSON object:
                    "The summarizer orders bullets from most specific to most abstract — bullet 1 is often the most abstract framing, "
                    "while bullets 2-4 contain the most specific mechanisms, named products, concrete tradeoffs, and verifiable numbers. "
                    "Do not stop reading after bullet 1. The strongest strategic insight is frequently not the first bullet. "
-                   "CONTRADICTION MANDATE: If any cited source contains a named expert, named data point, or explicit claim that directly challenges the paragraph's central thesis, "
-                   "it must appear in the paragraph. You may steelman your thesis against it, but you may not omit it. "
-                   "Suppressing a contradiction to preserve narrative coherence is a citation integrity violation. "
+                   "COMPLICATION MANDATE: If any cited source contains a bullet that contradicts, qualifies, or significantly complicates the paragraph's central claim, "
+                   "that bullet MUST appear in the paragraph. This is not optional. "
+                   "You may steelman your thesis against it, but you may not omit it. "
+                   "A bullet that reverses or limits the central implication is more valuable than a bullet that restates it from a different angle. "
+                   "The trigger is not 'does this directly oppose the thesis' but 'does this change the conclusion a reader would draw.' "
+                   "If yes, that bullet must be in the paragraph. Suppressing a complicating bullet to preserve narrative coherence is a citation integrity violation. "
                    "INFERENCE BOUNDARY RULE: The closing PM implication must be traceable to a specific bullet in a cited source. "
                    "You may take one logical step beyond the source (identifying an implication), but you may not: "
                    "(a) introduce strategic frameworks or design principles not present in any source, "
                    "(b) assert that a pattern is universal or industry-wide when sources show 1-2 examples, "
                    "(c) recommend a specific PM action that no source suggests or supports. "
                    "If your implication goes beyond what sources support, frame it explicitly as inference: 'these cases suggest...' not 'this demonstrates that PMs should...' "
+                   "QUALIFIER PRESERVATION CHECK: If the source uses hedged language ('suggests,' 'implies,' 'may,' 'could,' 'changes,' 'shifts'), "
+                   "your closing implication must match that hedge level. "
+                   "Converting a source observation into a prescription ('PMs must,' 'always,' 'from day one') when the source uses suggestive language is an inference boundary violation. "
                    "INFERENCE BOUNDARY SELF-CHECK: Before finalizing the closing implication, identify the specific source bullet it traces to. "
                    "If you cannot point to a specific bullet, rewrite the implication using 'these cases suggest...' framing. "
-                   "A well-written implication that exceeds what any source states must be reframed as inference, not presented as a sourced conclusion. "
                    "CLOSING SENTENCE SPECIFICITY TRAP: The most common inference boundary violation is a closing 'for PMs' sentence that adds operational details not present in any source bullet — "
                    "specific checklists, named thresholds, implementation steps, or design directives that go beyond what the source states. "
-                   "These feel grounded because they follow logically from the paragraph, but they are synthesizer-constructed, not source-derived. "
                    "Before finalizing: identify the exact source bullet the closing sentence extends. "
                    "If the bullet names an observation and your closing names a specific action, ask whether the source actually supports that action or whether you constructed it. "
                    "If constructed, replace the specific directive with 'these cases suggest PMs should consider...' framing. "
@@ -318,7 +350,6 @@ Produce a structured JSON object:
                    "not just a shared category label ('AI', 'regulation', 'platforms', 'government'). "
                    "Ask: do these stories share the same causal chain, the same failure mode, or the same design implication? "
                    "If the best you can say is 'both involve X category,' they belong in separate paragraphs. "
-                   "This replaces the REGULATORY CLUSTER RULE and applies to all source combinations. "
                    "THEMATIC COMBINATION SELF-CHECK: Before finalizing each paragraph that cites 2+ sources, write one sentence naming "
                    "the specific shared mechanism between all cited sources. If you cannot name it precisely — not 'both involve AI' "
                    "or 'both involve regulation' but a specific causal chain, failure mode, or design implication — do not combine. "
@@ -429,10 +460,10 @@ Produce a structured JSON object:
                    "Sentence 3 (optional): name the implication — one claim only, the most specific and directly grounded. "
                    "Only include this company if there is genuine signal today from the items provided. "
                    "COMPANY WATCH OMIT RULE: If no item directly covers this company's strategy or product moves, set paragraph to empty string. Do not substitute a tangentially related item. "
-                   "COMPANY WATCH SOURCE RULE: Company Watch entries may ONLY cite sources tagged 'company_watch ONLY' in their Allowed section field. "
-                   "A startup_disruption source that mentions a major company (e.g. a TechCrunch article about Google, a YourStory article about Anthropic) "
-                   "must NOT be used in Company Watch. If the only available signal about a company comes from a startup_disruption or other non-company_strategy source, "
-                   "set that company's paragraph to empty string. Do not cite it. "
+                   "COMPANY WATCH SOURCE RULE: Company Watch entries may ONLY cite sources tagged 'company_watch ONLY' in their Allowed section field AND whose Company field matches this company. "
+                   "An item tagged 'company_watch ONLY' whose Company field is 'NVIDIA' must NOT be used in the Google entry. "
+                   "An item tagged 'company_watch ONLY' whose Company field is 'Google' may ONLY be used in the Google entry. "
+                   "If no item has Company field matching this company, set paragraph to empty string. Do not cite any other company's source. "
                    "COMPANY WATCH CONVERGENCE RULE: Multiple threads allowed only if all threads converge on a single closing implication. "
                    "If the closing sentence does not follow from all threads, cut to the strongest single thread. "
                    "LEDE PRECISION RULE: Avoid absolute framing unless a source explicitly uses it. "
@@ -442,34 +473,20 @@ Produce a structured JSON object:
                    "OMISSION CHECK RULE: Before finalizing each company entry, review ALL insight bullets for every cited source. "
                    "For each cited source, identify the highest-value bullet you did NOT use. Ask: does omitting it distort the entry's conclusion or bury a stronger insight? "
                    "If yes, either incorporate it or revise the conclusion to reflect the more complete picture. "
-                   "A paragraph that selects only narrative-supporting bullets while dropping complicating evidence is a synthesis failure, not a synthesis. "
-                   "HIGHEST-RISK OMISSION TYPE: Bullets that contradict the entry's central claim, extend it to a new domain, or name a product or company not yet mentioned are the most commonly dropped and the most damaging to omit. "
-                   "A bullet that complicates your framing is more valuable than one that supports it — if it doesn't fit, ask whether your framing is too narrow. "
-                   "If you find yourself dropping a bullet because it 'doesn't quite fit,' that is a signal to stop and ask whether the entry's central claim is too narrow. "
+                   "COMPLICATION MANDATE: If any cited source contains a bullet that contradicts, qualifies, or significantly complicates the entry's central claim, "
+                   "that bullet MUST appear in the entry or the framing must be revised. This is not optional. "
+                   "You may steelman your thesis against it, but you may not omit it. "
+                   "QUALIFIER PRESERVATION CHECK: If the source uses hedged language ('suggests,' 'implies,' 'may,' 'could,' 'changes,' 'shifts'), "
+                   "your closing implication must match that hedge level. Do not convert a source observation into a prescription. "
                    "METRICS PRESERVATION RULE: If a source contains a specific number (dollar amount, percentage, named product, date), include it if it supports the entry. Named companies, products, and dollar figures ground the entry. "
                    "SCOPE FIDELITY RULE: Reflect the actual scope stated in the source. If a source explicitly limits scope (e.g. 'non-safety parts only'), the entry must reflect that limit, not expand it. "
                    "INFERENCE BOUNDARY RULE: Do not assert competitive framings, strategic motivations, or market positions not explicitly stated in the source. "
-                   "If the source says 'open infrastructure for non-safety functions,' do not write 'competing with safety-critical vendors.' "
-                   "If the source says 'minority investment participant,' do not write 'vertically integrating' or 'infrastructure ownership.' "
-                   "If a source shows a 1.75x fund size increase, do not assert '3-5x capital requirements' — that multiplier is not in the source. "
                    "The closing implication must be traceable to a specific bullet in a cited source. Frame synthesizer reasoning as inference: 'this suggests...' not 'this demonstrates...' "
-                   "CLOSING SENTENCE SPECIFICITY TRAP: The most common inference boundary violation is a closing sentence that adds operational details not present in any source bullet — "
-                   "specific checklists, named thresholds, implementation steps, or competitive framings that go beyond what the source states. "
-                   "Before finalizing: identify the exact source bullet the closing sentence extends. "
-                   "If the bullet names an observation and your closing names a specific action or competitive position, ask whether the source actually supports it or whether you constructed it. "
-                   "If constructed, replace with 'this suggests...' framing. "
                    "CONTRADICTION MANDATE: If any cited source contains a named data point, explicit claim, or product detail that directly challenges or complicates "
                    "the entry's central framing, it must appear in the entry or the framing must be revised. "
-                   "You may steelman your thesis against it, but you may not omit it. "
-                   "Suppressing a contradicting bullet to preserve a cleaner narrative is a citation integrity violation. "
                    "THEMATIC COMBINATION RULE: Multiple signals for the same company may only appear in the same entry if they share a specific mechanism — "
                    "not just a shared category label ('AI', 'cloud', 'regulation', 'growth'). "
-                   "Ask: do these signals share the same causal chain, the same strategic shift, or the same product implication? "
-                   "If the best you can say is 'both involve X category,' cut to the stronger single signal. "
-                   "THEMATIC COMBINATION SELF-CHECK: Before finalizing any entry citing 2+ sources, write one sentence naming the specific shared mechanism. "
-                   "If you cannot name it precisely — not 'both involve AI' or 'both involve cloud' but a specific causal chain or strategic shift — cut to the strongest single signal. "
-                   "MECHANISM SOURCING REQUIREMENT: The shared mechanism you name must be explicitly present in at least one source bullet — not constructed by inference across bullets. "
-                   "If no single bullet names it, the mechanism is synthesizer-constructed and the combination is invalid — it is a category label, not a mechanism. Cut to the strongest single signal.",
+                   "If the best you can say is 'both involve X category,' cut to the stronger single signal.",
       "source_indices": []
     }},
     "Meta": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
@@ -488,28 +505,15 @@ Produce a structured JSON object:
                 "Only include early-stage or emerging companies — do not include established large-cap companies. "
                 "IMPLICATION FOCUS RULE: Each bullet must close with exactly one strategic consequence. Cut any 'and' connecting two separate consequences. "
                 "METRICS PRESERVATION RULE: Include the funding amount, round size, or key metric from the source. Do not omit specific numbers that ground the strategic claim. "
-                "INFERENCE BOUNDARY RULE: Do not assert a specific multiplier, ratio, or benchmark unless it appears verbatim in the source. Inferred benchmarks must use 'suggests' or 'implies' framing, never assertion. "
-                "CLOSING SENTENCE SPECIFICITY TRAP: The most common inference boundary violation is a closing sentence that adds operational details not present in any source bullet — "
-                "specific checklists, named thresholds, implementation steps, or strategic conclusions that go beyond what the source states. "
-                "Before finalizing: identify the exact source bullet the closing sentence extends. "
-                "If the bullet names an observation and your closing names a specific action or pattern, ask whether the source actually supports it or whether you constructed it. "
-                "If constructed, replace with 'this suggests...' framing. "
                 "OMISSION CHECK RULE: Before finalizing each bullet, review ALL insight bullets for the cited source. "
                 "Identify the highest-value bullet you did NOT use. If omitting it buries the sharper strategic insight, use that one instead. "
-                "A bullet that selects only narrative-supporting content while dropping complicating evidence is a synthesis failure, not a synthesis. "
-                "HIGHEST-RISK OMISSION TYPE: Bullets that contradict the bullet's central claim, extend it to a new domain, or name a product or company not yet mentioned are the most commonly dropped and the most damaging to omit. "
-                "A bullet that complicates your framing is more valuable than one that supports it — if it doesn't fit, ask whether your framing is too narrow. "
-                "If you find yourself dropping a bullet because it 'doesn't quite fit,' that is a signal to stop and ask whether the bullet's central claim is too narrow. "
+                "COMPLICATION MANDATE: If any cited source contains a bullet that contradicts, qualifies, or significantly complicates the bullet's central claim, "
+                "that bullet MUST appear or the framing must be revised. This is not optional. "
+                "QUALIFIER PRESERVATION CHECK: If the source uses hedged language, your closing consequence must match that hedge level. "
+                "INFERENCE BOUNDARY RULE: Do not assert a specific multiplier, ratio, or benchmark unless it appears verbatim in the source. Inferred benchmarks must use 'suggests' or 'implies' framing, never assertion. "
                 "THEMATIC COMBINATION RULE: Each startup_radar bullet must cover a single company or a single strategic pattern. "
-                "Do not combine two unrelated companies or two unrelated stories into one bullet under a shared category label ('fintech', 'EV', 'AI'). "
-                "If two stories share only a category but not a specific causal mechanism or shared implication, "
-                "they belong in separate bullets. "
-                "THEMATIC COMBINATION SELF-CHECK: Before finalizing any bullet citing 2+ sources, name the specific shared mechanism. "
-                "If you cannot name it precisely, do not combine. "
-                "MECHANISM SOURCING REQUIREMENT: The shared mechanism you name must be explicitly present in at least one source bullet — not constructed by inference across bullets. "
-                "Ask: which specific bullet uses this mechanism, causal chain, or failure mode by name or clear implication? "
-                "If no single bullet names it, the mechanism is synthesizer-constructed and the combination is invalid — it is a category label, not a mechanism. "
-                "In that case, treat each source as a candidate for its own standalone bullet.",
+                "Do not combine two unrelated companies or two unrelated stories into one bullet under a shared category label. "
+                "If two stories share only a category but not a specific causal mechanism or shared implication, they belong in separate bullets.",
       "source_indices": []
     }}
   ],
@@ -523,31 +527,29 @@ Produce a structured JSON object:
             "Write for a reader who has NOT read the source. "
             "OMISSION CHECK RULE: Before finalizing, review ALL insight bullets for every cited source. "
             "The most actionable PM craft insight may not be the first bullet — check all of them before selecting. "
-            "A bullet that selects only the most obviously craft-relevant content while dropping complicating or extending evidence is a synthesis failure, not a synthesis. "
-            "HIGHEST-RISK OMISSION TYPE: The most actionable PM craft insight is frequently the one that contradicts a common PM assumption, extends the pattern to a decision domain not yet named, or applies to a product context not yet mentioned. "
-            "If you are defaulting to the most obviously PM-relevant bullet, check whether a less obvious bullet delivers a sharper decision-forcing insight. "
-            "A bullet that complicates your framing is more valuable than one that confirms it — if it doesn't fit, ask whether your framing is too narrow. "
+            "COMPLICATION MANDATE: If any source bullet contradicts, qualifies, or complicates the central craft insight, it must appear or the framing must be revised. "
+            "QUALIFIER PRESERVATION CHECK: Match the hedge level of the source. Do not convert 'suggests' into 'must.' "
             "If no craft-relevant insight exists, set text to empty string.",
     "source_indices": []
   }}
 }}
 
 Guidance:
-- SECTION ROUTING RULE: Each item is tagged with an "Allowed section" field. This is a hard constraint, not a suggestion.
-    Items tagged "company_watch ONLY" (theme: company_strategy) may ONLY appear in company_watch entries.
+- SECTION ROUTING RULE: Each item is tagged with an "Allowed section" field and a "Company" field. Both are hard constraints, not suggestions.
+    Items tagged "company_watch ONLY" may ONLY appear in the company_watch entry whose company name matches the item's Company field.
     Items tagged "startup_radar ONLY" (theme: startup_disruption) may ONLY appear in startup_radar bullets.
     Items tagged "pm_craft_today ONLY" (theme: product_craft) may ONLY appear in pm_craft_today.
   A TechCrunch article about Amazon is tagged startup_disruption → startup_radar ONLY. Do not use it in company_watch even if it describes a major company's strategy.
   A YourStory article about Anthropic is tagged startup_disruption → startup_radar ONLY. Do not use it in company_watch.
-  Company Watch entries must be built exclusively from items tagged "company_watch ONLY" (theme: company_strategy), which means official company blogs, newsrooms, and first-party announcements.
-  If no company_strategy item covers a given company today, set that company's paragraph to empty string — do not substitute any other source type.
-- COMPANY WATCH GROUNDING RULE: Do not connect two separate signals for the same company into a causal narrative unless that connection is explicitly made in the sources. Each sentence must be traceable to a specific cited source. Do not infer competitive intent, strategic motivation, or market position that the source does not explicitly state. Scope fidelity is required: if a source limits a product to 'non-safety functions,' do not frame it as competing with safety-critical vendors. If a source describes a minority VC investment, do not frame it as vertical integration or infrastructure ownership. If a source shows a fund grew 1.75x, do not assert industry-wide capital requirements are 3-5x higher.
+  An NVIDIA Blog item has Company field 'NVIDIA' → it may only appear in the NVIDIA company_watch entry. Do not use it for Google or any other company.
+  Company Watch entries must be built exclusively from items tagged "company_watch ONLY" whose Company field matches that company.
+  If no such item exists for a given company today, set that company's paragraph to empty string.
+- COMPANY WATCH GROUNDING RULE: Do not connect two separate signals for the same company into a causal narrative unless that connection is explicitly made in the sources. Each sentence must be traceable to a specific cited source. Do not infer competitive intent, strategic motivation, or market position that the source does not explicitly state.
 - COMPANY WATCH INSIGHT RULE: Each company paragraph must answer 'what is strategically shifting for this company today' — not just 'what did they do.'
 - STARTUP RADAR RULE: Each bullet must contain a genuine 'so what' — the strategic implication, competitive threat, or market pattern revealed, not just a description of the event.
 - PM CRAFT OMIT RULE: If no item contains a craft-relevant insight, set pm_craft_today text to empty string rather than forcing a weak insight.
 - PM ACTIONABILITY RULE: Prefer concrete product design consequences over strategic observations. Does this tell a PM what to build or decide differently?
 - IMPLICATION FOCUS RULE: Every closing implication must make exactly one claim.
-- DATE VALIDATION RULE: Today's date is {today}. If any milestone date is earlier than today, flag it with [DATE CHECK: this date may already have passed].
 - CITATION RULE: Only cite item [n] if a specific insight bullet directly supports the exact claim.
 """.strip()
 
@@ -595,6 +597,10 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
     Filters to items that are:
       - confidence: high or medium
       - pm_relevance_score: high or medium
+
+    Additional routing rules:
+      - regulation_policy items with scope=company_specific are excluded from WS
+        and eligible for company_watch only (handled by dedicated section routing)
     """
     client = _build_client()
     settings = load_settings()
@@ -641,6 +647,8 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "theme": theme,
                 "title": item.get("title", ""),
                 "source_name": item.get("source_name", ""),
+                "company_id": item.get("company_id"),
+                "scope": str(item.get("scope") or "cross_market").lower(),
                 "insights": item.get("insights") or [],
                 "confidence": conf_raw,
                 "pm_relevance_score": relevance_raw,
@@ -705,9 +713,33 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
     # ---------------------------------------------------------------------------
     # Partition by routing eligibility
+    #
+    # NEW: regulation_policy items with scope=company_specific are excluded from
+    # WS and routed to dedicated sections instead. This prevents single-company
+    # regulatory stories (e.g. OpenAI military contract RTI filing) from appearing
+    # in What's Shifting, which is reserved for cross-market patterns.
     # ---------------------------------------------------------------------------
-    ws_items = [i for i in filtered_items if i["theme"] in WHATS_SHIFTING_THEMES]
-    dedicated_items = [i for i in filtered_items if i["theme"] in DEDICATED_SECTION_THEMES]
+    ws_items = []
+    dedicated_items = []
+
+    for item in filtered_items:
+        theme = item["theme"]
+        scope = item.get("scope", "cross_market")
+
+        if theme in DEDICATED_SECTION_THEMES:
+            dedicated_items.append(item)
+        elif theme in WHATS_SHIFTING_THEMES:
+            # regulation_policy items with company_specific scope go to dedicated
+            # sections (they may be relevant to a Company Watch entry) rather than WS
+            if theme == "regulation_policy" and scope == "company_specific":
+                logger.info(
+                    "FILTER [step=4 reason=regulation_policy_company_specific_excluded_from_ws] "
+                    "routed to dedicated: %s — %s",
+                    item.get("source_name"), item.get("title")
+                )
+                dedicated_items.append(item)
+            else:
+                ws_items.append(item)
 
     logger.info(
         "Routing: %d whats_shifting items, %d dedicated section items",
@@ -739,13 +771,14 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "title": entry["title"],
                 "source_name": entry["source_name"],
                 "theme": entry["theme"],
+                "company_id": entry.get("company_id"),
             }
 
         # ---------------------------------------------------------------------------
-        # Normalize outputs
+        # Normalize outputs — DATE CHECK flags are stripped inside each normalizer
         # ---------------------------------------------------------------------------
         normalized_whats_shifting = _normalize_whats_shifting(call1_parsed.get("whats_shifting") or [])
-        interview_angle = str(call1_parsed.get("interview_angle") or "")
+        interview_angle = _strip_date_check_flags(str(call1_parsed.get("interview_angle") or ""))
 
         normalized_company_watch = _normalize_company_watch(call2_parsed.get("company_watch") or {})
         normalized_startup_radar = _normalize_startup_radar(call2_parsed.get("startup_radar") or [])
@@ -758,7 +791,18 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         ws_eligible_indices = {entry["index"] for entry in ws_indexed}
         dedicated_eligible_indices = {entry["index"] for entry in dedicated_indexed}
 
-        # Build a set of company_strategy-only indices for CW source integrity check
+        # Build a mapping from company_id to permitted source indices for CW integrity check.
+        # Only company_strategy sources with a matching company_id are permitted for each company entry.
+        company_strategy_by_company: Dict[str, set] = {}
+        for entry in dedicated_indexed:
+            if entry["theme"] == "company_strategy":
+                cid = entry.get("company_id")
+                if cid:
+                    if cid not in company_strategy_by_company:
+                        company_strategy_by_company[cid] = set()
+                    company_strategy_by_company[cid].add(entry["index"])
+
+        # Also keep a flat set of all company_strategy indices for legacy checks
         company_strategy_indices = {
             entry["index"] for entry in dedicated_indexed
             if entry["theme"] == "company_strategy"
@@ -944,38 +988,58 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             for w in omit_rule_warnings:
                 print(json.dumps(w, indent=2))
 
-        # NEW: 5b. Company Watch source integrity check
-        # Flags any CW entry that cites a non-company_strategy source and clears the entry
+        # 5b. Company Watch source integrity check — extended to verify company_id match
+        # Clears any CW entry that cites:
+        #   (a) a non-company_strategy source, OR
+        #   (b) a company_strategy source whose company_id does not match the CW entry's company
         cw_source_integrity_violations = []
         companies_to_clear = []
 
         for company, value in normalized_company_watch.items():
-            bad_indices = [
-                idx_val for idx_val in value.get("source_indices", [])
-                if idx_val not in company_strategy_indices
-            ]
+            bad_indices = []
+            for idx_val in value.get("source_indices", []):
+                source_info = source_index_lookup.get(str(idx_val), {})
+                source_theme = source_info.get("theme", "")
+                source_company_id = source_info.get("company_id")
+
+                if source_theme != "company_strategy":
+                    # Not a first-party company source at all
+                    bad_indices.append((idx_val, "non_company_strategy", source_info))
+                elif source_company_id != company:
+                    # First-party source but belongs to a different company
+                    bad_indices.append((idx_val, "company_id_mismatch", source_info))
+
             if bad_indices:
-                for idx_val in bad_indices:
-                    source_info = source_index_lookup.get(str(idx_val), {})
+                for idx_val, reason, source_info in bad_indices:
+                    if reason == "non_company_strategy":
+                        warning_msg = (
+                            f"Company Watch entry for {company} cites a non-company_strategy source "
+                            f"(theme: {source_info.get('theme', 'unknown')}). "
+                            "Entry cleared — only first-party company_strategy sources are permitted."
+                        )
+                    else:
+                        warning_msg = (
+                            f"Company Watch entry for {company} cites a company_strategy source "
+                            f"belonging to '{source_info.get('company_id', 'unknown')}', not '{company}'. "
+                            "Entry cleared — each company entry must only cite its own first-party sources."
+                        )
                     cw_source_integrity_violations.append({
                         "company": company,
                         "source_index": idx_val,
                         "source_title": source_info.get("title", "unknown"),
                         "source_theme": source_info.get("theme", "unknown"),
+                        "source_company_id": source_info.get("company_id"),
+                        "reason": reason,
                         "action": "ENTRY_CLEARED",
-                        "warning": (
-                            f"Company Watch entry for {company} cites a non-company_strategy source "
-                            f"(theme: {source_info.get('theme', 'unknown')}). "
-                            "Entry cleared — only first-party company_strategy sources are permitted in Company Watch."
-                        )
+                        "warning": warning_msg,
                     })
                 companies_to_clear.append(company)
 
         for company in companies_to_clear:
             logger.warning(
-                "CW SOURCE INTEGRITY: Clearing %s entry — cited non-company_strategy source(s): %s",
+                "CW SOURCE INTEGRITY: Clearing %s entry — violation(s): %s",
                 company,
-                [v["source_title"] for v in cw_source_integrity_violations if v["company"] == company]
+                [v["warning"] for v in cw_source_integrity_violations if v["company"] == company]
             )
             normalized_company_watch[company] = {"paragraph": "", "source_indices": []}
 
@@ -989,7 +1053,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 print(json.dumps(v, indent=2))
 
         # 5c. PM Craft source integrity check
-        # Flags pm_craft_today if it cites a non-product_craft / non-design_ux source
         product_craft_indices = {
             entry["index"] for entry in dedicated_indexed
             if entry["theme"] in {"product_craft", "design_ux"}

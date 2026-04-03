@@ -71,6 +71,7 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
           "pm_relevance_score": "high" | "medium" | "low",  # categorical
           "confidence": "high" | "medium" | "low",
           "company_maturity": "startup" | "established" | "not_applicable",
+          "scope": "cross_market" | "company_specific",
           "content_word_count": int  # words in content body sent to the model
         }
     """
@@ -114,7 +115,8 @@ Please respond in strict JSON with the following structure:
   "pm_interview_relevance": "one line explaining why this matters (or doesn't) for a PM interview",
   "pm_relevance_score": "high" | "medium" | "low",
   "confidence": "high" | "medium" | "low",
-  "company_maturity": "startup" | "established" | "not_applicable"
+  "company_maturity": "startup" | "established" | "not_applicable",
+  "scope": "cross_market" | "company_specific"
 }}
 
 Guidance:
@@ -127,12 +129,14 @@ Guidance:
     (2) Bullets naming a strategic pattern or competitive dynamic with a named mechanism.
     (3) Bullets naming a market observation or trend without a concrete action attached.
   A bullet that tells a PM what to build or decide differently outranks a bullet that tells them what is happening. Both are valuable, but the synthesizer will select from your bullets — give it your most actionable ones first. When in doubt, ask: could a PM use this bullet to change a decision in a meeting tomorrow? If yes, it ranks above bullets where the answer is 'it depends' or 'it's a useful frame.'
+- COMPLICATION RULE: If the content body contains a fact, data point, mechanism, or claim that contradicts, qualifies, or significantly complicates the article's central claim, you MUST include it as a bullet regardless of where it falls in the prioritization order. This is not optional. A bullet that reverses or limits the central implication is more valuable than a bullet that restates it from a different angle. Ask: is there anything in this content that would make a reader second-guess the main takeaway? If yes, that belongs in the bullets. CONTRADICTION MANDATE: If the content body contains a named data point, statistic, expert claim, or explicit mechanism that directly contradicts, qualifies, or limits the article's central thesis, it must appear as a bullet. You may not omit it because it complicates the narrative. A qualifying fact (e.g. a number that limits the scope of a claim, a geographic or demographic restriction, a named alternative that undermines the central argument) is as important as an explicit contradiction. The trigger is not 'does this directly oppose the thesis' but 'does this change the conclusion a reader would draw.' If yes, include it.
 - SOURCE FIDELITY RULE: Every bullet must be traceable to a specific claim, data point, or quote in the content body above. You may reason one logical step beyond the source (e.g. identifying an implication), but you may not:
     (a) Introduce named entities (companies, products, people, technologies) that do not appear in the content body
     (b) Assert specific numbers (multipliers, percentages, dollar figures, timelines) that do not appear in the content body
     (c) Assign strategic motivations to a company that the source does not state
   If you find yourself writing "this is similar to how X did Y" or "this follows the pattern of Z" using a company or event not mentioned in the content — stop. That bullet is from your training knowledge, not from the source. Either ground it in the source or cut it.
   HALLUCINATION TEST: Before finalizing each bullet, ask: "Is the specific company name, product name, number, or causal claim I am asserting actually in the content body above?" If no, rewrite without it.
+  QUALIFIER PRESERVATION RULE: If the source uses hedged language to describe a finding ('suggests,' 'implies,' 'may,' 'could,' 'changes,' 'shifts'), your bullet must match that hedge level. Do not convert a source observation into a prescription. If the source says 'this changes how PMs prioritize,' do not write 'PMs must prioritize X from day one.' If the source says 'this suggests a tradeoff,' do not write 'PMs should always choose Y.' Preserving the source's epistemic confidence level is part of source fidelity. Converting hedged observations into prescriptive mandates is an inference boundary violation at the summarizer stage.
 - "pm_relevance_score" should be a categorical assessment of how useful this item is for PM interview preparation:
     high   = directly relevant to product strategy, company moves, or market shifts a PM interviewer would ask about
     medium = tangentially relevant; useful context but not a likely interview topic
@@ -143,6 +147,10 @@ Guidance:
     established = primary subject is a publicly traded company, a subsidiary of one, or a company with $1B+ valuation and significant market presence (e.g. Intuit, Google, Meta, Amazon, Salesforce)
     not_applicable = article is not primarily about a named company, or covers multiple companies without a single primary subject
   This field is used downstream to filter Startup Radar — established companies will not appear in Startup Radar regardless of feed tag.
+- SCOPE RULE: Assess whether this article describes a pattern affecting multiple companies or an entire product category ('cross_market'), or whether it is primarily about one named company's specific regulatory situation, legal case, government contract, or product decision ('company_specific').
+    cross_market    = the article's central claim applies to an industry, a product category, or a regulatory framework that affects multiple companies or builders. Example: an EFF article about how 3D printer regulations create repurposable censorship infrastructure is cross_market. An MIT Technology Review article about plastics supply chain vulnerabilities is cross_market.
+    company_specific = the article is primarily about what one named company did, faces, or decided. Example: a TechCrunch article about Google's new API is company_specific. An RTI filing about OpenAI's military contract is company_specific.
+  This field is used downstream to route regulation_policy articles — only cross_market articles are eligible for What's Shifting. Company_specific articles route to Company Watch or are dropped.
 - "pm_interview_relevance" should be a one-line text explanation supporting your pm_relevance_score judgment.
 - "confidence" should reflect how well the content body above supports producing accurate, grounded insight bullets — it is a self-assessment of source quality, NOT a judgment of topic interest. Ask: how much of what I would write comes from the content body vs. from my own training knowledge?
     high   = content body is substantive (300+ words of original reporting, analysis, or primary source material) and provides enough specific detail to write 3-5 grounded bullets without drawing on outside knowledge
@@ -156,7 +164,7 @@ Guidance:
 
     response = client.messages.create(
         model=settings.claude_model,
-        max_tokens=800,
+        max_tokens=1200,
         temperature=0.2,
         system=SYSTEM_PROMPT,
         messages=[
@@ -192,6 +200,7 @@ Guidance:
             "pm_relevance_score": "medium",
             "confidence": "medium",
             "company_maturity": "not_applicable",
+            "scope": "cross_market",
         }
 
     # Ensure required keys exist with safe defaults.
@@ -212,11 +221,16 @@ Guidance:
     if company_maturity not in {"startup", "established", "not_applicable"}:
         company_maturity = "not_applicable"
 
+    scope = str(parsed.get("scope") or "cross_market").lower()
+    if scope not in {"cross_market", "company_specific"}:
+        scope = "cross_market"
+
     return {
         "insights": insights,
         "pm_interview_relevance": str(pm_interview_relevance),
         "pm_relevance_score": pm_relevance_score,
         "confidence": confidence,
         "company_maturity": company_maturity,
+        "scope": scope,
         "content_word_count": content_word_count,
     }

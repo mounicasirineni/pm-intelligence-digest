@@ -482,11 +482,24 @@ async def llm_judge(
         except Exception:
             return None
 
-    async def score_sr_one(bullet: Any) -> Dict[str, Any] | None:
-        text = str(bullet).strip()
+    async def score_sr_one(bullet_entry: Any) -> Dict[str, Any] | None:
+        """
+        Score a startup_radar bullet.
+
+        Accepts the full SR dict (with source_indices) rather than a plain string,
+        so the evaluator has access to source evidence for backward completeness checks.
+        Falls back to extracting indices from bullet text if source_indices is absent.
+        """
+        if isinstance(bullet_entry, dict):
+            text = str(bullet_entry.get("bullet") or "").strip()
+            indices = bullet_entry.get("source_indices") or []
+        else:
+            text = str(bullet_entry).strip()
+            indices = _extract_indices_from_text(text)
+
         if not text:
             return None
-        indices = _extract_indices_from_text(text)
+
         loop = asyncio.get_running_loop()
         try:
             return await loop.run_in_executor(None, lambda: _score_paragraph(text, indices, "startup_radar"))
@@ -519,8 +532,10 @@ async def llm_judge(
                 cw_scores.append(scored)
 
     sr_scores: List[Dict[str, Any]] = []
-    for bullet in startup_radar:
-        scored = await score_sr_one(bullet)
+    for bullet_entry in startup_radar:
+        # Pass the full dict (not just the bullet string) so score_sr_one
+        # can read source_indices directly rather than extracting from text.
+        scored = await score_sr_one(bullet_entry)
         if scored:
             sr_scores.append(scored)
 
@@ -668,7 +683,6 @@ async def pm_craft_quality(
     """Quality: Score pm_craft_today on Insight Depth (1-5). Weighted 10pts."""
     client = _build_llm_client()
 
-    # Fix G: correctly extract text field from pm_craft_today dict
     pm_craft_raw = synthesis.get("pm_craft_today") or {}
     pm_craft = (
         str(pm_craft_raw.get("text") or "").strip()
@@ -743,11 +757,6 @@ def run(
     Scoring is dynamic — sections with no output are excluded from both
     score_components and score_weights, and overall_score is normalized
     to 100 based only on the weights of sections that produced output.
-    This handles all four scenarios:
-      1. All 5 sections scored
-      2. PM Craft empty — 4 sections scored
-      3. Company Watch empty — 4 sections scored
-      4. PM Craft and Company Watch both empty — 3 sections scored
     """
     if not date_str:
         date_str = date.today().isoformat()
