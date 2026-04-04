@@ -254,8 +254,9 @@ async def llm_judge(
     Weights:
       WS 40pts: coherence 10 + insight 10 + grounding 10 + topical_breadth 10
       CW 25pts: coherence 8.3 + insight 8.3 + grounding 8.4
-      SR 15pts: coherence 5 + insight 5 + grounding 5
-      IA 20pts: relevance 20
+      SR 20pts: coherence 6.7 + insight 6.7 + grounding 6.6
+      PM Craft 10pts: insight 10
+      IA 5pts: relevance 5
     """
     client = _build_llm_client()
     whats_shifting = synthesis.get("whats_shifting") or []
