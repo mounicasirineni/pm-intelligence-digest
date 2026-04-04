@@ -533,7 +533,7 @@
       <div class="callout">
         <div class="callout-label">Today&rsquo;s Interview Angle</div>
         <div class="callout-text">
-          {{ synthesis.interview_angle or "Run the synthesis pipeline to surface this week’s interview angle." }}
+          {{ synthesis.interview_angle or "Run the synthesis pipeline to surface this week's interview angle." }}
         </div>
       </div>
     </section>
@@ -675,8 +675,6 @@
           {% endfor %}
         {% endfor %}
 
-          {% set utilized_items = utilized_items | sort(attribute='title') %}
-
           {# ── Utilized ── #}
           <div style="margin-top: 0.75rem;">
             <div class="collapsible-header" id="utilized-header" style="cursor: pointer;">
@@ -685,7 +683,15 @@
             </div>
             <div class="collapsible-body" id="utilized-body">
             {% if utilized_items %}
+              {# Build sortable list by citation index, then render in that order #}
+              {% set utilized_with_idx = [] %}
               {% for item in utilized_items %}
+                {% set sort_idx = citation_sort_map.get((item.source_name, item.title), 9999) %}
+                {% set _ = utilized_with_idx.append({'item': item, 'idx': sort_idx}) %}
+              {% endfor %}
+              {% set utilized_with_idx = utilized_with_idx | sort(attribute='idx') %}
+              {% for entry in utilized_with_idx %}
+                {% set item = entry.item %}
                 {% set cite_idx = citation_index_map.get((item.source_name, item.title)) %}
                 <article class="source-item">
                   <div class="source-title-row">
@@ -826,18 +832,17 @@
       if (header && body && icon) {
         header.addEventListener("click", function () {
           var isOpen = body.classList.toggle("open");
-          icon.textContent = isOpen ? "−" : "+";
+          icon.textContent = isOpen ? "\u2212" : "+";
         });
       }
 
-      // Company watch toggles (simple inline show/hide)
+      // Company watch toggles
       var pills = document.querySelectorAll(".company-pill");
       pills.forEach(function (pill) {
         pill.addEventListener("click", function () {
           var company = pill.getAttribute("data-company");
           if (!company) return;
 
-          // Toggle active state
           var alreadyActive = pill.classList.contains("active");
           pills.forEach(function (p) { p.classList.remove("active"); });
           var signals = document.querySelectorAll("[data-company-signal]");
@@ -850,6 +855,7 @@
           }
         });
       });
+
       // Filtered Out collapsible
       var filteredHeader = document.getElementById("filtered-header");
       var filteredBody = document.getElementById("filtered-body");
@@ -860,18 +866,18 @@
           filteredIcon.textContent = isOpen ? "\u2212" : "+";
         });
       }
+
       // Utilized collapsible
       var utilizedHeader = document.getElementById("utilized-header");
-var utilizedBody = document.getElementById("utilized-body");
-var utilizedIcon = document.getElementById("utilized-icon");
-if (utilizedHeader && utilizedBody && utilizedIcon) {
-  utilizedHeader.addEventListener("click", function () {
-    var isOpen = utilizedBody.classList.toggle("open");
-    utilizedIcon.textContent = isOpen ? "\u2212" : "+";
-  });
-}
+      var utilizedBody = document.getElementById("utilized-body");
+      var utilizedIcon = document.getElementById("utilized-icon");
+      if (utilizedHeader && utilizedBody && utilizedIcon) {
+        utilizedHeader.addEventListener("click", function () {
+          var isOpen = utilizedBody.classList.toggle("open");
+          utilizedIcon.textContent = isOpen ? "\u2212" : "+";
+        });
+      }
     })();
   </script>
 </body>
 </html>
-

@@ -398,6 +398,10 @@ def index():
         (v["source_name"], v["title"]): k
         for k, v in source_index_lookup.items()
     }
+    citation_sort_map = {
+        (v["source_name"], v["title"]): int(k)
+        for k, v in source_index_lookup.items()
+    }
     utilized_keys = _build_utilized_keys(synthesis or {})
     return render_template(
         "index.html",
@@ -406,6 +410,7 @@ def index():
         generated_at=generated_at,
         eval_summary=eval_summary,
         citation_index_map=citation_index_map,
+        citation_sort_map=citation_sort_map,
         utilized_keys=utilized_keys,
     )
 
@@ -488,6 +493,10 @@ def digest_by_date(date_str: str):
         (v["source_name"], v["title"]): k
         for k, v in source_index_lookup.items()
     }
+    citation_sort_map = {
+        (v["source_name"], v["title"]): int(k)
+        for k, v in source_index_lookup.items()
+    }
     utilized_keys = _build_utilized_keys(synthesis or {})
     return render_template(
         "index.html",
@@ -496,6 +505,7 @@ def digest_by_date(date_str: str):
         generated_at=generated_at,
         eval_summary=eval_summary,
         citation_index_map=citation_index_map,
+        citation_sort_map=citation_sort_map,
         utilized_keys=utilized_keys,
     )
 
