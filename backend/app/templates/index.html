@@ -663,8 +663,7 @@
           {% for item in items %}
             {% set conf = (item.confidence or 'medium') | lower %}
             {% set rel = (item.pm_relevance_score or 'medium') | lower %}
-            {% set cite_idx = citation_index_map.get((item.source_name, item.title)) %}
-            {% if conf in ['high', 'medium'] and rel in ['high', 'medium'] and cite_idx %}
+            {% if (item.source_name, item.title) in utilized_keys %}
               {% set _ = utilized_items.append(item) %}
             {% elif conf not in ['high', 'medium'] %}
               {% set _ = filtered_items.append({'item': item, 'reason': 'Low Confidence'}) %}
@@ -675,6 +674,8 @@
             {% endif %}
           {% endfor %}
         {% endfor %}
+
+          {% set utilized_items = utilized_items | sort(attribute='title') %}
 
           {# ── Utilized ── #}
           <div style="margin-top: 0.75rem;">

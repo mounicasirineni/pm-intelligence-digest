@@ -32,17 +32,15 @@ app = Flask(
 
 @app.after_request
 def _add_noindex_headers(response):
-    # Ensure pages and API responses are not indexed by search engines.
     response.headers.setdefault("X-Robots-Tag", "noindex, nofollow, noarchive")
     return response
 
 
 @app.route("/robots.txt")
 def robots_txt():
-    # Serve a crawl-disallowing robots file even if static routing isn't configured.
     return send_from_directory(app.static_folder, "robots.txt")
 
-# Ensure the digests table exists before serving requests.
+
 init_db()
 
 _scheduler: BackgroundScheduler | None = None
@@ -56,6 +54,42 @@ def _bold_md(value: str) -> str:
 
 
 app.jinja_env.filters["bold_md"] = _bold_md
+
+
+def _build_utilized_keys(synthesis: dict) -> set:
+    """
+    Return the set of (source_name, title) pairs for articles actually
+    cited in synthesis output via source_indices.
+
+    source_index_lookup contains every article passed INTO synthesis.
+    This function resolves only the subset that Claude actually referenced
+    in whats_shifting, company_watch, startup_radar, or pm_craft_today.
+    """
+    source_index_lookup = (synthesis or {}).get("source_index_lookup") or {}
+
+    used_indices: set = set()
+
+    for insight in (synthesis.get("whats_shifting") or []):
+        if isinstance(insight, dict):
+            used_indices.update(str(i) for i in (insight.get("source_indices") or []))
+
+    for company in (synthesis.get("company_watch") or {}).values():
+        if isinstance(company, dict):
+            used_indices.update(str(i) for i in (company.get("source_indices") or []))
+
+    for item in (synthesis.get("startup_radar") or []):
+        if isinstance(item, dict):
+            used_indices.update(str(i) for i in (item.get("source_indices") or []))
+
+    pm_craft = synthesis.get("pm_craft_today")
+    if isinstance(pm_craft, dict):
+        used_indices.update(str(i) for i in (pm_craft.get("source_indices") or []))
+
+    return {
+        (v["source_name"], v["title"])
+        for k, v in source_index_lookup.items()
+        if k in used_indices and isinstance(v, dict)
+    }
 
 
 _CACHE = {
@@ -89,8 +123,6 @@ def _run_pipeline():
                     "title": item.get("title"),
                     "url": item.get("url"),
                     "source_name": item.get("source_name"),
-                    # company_id comes from rss.py (set from sources.json) —
-                    # used by synthesizer CW source integrity check
                     "company_id": item.get("company_id"),
                     "theme": theme,
                     "insights": summary.get("insights", []),
@@ -98,8 +130,6 @@ def _run_pipeline():
                     "pm_relevance_score": summary.get("pm_relevance_score", "medium"),
                     "confidence": summary.get("confidence", "medium"),
                     "company_maturity": summary.get("company_maturity", "not_applicable"),
-                    # scope comes from summarizer — cross_market vs company_specific,
-                    # used by synthesizer to route regulation_policy articles correctly
                     "scope": summary.get("scope", "cross_market"),
                     "content_word_count": summary.get("content_word_count", 0),
                 }
@@ -115,7 +145,6 @@ def _run_pipeline():
 
 
 def _start_scheduler_if_needed() -> None:
-    """Start the daily digest scheduler, avoiding duplicate schedulers in debug mode."""
     global _scheduler
     print("_start_scheduler_if_needed called", flush=True)
 
@@ -123,7 +152,6 @@ def _start_scheduler_if_needed() -> None:
     if settings.app_env.lower() == "testing":
         return
 
-    # In Flask debug, the reloader spawns two processes. Only start the scheduler in the main one.
     if os.environ.get("WERKZEUG_RUN_MAIN") not in {None, "true"}:
         return
 
@@ -316,7 +344,6 @@ def _get_all_evals():
             "date":          date_str,
             "label":         label,
             "overall_score": float(overall_score or 0.0),
-            # Quality — WS
             "ws_coherence":        float(llm.get("ws_avg_coherence")  or llm.get("avg_coherence")  or 0.0),
             "ws_coherence_reason": str(llm.get("ws_coherence_reason") or ""),
             "ws_insight":          float(llm.get("ws_avg_insight_depth") or llm.get("avg_insight_depth") or 0.0),
@@ -325,27 +352,22 @@ def _get_all_evals():
             "ws_grounding_reason": str(llm.get("ws_grounding_reason") or ""),
             "ws_breadth":          float(llm.get("ws_topical_breadth") or 0.0),
             "ws_breadth_reason":   str(llm.get("ws_topical_breadth_reason") or ""),
-            # Quality — CW
             "cw_coherence":        float(llm.get("cw_avg_coherence")  or 0.0),
             "cw_coherence_reason": str(llm.get("cw_coherence_reason") or ""),
             "cw_insight":          float(llm.get("cw_avg_insight_depth")  or 0.0),
             "cw_insight_reason":   str(llm.get("cw_insight_reason") or ""),
             "cw_grounding":        float(llm.get("cw_avg_citation_support") or 0.0),
             "cw_grounding_reason": str(llm.get("cw_grounding_reason") or ""),
-            # Quality — SR
             "sr_coherence":        float(llm.get("sr_avg_coherence")  or 0.0),
             "sr_coherence_reason": str(llm.get("sr_coherence_reason") or ""),
             "sr_insight":          float(llm.get("sr_avg_insight_depth")  or 0.0),
             "sr_insight_reason":   str(llm.get("sr_insight_reason") or ""),
             "sr_grounding":        float(llm.get("sr_avg_citation_support") or 0.0),
             "sr_grounding_reason": str(llm.get("sr_grounding_reason") or ""),
-            # Quality — PM Craft
             "pc_insight":         float(pc.get("insight_depth") or 0.0),
             "pc_insight_reason":  str(pc.get("insight_depth_reason") or ""),
-            # Quality — IA
             "ia_relevance":        float(ia.get("relevance") or 0.0),
             "ia_relevance_reason": str(ia.get("relevance_reason") or ""),
-            # Guardrails — pipeline funnel (5 stages)
             "sources_configured": int(pf.get("sources_configured") or 0),
             "sources_active":     int(pf.get("sources_active") or 0),
             "sources_active_pct": float(pf.get("sources_active_pct") or 0.0),
@@ -356,7 +378,6 @@ def _get_all_evals():
             "relevant_pct":       float(pf.get("relevant_pct") or 0.0),
             "utilized":           int(pf.get("utilized") or 0),
             "utilized_pct":       float(pf.get("utilized_pct") or 0.0),
-            # Guardrails — PM relevance distribution
             "pm_high":   float(pm.get("high_pct") or 0.0),
             "pm_med":    float(pm.get("medium_pct") or 0.0),
             "pm_low":    float(pm.get("low_pct") or 0.0),
@@ -377,6 +398,7 @@ def index():
         (v["source_name"], v["title"]): k
         for k, v in source_index_lookup.items()
     }
+    utilized_keys = _build_utilized_keys(synthesis or {})
     return render_template(
         "index.html",
         synthesis=synthesis or {},
@@ -384,6 +406,7 @@ def index():
         generated_at=generated_at,
         eval_summary=eval_summary,
         citation_index_map=citation_index_map,
+        utilized_keys=utilized_keys,
     )
 
 
@@ -436,7 +459,6 @@ def evals_page():
     return render_template("evals.html", eval_rows=eval_rows)
 
 
-# TEMP DEBUG ROUTE: trigger evaluator.run with the debug flag for a given digest date.
 @app.route("/debug-eval/<date_str>")
 def debug_eval(date_str: str):
     result = _get_digest_for_date(date_str)
@@ -450,7 +472,6 @@ def debug_eval(date_str: str):
 
 @app.route("/<date_str>")
 def digest_by_date(date_str: str):
-    # Expect YYYY-MM-DD
     try:
         datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
@@ -467,6 +488,7 @@ def digest_by_date(date_str: str):
         (v["source_name"], v["title"]): k
         for k, v in source_index_lookup.items()
     }
+    utilized_keys = _build_utilized_keys(synthesis or {})
     return render_template(
         "index.html",
         synthesis=synthesis or {},
@@ -474,6 +496,7 @@ def digest_by_date(date_str: str):
         generated_at=generated_at,
         eval_summary=eval_summary,
         citation_index_map=citation_index_map,
+        utilized_keys=utilized_keys,
     )
 
 
@@ -483,5 +506,4 @@ def create_app() -> Flask:
     return app
 
 
-# When running this module directly via Flask/WSGI, ensure scheduler is considered.
 _start_scheduler_if_needed()

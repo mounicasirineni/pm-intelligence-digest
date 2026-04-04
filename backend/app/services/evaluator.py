@@ -102,7 +102,11 @@ def pipeline_funnel(
       Stage 2: Fetched articles — total articles across all active sources
       Stage 3: Confident        — high/medium confidence / fetched
       Stage 4: Relevant         — high/medium pm_relevance / confident
-      Stage 5: Utilized         — cited in synthesis / relevant
+      Stage 5: Utilized         — articles actually cited in synthesis output / relevant
+
+    "Utilized" means the article's index appears in source_indices in at least one
+    of: whats_shifting, company_watch, startup_radar, or pm_craft_today.
+    Articles that passed filtering but were not selected are NOT counted as utilized.
     """
     meta = fetch_metadata or {}
 
@@ -130,14 +134,36 @@ def pipeline_funnel(
         and str(item.get("pm_relevance_score") or "medium").lower() in {"high", "medium"}
     )
 
+    # ── Stage 5: Utilized ────────────────────────────────────────────────────
+    # Collect only the indices Claude actually cited in synthesis output.
+    # source_index_lookup contains every article passed INTO synthesis —
+    # we must resolve to the subset referenced via source_indices in the output.
     source_index_lookup = synthesis.get("source_index_lookup") or {}
-    cited_titles: set[str] = {
-        str(meta_val["title"])
-        for meta_val in source_index_lookup.values()
-        if isinstance(meta_val, dict) and meta_val.get("title")
+
+    used_indices: set[str] = set()
+    for insight in (synthesis.get("whats_shifting") or []):
+        if isinstance(insight, dict):
+            used_indices.update(str(i) for i in (insight.get("source_indices") or []))
+    for company in (synthesis.get("company_watch") or {}).values():
+        if isinstance(company, dict):
+            used_indices.update(str(i) for i in (company.get("source_indices") or []))
+    for item in (synthesis.get("startup_radar") or []):
+        if isinstance(item, dict):
+            used_indices.update(str(i) for i in (item.get("source_indices") or []))
+    pm_craft = synthesis.get("pm_craft_today")
+    if isinstance(pm_craft, dict):
+        used_indices.update(str(i) for i in (pm_craft.get("source_indices") or []))
+
+    # Titles of articles actually cited in output
+    output_cited_titles: set[str] = {
+        str(source_index_lookup[k]["title"])
+        for k in used_indices
+        if k in source_index_lookup
+        and isinstance(source_index_lookup[k], dict)
+        and source_index_lookup[k].get("title")
     }
 
-    # Utilized = cited out of relevant items
+    # Titles of articles that passed confidence + relevance filters
     relevant_titles: set[str] = {
         str(item.get("title") or "")
         for item in all_items
@@ -145,7 +171,8 @@ def pipeline_funnel(
         and str(item.get("pm_relevance_score") or "medium").lower() in {"high", "medium"}
         and item.get("title")
     }
-    utilized = len(cited_titles & relevant_titles)
+
+    utilized = len(output_cited_titles & relevant_titles)
 
     return {
         # Stage 1
