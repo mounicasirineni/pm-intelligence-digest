@@ -1,292 +1,83 @@
 # PM Intelligence Digest
 
-> A daily AI-powered intelligence digest that surfaces what's actually shifting in the industry — not just what happened, but what it means.
+A daily intelligence brief for a product manager who is actively interviewing. It reads from 40 curated sources, reasons across them with Claude, grades its own output, and ships a one-page brief every morning.
 
-**[→ Live Demo](https://pm-intelligence-digest-production.up.railway.app)** · **[→ Evals Dashboard](https://pm-intelligence-digest-production.up.railway.app/evals)** · **[→ Archive](https://pm-intelligence-digest-production.up.railway.app/history)**
+**[→ Live demo](https://pm-intelligence-digest-production.up.railway.app/)** · **[→ Evals dashboard](https://pm-intelligence-digest-production.up.railway.app/evals)** · **[→ Archive](https://pm-intelligence-digest-production.up.railway.app/history)**
 
 ---
 
-## What This Is
-
-Most news digests summarize. This one synthesizes.
-
-The brief runs every morning at 7am, pulls from 40 curated sources across 8 themes, and uses Claude to do two things most digest tools don't:
-
-1. **Extract signal, not summaries** — each article is analyzed for what it means, not just what happened. Every insight bullet must pass a non-obvious test: would a reader get this from the headline alone? If yes, it's not an insight.
-2. **Reason across sources** — a second AI pass connects signals across multiple sources to surface patterns that don't appear in any single article.
-
-Built for product managers who want a prepared opinion on what's shifting — across AI, business strategy, consumer behavior, regulation, and design.
-
-## What It Produces
-
-Every day the brief generates:
-
-* **What's Shifting** — 4-5 cross-source insights with inline citations, distributed across five themes: AI & technology, market behavior, consumer behavior, regulation & policy, and design & UX — no single theme dominates more than one paragraph per brief
-* **Interview Angle** — one specific thing to have a prepared opinion on, rotated across product strategy, consumer insight, regulatory navigation, and AI
-* **PM Craft Today** — the most actionable PM craft insight from the day's content, grounded in a specific source; shows "Not available today." when no dedicated craft sources are in the pool
-* **Company Watch** — strategic signal for Google, Microsoft, Apple, Meta, Amazon, Netflix, NVIDIA, OpenAI, and Anthropic — what's strategically shifting, not just what they announced, sourced exclusively from first-party official feeds; shows "Not available today." when no first-party signals are available
-* **Startup Radar** — 2-3 disruption moves worth knowing about from early-stage or emerging companies only, each with a "so what" — the competitive threat or market pattern it reveals; established large-cap companies are filtered out at the pipeline level regardless of feed tag
-* **Source Details** — every underlying article with confidence score, relevance score, and insight bullets. Utilized shows only articles actually cited in the synthesis; articles that passed filtering but were not selected by the synthesizer appear in Filtered Out as "Not Selected"
-
-## How It Works
-
-```
-RSS/Podcast Sources (40)
-        ↓
-    Fetcher
-    (24hr lookback window)
-        ↓
-  Summarizer (Pass 1)
-  Claude extracts signal per item
-  scores confidence + PM relevance
-  non-obvious insight test applied
-  PM actionability ranking applied
-  company maturity assessed per item
-  (startup / established / not_applicable)
-        ↓
-  Synthesizer (Pass 2)
-  Sources partitioned by routing eligibility
-  established companies dropped from startup_radar pool
-  Claude reasons across all items
-  adds inline citations [n]
-  builds source_index_lookup
-        ↓
-  Evaluator (Pass 3)
-  LLM-as-judge scores quality
-  5 dimensions, 100pt weighted scale
-  dynamic weight normalization
-  (empty sections excluded from scoring)
-        ↓
-  Post-processing Validators
-  multi-thread violations
-  date warnings
-  coherence warnings
-  routing violations
-  CW source integrity checks
-  source concentration warnings
-  split implication warnings
-  theme audit warnings
-        ↓
-  SQLite Cache
-  (date-keyed, Railway Volume)
-        ↓
-  Flask Web App
-  (daily auto-refresh at 7am IST)
-```
-
-## Evals Framework
-
-Every digest run is automatically evaluated by an LLM judge across 5 quality dimensions, producing a weighted score out of 100. Scoring is dynamic — sections with no output are excluded from both score components and score weights, and the overall score is normalized to 100 based only on the weights of sections that produced output. This handles all four scenarios: all 5 sections scored; PM Craft empty; Company Watch empty; both empty.
-
-| Section | Dimensions | Weight |
-|---|---|---|
-| What's Shifting | Coherence, Insight Depth, Grounding, Topical Breadth | 40pts |
-| Company Watch | Coherence, Insight Depth, Grounding | 25pts |
-| Startup Radar | Coherence, Insight Depth, Grounding | 20pts |
-| PM Craft Today | Insight Depth | 10pts |
-| Interview Angle | PM Relevance | 5pts |
-
-**The 5 dimensions:**
-
-| Dimension | What it measures |
-|---|---|
-| **Coherence** | Do all sentences support a single unified insight, and is that unity emergent from the sources or constructed by the synthesizer? Paragraphs that ignore complicating source evidence to preserve narrative coherence score lower even if internally consistent. |
-| **Insight Depth** | Is this a genuine synthesis revealing something non-obvious, does the closing implication commit to one sharp claim, and is that implication traceable to a source bullet rather than synthesizer reasoning? Closing sentences that add operational specificity not present in any source bullet (checklists, thresholds, implementation steps) are scored as inference boundary violations. |
-| **Grounding** | Two-component check: (1) forward traceability — can every specific claim be traced to a source passage? (2) backward completeness — did the synthesis fairly represent the full source evidence, including contradictions and complicating bullets? Selective omission that distorts the conclusion is scored as a grounding failure even if every included claim is correctly sourced. The evaluator refers to sources by name only in justification text to prevent conflating its internal evidence reference numbers with the synthesis citation indices. |
-| **Topical Breadth (What's Shifting)** | Does this section distribute central claims across the five eligible themes (AI & technology, market behavior, consumer behavior, regulation & policy, design & UX)? No single theme should anchor more than one paragraph. Scored against available source material — if a theme had 2+ eligible items and does not appear in any paragraph, that is a breadth failure. |
-| **Relevance (Interview Angle)** | Can a PM use this insight to demonstrate strategic thinking in an interview? Domain specificity is not penalized if the underlying principle is transferable across PM roles. |
-
-**Pipeline guardrails** (diagnostic, not scored):
-
-| Metric | What it measures |
-|---|---|
-| Silent % | Sources with no new articles in the lookback window |
-| Confident % | Articles summarized with high/medium confidence |
-| Relevant % | Articles with high/medium PM relevance |
-| Utilized % | Relevant articles actually cited in the synthesis (not just filtered pool size) |
-| Weak % | Paragraphs scoring ≤2 on any quality dimension |
-| Sections scored | Which sections contributed to the overall score that day — makes day-over-day score comparisons interpretable when section availability varies |
-
-**Post-processing editorial warnings** (logged per run, not scored):
+## What this is
 
-| Warning | What it catches |
-|---|---|
-| Multi-thread violations | Company Watch entries citing more than 2 sources or with high conjunction counts suggesting multiple disconnected claims |
-| Date warnings | Milestone or timeline claims where the cited date is earlier than today — catches past dates stated as future events |
-| Coherence warnings | Same source cited in multiple company entries (risk of contradictory framings) or shared between What's Shifting and Company Watch (routing violation) |
-| Routing violations | What's Shifting paragraphs citing dedicated-section sources, or Company Watch citing What's Shifting sources |
-| CW source integrity violations | Company Watch entries citing non-company_strategy sources (e.g. a third-party article about a major company routed incorrectly); entry is automatically cleared and logged |
-| PM Craft source violations | PM Craft entries citing non-product_craft or non-design_ux sources; logged as a violation since PM Craft draws exclusively from dedicated craft sources |
-| Source concentration warnings | Any single source contributing 3+ items to the filtered pool in a single run — flags potential source diversity risk without dropping items |
-| Split implication warnings | Closing sentences containing conjunctions ("and", "as well as") that connect two distinct actionable consequences — flags potential implication focus violations |
-| Theme audit warnings | What's Shifting paragraphs where a single theme (e.g. AI & technology) anchors more than one paragraph — triggers REWRITE_DUPLICATE_RECOMMENDED |
+A production Flask app that fetches 40 RSS/podcast feeds every morning, runs a two-pass Claude pipeline (per-item signal extraction, then cross-source synthesis), evaluates its own output with a separate Haiku-based judge, and serves the result as a five-section editorial brief with inline citations and a visible quality score. I built it as a working demonstration of how I think about product decisions, LLM correctness guarantees, and evaluation rigor — each of which is visible in the code rather than claimed in a doc. It runs daily in production on Railway.
 
-Every brief on the [Evals page](https://pm-intelligence-digest-production.up.railway.app/evals) includes an inline reasons row in the table showing the judge's one-sentence reasoning per dimension.
+## Why I built it
 
-## Source Design
+I was preparing for PM interviews at top tech companies and couldn't find a source that did the thing I actually needed: reason *across* the day's news and tell me what was shifting, not restate what happened. Every newsletter I tried was either a link dump or a summary, and both collapse under the same problem — a PM in an interview gets rewarded for having a *prepared opinion*, not for having read the headlines. So I built the tool I wanted: a daily brief written for one specific reader (a PM interviewing this week), where every paragraph has to pass a "would you get this from any single source alone" test, and every closing implication has to be concrete enough that a PM could walk into a meeting tomorrow and use it to change a decision. The product decisions in the code — actionability standards, theme diversity enforcement, the Interview Angle section, the filtered-out panel that shows what the system rejected and why — all follow from that one user.
 
-40 sources across 8 themes, curated for balance:
+## How it works
 
-| Theme | Sources |
-|---|---|
-| AI & Technology | Import AI, Simon Willison, Benedict Evans, AI Snake Oil, a16z, Dwarkesh |
-| Company Strategy | Google, Meta, Apple, Amazon, OpenAI, Microsoft Research, NVIDIA, Netflix Tech Blog, Anthropic News |
-| Product Craft | Shreyas Doshi, SVPG, Lenny's Podcast, Lenny's Newsletter, How I AI |
-| Startup Disruption | TechCrunch, Y Combinator, Hacker News, YourStory |
-| Market Behavior | Platformer, Stratechery, Rest of World, Hard Fork, Sifted, The Verge, Vulcan Post |
-| Consumer Behavior | Quartz, Axios, Pivot |
-| Regulation & Policy | Politico Tech, EFF, Medianama |
-| Design & UX | Nielsen Norman Group, UX Collective |
+The pipeline is three stages plus evaluation, all orchestrated from `backend/app/main.py:_run_pipeline`.
 
-**Source routing:** Company Watch is sourced exclusively from first-party official feeds (company blogs and newsrooms). A post-processing validator enforces this at runtime — any Company Watch entry whose cited source is not tagged `company_strategy` is automatically cleared before the digest is stored or displayed. What's Shifting, Startup Radar, and PM Craft draw from third-party sources only — ensuring Company Watch and What's Shifting never recycle the same source across sections.
+**1. Fetch** — `services/rss.py:fetch_items_grouped_by_theme` reads every feed in `config/sources.json`, applies a UTC-aware 24-hour lookback, isolates per-source failures so one dead feed can't take the run down, and returns items grouped by theme along with a `fetch_metadata` blob that later feeds the pipeline funnel.
 
-**Company maturity filtering:** Startup Radar is restricted to early-stage and emerging companies. The summarizer assesses company maturity per article (startup / established / not_applicable), and the synthesizer drops any `startup_disruption`-tagged item where the primary subject is an established large-cap or publicly traded company — regardless of feed tag. This prevents well-known companies from appearing in Startup Radar simply because they were covered by a startup-disruption feed.
+**2. Summarize** — `services/summarizer.py:summarize_item` sends each article to Claude Sonnet with a strict prompt: extract 3–5 bullets ordered most-specific-to-most-abstract, and label the article on `confidence` (how grounded the bullets can be in the content body), `pm_relevance_score`, `company_maturity`, and `scope`. The prompt enforces source fidelity, qualifier preservation, and a contradiction mandate so complicating bullets can't be silently dropped.
 
-Sources were chosen to balance AI-optimist vs. skeptic voices, US vs. global perspective, and primary sources vs. independent analysis.
+**3. Synthesize** — `services/synthesizer.py:synthesize_trends` is the architecturally interesting step. Summarized items are filtered and then **partitioned** into two pools by routing eligibility. One Claude call sees only the *What's Shifting* pool and produces the cross-source trend paragraphs plus the Interview Angle. A second call sees only the *dedicated-section* pool and produces Company Watch, Startup Radar, and PM Craft. Because each call's context is partitioned, the model literally cannot cite across sections — routing is enforced structurally, not by prompt instruction. A battery of deterministic post-processors then runs: routing canaries that should stay silent forever, a Company Watch source-integrity check that clears any entry citing the wrong company, a theme audit, a date-in-the-past detector, and a split-implication heuristic.
 
-## Hallucination Mitigation
+**4. Persist** — `services/cache.py:save_digest` writes the synthesis, per-theme item map, and fetch metadata to SQLite, one row per date. An in-memory cache in `main.py` fronts it so page loads don't hit disk.
 
-Every claim in the synthesis is grounded in cited source items. The `source_index_lookup` maps each `[n]` citation back to the original article title and source name, making it easy to verify any claim in seconds.
+**5. Evaluate** — `services/evaluator.py:run` computes two things. The deterministic **guardrails** (`pipeline_funnel`, `pm_relevance`) walk the 5-stage funnel from sources active → fetched → confident → relevant → utilized. The **quality scores** use a separate Claude Haiku model as a judge, scoring every paragraph on coherence, insight depth, and citation support, plus a topical-breadth score for What's Shifting as a whole. Sections that produced no output are excluded from both the score and the weight denominator, so the 0–100 overall score stays comparable across days. Eval rows are stored alongside the digest in the same SQLite file.
 
-The evaluator's **Grounding** dimension applies a two-component check. Forward traceability requires that every specific claim traces to a specific source passage or data point — plausibility and topic consistency are explicitly excluded as proxies for evidence, and specific numbers not appearing verbatim in the source are treated as unsourced. Backward completeness requires that the synthesis fairly represents the full source evidence: omitting a named expert contradiction, suppressing a bullet that challenges the paragraph's central claim, or building a conclusion from 1-2 bullets while ignoring stronger ones all constitute grounding failures regardless of how well-cited the included claims are.
+**6. Serve** — `main.py` exposes `/`, `/<YYYY-MM-DD>`, `/history`, and `/evals`. `templates/index.html` renders the brief with inline citations, an expandable Source Details panel split into *utilized* vs *filtered out with reason*, and a visible quality-score bar that links to the evals dashboard. An APScheduler cron triggers the full pipeline daily at the configured time.
 
-Only high and medium confidence items (scored by Claude in Pass 1) are fed into the synthesis pass. Confidence is defined as source depth — how much of a bullet could be written from the content body itself — not topic interest. A thin source on an interesting topic scores low confidence.
+### What the brief produces
 
-## Setup
+- **What's Shifting** — 4–5 cross-source insight paragraphs with inline `[n]` citations, distributed across AI & technology, market behavior, consumer behavior, regulation & policy, and design & UX. No single theme is allowed to anchor more than one paragraph.
+- **Interview Angle** — one specific debatable claim a PM should walk in prepared to defend, anchored to a source already cited in What's Shifting.
+- **PM Craft Today** — the single most actionable craft insight, drawn exclusively from product_craft or design_ux sources.
+- **Company Watch** — strategic signal for nine named companies, sourced exclusively from first-party feeds with a deterministic integrity check.
+- **Startup Radar** — 2–3 early-stage moves with a named "so what"; established companies are filtered out regardless of feed tag.
+- **Source Details** — every underlying article with its insight bullets, split into what the synthesizer actually cited vs. what it saw and rejected.
 
-### Prerequisites
+## What's technically interesting
 
-* Python 3.9+
-* pip
-* Git
-* [Cursor](https://cursor.sh) — AI-assisted development environment used to build this project
-* Anthropic API key — get one at [console.anthropic.com](https://console.anthropic.com)
-* Private RSS URLs (optional) — `LENNYS_PODCAST_RSS`, `HOW_I_AI_RSS`, `LENNYS_NEWSLETTER_RSS` for private feed sources. Without them those sources are skipped — the pipeline runs fine with the remaining public sources.
+**Structural routing beats prompt instructions.** Early versions of the synthesizer asked one Claude call to produce all five sections and route items itself via prompt rules. It cheated — recycling Company Watch sources into What's Shifting, combining mechanistically unrelated stories under broad category labels, and violating routing rules given 3,000 tokens earlier in the prompt. The fix was to split synthesis into two calls where each call's context is partitioned at the input level. The model can't violate routing because the wrong items are never in its context. The routing canaries in `synthesizer.py` were written to fire if my structural assumption ever breaks — they've been silent since the rewrite.
 
-### Installation
+**LLM-as-judge needs backward completeness, not just forward traceability.** The first version of the grounding evaluator only checked whether each claim traced to a source — and gave 5.0s to paragraphs that suppressed named expert contradictions. Manual QA caught three failure modes the automated eval missed: contradiction suppression, selective bullet use (1–2 bullets padded while 3–4 stronger ones were dropped), and mechanistically forced thematic combination. I rewrote the judge in `evaluator.py:_score_paragraph` to see *all* source bullets for every cited source — not just the ones the synthesis used — and to score selective omission as a grounding failure even when every included claim is correctly cited. The judge and the synthesizer prompts have been co-evolving ever since; each revealed a failure mode the other couldn't catch alone.
 
-```bash
-# Clone the repo
-git clone https://github.com/mounicasirineni/pm-intelligence-digest.git
-cd pm-intelligence-digest
+**The "utilized" metric has to be honest.** An earlier version of the pipeline funnel counted any article that passed filtering as utilized. That made the funnel look healthy even when the synthesizer only cited 4 of 20 eligible articles. The current version (`evaluator.py:pipeline_funnel`) resolves utilized against the actual `source_indices` referenced in the synthesis output, not against the filtered pool. Together with the visible Filtered Out panel on the frontend — which labels each rejected article with its reason (Low Confidence, Low Relevance, or Not Selected) — this makes the system honest about what it's throwing away. Trust in an editorial product comes from showing your work, not from looking infallible.
 
-# Install dependencies
-pip install -r requirements.txt
+**Feed tags are insufficient for section routing.** A YourStory article about Intuit (a large public company) was tagged `startup_disruption` and reached Startup Radar because the routing logic only read the feed tag. The fix is two layers: the summarizer now assesses `company_maturity` per article from the content, and the synthesizer filters out `startup_disruption` items whose primary subject is an established company *before* they reach the prompt. Structural filters on content, not tags.
 
-# Configure environment
-cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+**Dynamic score normalization keeps day-over-day comparisons meaningful.** Some days have no first-party company news. Some days have no early-stage signal. A fixed 100-point scale would punish a day for being quiet. `evaluator.py:run` only includes sections that produced output in the weight denominator, so the 0–100 overall score stays comparable across days regardless of which sections appeared — and the evals dashboard lists which sections were scored so the comparison stays interpretable.
 
-# Run
-python run.py
-```
+## Stack
 
-Open `http://127.0.0.1:8000` — the first load triggers the full pipeline. Runtime depends on how many sources are active that day (typically 2-5 minutes locally). Results are cached to SQLite after completion, so subsequent loads are instant.
+- Python 3.12, Flask
+- Anthropic Claude Sonnet (synthesis), Claude Haiku (evaluation)
+- feedparser for RSS/podcast ingestion
+- APScheduler for the daily cron
+- SQLite for digest + eval persistence (one row per day, keyed by date)
+- Jinja2 templates for the editorial frontend
+- Railway for deployment, with a mounted volume for SQLite persistence
+- Nixpacks pinned to Python 3.12.8 (3.13 free-threaded builds break `mise` on Railway)
 
-> **Note for production deployments:** The pipeline runs too long for a synchronous HTTP request. Use the built-in scheduler instead — it runs the pipeline in the background at the configured time. Avoid triggering `/refresh` manually in production.
+## Live demo
 
-### Railway / Nixpacks (Python version)
+**[→ LIVE DEMO](https://pm-intelligence-digest-production.up.railway.app/)** — today's brief, the archive, and the evals dashboard are all linked from the header.
 
-The repo pins **Python 3.12.8** via `nixpacks.toml`, `mise.toml`, and `.python-version` so Railway's build does not pull **Python 3.13.x** builds that can fail under `mise` with *"Python installation is missing a `lib` directory"* (often tied to experimental freethreaded installers). If you deploy elsewhere, use Python **3.12.x** or **3.11.x** for the same reason.
+## What I learned / what I'd do differently
 
-### Configuration
+**Synthesizers optimize for narrative coherence over source fidelity, and prompt rules alone won't fix it.** The single most consistent failure mode across every version of the synthesizer has been selective evidence use — picking 1–2 supporting bullets, dropping the rest, and writing a clean paragraph. Every round of prompt-tightening made the symptom rarer but never eliminated it. The real fix was architectural (see the two-call partitioning) plus evaluative (backward completeness in the judge). If I were starting over, I'd build the judge's backward completeness check *first*, before touching the synthesizer prompt at all, because the evals are what actually reveal which prompt rules are load-bearing and which are decorative.
 
-All settings are in `.env`:
+**I over-invested in prompt engineering before I had evals.** The synthesizer prompt is enormous (hundreds of lines of rules) and most of it was written before I had any way to measure which rules mattered. Once I added the LLM judge and saw scores per dimension per day, I could have deleted half the prompt and the quality would have held. Next time: evals first, prompts second, and treat every prompt rule as a hypothesis the eval has to validate before it earns a permanent place in the prompt.
 
-```
-ANTHROPIC_API_KEY=        # Required
-CLAUDE_MODEL=claude-sonnet-4-5
-LOOKBACK_HOURS=24         # Content window
-DIGEST_SCHEDULE_HOUR=7    # Daily refresh time
-DIGEST_SCHEDULE_MINUTE=0
-DIGEST_TIMEZONE=Asia/Kolkata
-```
+**RSS is more broken than I expected.** About 30% of feeds I curated were dead, blocked by Cloudflare, or redirected to marketing pages. Even with 40 configured sources, roughly 46% are silent on any given day. That's why the Silent % guardrail exists on the evals page — it's a real operating metric, not a diagnostic nicety. If I were designing source intake from scratch, I'd budget for a scraper tier alongside the RSS tier rather than treating RSS as a complete solution.
 
-### Validating Sources
+**Railway's ephemeral filesystem bit me in production.** The SQLite database was being wiped on every deploy until I mounted a persistent volume. I knew this in principle; I still shipped without it because local testing hid the problem. Lesson: stateful services on PaaS deploys need a volume from day one, not "we'll add it when it matters."
 
-```bash
-python validate_sources.py
-```
+**A one-character bug made the grounding score 1.00 for an entire day.** `source_index_lookup` used integer keys in the synthesizer and string keys in the evaluator. Every evidence lookup in the judge failed silently, so it scored every paragraph as unsourced. The fix was `str(idx)`. The lesson isn't the bug — it's that the eval was designed well enough to make the failure loud (a floor score, visible on the dashboard) instead of degrading quietly. An eval that fails silently is worse than no eval.
 
-Checks all RSS/podcast feeds and reports pass/fail with entry counts.
+**The hardest part of building an LLM product isn't the LLM, it's deciding what "good" means.** Most of my time on this project went into defining — and then redefining — the quality rubric: what counts as a genuine insight, what separates a prepared opinion from a restatement, when a multi-source combination is real synthesis vs. forced category labeling. The model was capable of producing good output from day one. What took months was building the editorial taste into the system so it could tell the difference between good output and plausible output, and surface that judgment to the user as a visible score they could trust.
 
-## Project Structure
-
-```
-pm-intelligence-digest/
-├── backend/app/
-│   ├── main.py             # Flask app, routes, scheduler
-│   ├── config.py           # Settings from .env
-│   ├── services/
-│   │   ├── rss.py          # RSS + podcast fetcher
-│   │   ├── summarizer.py   # Pass 1: per-item signal extraction + PM actionability ranking + company maturity scoring
-│   │   ├── synthesizer.py  # Pass 2: cross-source reasoning + citations + routing + company maturity filter + validators
-│   │   ├── evaluator.py    # Pass 3: LLM-as-judge quality scoring + dynamic weight normalization
-│   │   └── cache.py        # SQLite date-based caching
-│   └── templates/
-│       ├── index.html      # Editorial frontend
-│       ├── evals.html      # Evals dashboard
-│       └── history.html    # Archive
-├── config/
-│   └── sources.json        # 40 curated sources with theme-based routing
-├── data/                   # SQLite digest + evals storage
-├── validate_sources.py     # Source health checker
-├── test_fetcher.py         # Pipeline test script
-└── run.py                  # Entry point
-```
-
-## What I Learned Building This
-
-**RSS feeds are unreliable at scale.** 30%+ of URLs I tried were dead, blocked, or redirected. Built a validation script to catch this systematically. Even with 40 configured sources, ~46% are silent on any given day — the digest runs on 20-25 active sources.
-
-**LLM output needs token budgets.** The synthesizer was silently truncating JSON until I diagnosed it and increased `max_tokens` to 4000.
-
-**Type mismatches cause silent eval failures.** The grounding score was 1.00 (floor) on day one because `source_index_lookup` used integer keys in the synthesizer but the evaluator looked up string keys. Every lookup failed silently, so the judge had no evidence to verify claims against. The fix was one character: `source_index_lookup[str(idx)]`.
-
-**Caching strategy matters for cost.** Without date-based SQLite caching, every page reload would re-run ~$0.10 in API calls. The evaluator alone makes 10-15 LLM calls per digest run.
-
-**Production deployment reveals bugs local testing misses.** Railway's ephemeral filesystem wiped the SQLite DB on every deploy until a persistent volume was mounted. The `digest_by_date` route crashed with `citation_index_map is undefined` because only the index route passed that variable to the template.
-
-**Prompt and eval design improve together.** The synthesizer prompt and the eval scorers have been in continuous co-evolution since deployment. Topical breadth went through three rewrites — from "reward non-AI" to "penalize both extremes" to "score distance from 60/40 ideal" to "a five-theme diversity model" — each time because the eval revealed a pattern the current rule couldn't catch. Coherence and insight depth scorers were extended to explicitly check lede fidelity and implication focus after paragraph-level review identified overclaiming and multi-part implications the original rubric scored as fine. The eval reasons UI — judge reasoning displayed inline in the evals table per dimension — made all of this debuggable in production rather than opaque.
-
-**Synthesizers optimize for narrative coherence over source fidelity.** Manual QA against raw source bullets revealed a consistent failure mode: the synthesizer selects 1-2 bullets that support its central thesis and drops the rest — including named expert contradictions, complicating evidence, and often stronger PM insights than the ones it leads with. Prompt rules alone don't fully fix this. The synthesizer needs an explicit omission check (review all bullets per source before finalizing, assess whether dropping any distorts the conclusion) and a contradiction mandate (named challenges to the central claim must appear). The evaluator needs a matching backward completeness check — otherwise it rewards well-constructed arguments built on selectively chosen evidence with perfect grounding scores.
-
-**The highest-risk omissions are thesis-extending bullets, not thesis-supporting ones.** Manual QA identified a consistent pattern: the synthesizer drops bullets that contradict the central claim, extend it to a new domain, or name a product not yet mentioned — precisely the bullets that would make the paragraph more complete or force a thesis revision. Prompt rules targeting "review all bullets" don't catch this because the synthesizer can comply with the letter of the rule while still dropping the most challenging evidence. The fix requires naming the omission type explicitly: bullets that complicate your thesis are more valuable than bullets that support it.
-
-**Thematic combination requires a traceable mechanism, not a shared category label.** The synthesizer consistently grouped mechanistically unrelated sources under broad category labels ("AI", "regulation", "platforms") and presented the combination as a genuine synthesis. The distinction that matters: a shared mechanism must be explicitly present in at least one source bullet — if it only emerges when you abstract across all bullets, it is a category label, not a mechanism. Two stories that share only a category label belong in separate paragraphs anchored to distinct themes, not forced into one paragraph under a synthesizer-constructed framing.
-
-**Source routing prevents cross-section recycling but needs two enforcement layers.** Early versions of What's Shifting consistently recycled the strongest Company Watch insights at a higher abstraction level. The fix was architectural: partition the 40 sources into routing buckets at the synthesizer level. But prompt-level routing rules can still be violated when a third-party article about a major company reaches the synthesizer in the same call as first-party sources. A deterministic post-processing validator — checking that every Company Watch citation index maps to a `company_strategy`-themed source and clearing violations before storage — provides the second enforcement layer that prompt rules alone cannot guarantee.
-
-**Post-processing validators catch what prompts miss.** Prompt rules alone don't reliably enforce structural constraints — a model under a long context will occasionally violate a rule it was given 3,000 tokens earlier. Adding deterministic post-processing validators (multi-thread detection, date validation, cross-source coherence checks, routing violation flags, CW source integrity checks, split implication detection, theme audit warnings) creates a second enforcement layer that runs after every synthesis pass and logs warnings before anything reaches the frontend.
-
-**QA and prompt co-evolution requires source verification.** Automated eval scores can mask systematic omission bias — the grounding evaluator gave 5.0 to paragraphs that suppressed named contradictions and dropped stronger insights, because it only checked forward traceability. Manual source verification caught three failure categories the automated eval missed: contradiction suppression (named expert challenges dropped to preserve narrative), selective bullet use (1-2 bullets padded into a paragraph while 3-4 stronger bullets were ignored), and thematic forced combination (mechanistically unrelated stories grouped under a broad category label). The fix required both a synthesizer-side omission check and an evaluator-side backward completeness rubric — neither alone is sufficient.
-
-**Roundup articles require per-story extraction, not lead-story focus.** Multi-story roundup articles (single URLs containing 4-5 unrelated stories) were producing systematic backward completeness failures — the summarizer's "focus on lead story" instruction caused 75%+ of each roundup's signal to be discarded before it reached the synthesizer. The fix was to extract insights from each distinct story separately in the summarizer, giving the synthesizer the full evidence pool to work with. This resolved the downstream pattern of the synthesizer combining mechanistically unrelated stories under forced category labels to compensate for thin evidence per bullet.
-
-**Interview Angle must be anchored to What's Shifting content, not the broader source pool.** Manual QA identified a routing failure where the Interview Angle was sourced from a regulation_policy article that never appeared in What's Shifting — producing an angle with no connective tissue to the rest of the brief. The fix was a prompt-level restriction: the interview angle must derive from a source already cited in one of the whats_shifting paragraphs, not from any WS-eligible source. This ensures the angle feels like a natural extension of what the reader just consumed rather than an independent fifth story.
-
-**Feed tags alone are insufficient for section routing.** A YourStory article about Intuit (a large public company) was tagged `startup_disruption` and reached Startup Radar because the synthesizer's routing rules only checked the feed tag, not the maturity of the company being covered. The fix required a two-layer approach: the summarizer now assesses company maturity per article, and the synthesizer filters out `startup_disruption` items where the primary subject is an established company before they reach the prompt — making the constraint deterministic rather than prompt-dependent.
-
-## Roadmap
-
-* [ ] Email delivery option
-* [ ] "Save to prep notes" — tag insights directly into interview prep
-* [ ] Source health monitoring — auto-flag dead feeds
-* [ ] Mobile-optimized layout
-* [ ] Async pipeline — background refresh so `/refresh` returns immediately
-* [ ] Timestamp localization — show IST instead of UTC
-* [ ] Scraper support for Uber newsrooms (no native RSS feeds available)
-* [ ] Editorial warnings surfaced in the Evals UI alongside judge scores
-
-## Built With
-
-| Tool | Role |
-|---|---|
-| Python / Flask | Web framework and request routing |
-| Claude Sonnet (`claude-sonnet-4-5`) | Signal extraction (Pass 1) and cross-source synthesis (Pass 2) |
-| Claude Haiku (`claude-haiku-4-5-20251001`) | LLM-as-judge quality evaluation (Pass 3) |
-| feedparser | RSS and podcast feed parsing |
-| APScheduler | Daily background pipeline execution at 7am IST |
-| SQLite | Date-keyed digest and eval storage |
-| Railway | Production deployment with persistent volume for SQLite |
-| Cursor | AI-assisted development environment |
+**What I'd change in the architecture.** I'd make the pipeline async end-to-end so `/refresh` returns immediately and progress is streamed to the user, rather than the current synchronous-with-scheduler compromise. I'd also move the evaluator's paragraph scoring into a proper task queue so reruns don't block a web worker. And I'd separate the "editorial prompt" from the "format prompt" — right now both live inside the same giant user message, which makes it hard to iterate on editorial voice without risking JSON schema drift.
