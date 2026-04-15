@@ -9,10 +9,9 @@ from typing import Any, Dict, List, Tuple
 import feedparser
 
 from ..config import load_settings, load_sources_config
-from .fetcher import fetch_article_text
+from .fetcher import fetch_article_text, MIN_WORD_THRESHOLD
 
 logger = logging.getLogger(__name__)
-MIN_RSS_WORDS = 50  # threshold below which we attempt full fetch
 
 
 def _parse_published(entry: Any) -> datetime | None:
@@ -34,11 +33,22 @@ def _fetch_rss_items(
     lookback_hours: int = 24,
 ) -> List[Dict[str, Any]]:
     url = source["url"]
+    is_thin_feed = source.get("thin_feed", False)
+    is_fetch_blocked = source.get("fetch_blocked", False)
     parsed = feedparser.parse(url)
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
     total_entries = 0
     kept_entries = 0
+    enriched_entries = 0
+
+    # Log fetch_blocked status once at feed level
+    if is_thin_feed and is_fetch_blocked:
+        logger.warning(
+            "RSS source %s: full fetch disabled — "
+            "domain blocks automated requests, using RSS summary only",
+            source.get("id")
+        )
 
     items: List[Dict[str, Any]] = []
     for entry in parsed.entries[:max_items]:
@@ -54,32 +64,6 @@ def _fetch_rss_items(
             content_text = getattr(entry, "summary", "") or getattr(
                 entry, "description", ""
             )
-        word_count = len(content_text.split())
-        if word_count < MIN_RSS_WORDS:
-            entry_url = getattr(entry, "link", "")
-            if entry_url:
-                logger.info(
-                    "RSS source %s: thin content (%d words) for '%s', attempting full fetch",
-                    source.get("id"),
-                    word_count,
-                    getattr(entry, "title", ""),
-                )
-                fetched_text = fetch_article_text(entry_url)
-                if fetched_text:
-                    content_text = fetched_text
-                    logger.info(
-                        "RSS source %s: full fetch succeeded (%d words) for '%s'",
-                        source.get("id"),
-                        len(fetched_text.split()),
-                        getattr(entry, "title", ""),
-                    )
-                else:
-                    logger.warning(
-                        "RSS source %s: full fetch failed for '%s' — url=%s",
-                        source.get("id"),
-                        getattr(entry, "title", ""),
-                        entry_url,
-                    )
 
         published_at = _parse_published(entry)
 
@@ -87,6 +71,38 @@ def _fetch_rss_items(
             continue
 
         kept_entries += 1
+
+        # Full-article fetch for thin feeds or thin content
+        entry_url = getattr(entry, "link", "")
+        word_count = len(content_text.split())
+        needs_fetch = (is_thin_feed or word_count < MIN_WORD_THRESHOLD) \
+                      and not is_fetch_blocked
+
+        if needs_fetch and entry_url:
+            logger.info(
+                "RSS source %s: %s for '%s' — attempting full fetch",
+                source.get("id"),
+                "thin_feed=true" if is_thin_feed
+                else f"thin content ({word_count} words)",
+                getattr(entry, "title", "")[:80],
+            )
+            fetched_text = fetch_article_text(entry_url)
+            if fetched_text:
+                content_text = fetched_text
+                enriched_entries += 1
+                logger.info(
+                    "RSS source %s: full fetch succeeded (%d words) for '%s'",
+                    source.get("id"),
+                    len(fetched_text.split()),
+                    getattr(entry, "title", "")[:80],
+                )
+            else:
+                logger.warning(
+                    "RSS source %s: full fetch failed for '%s' — url=%s",
+                    source.get("id"),
+                    getattr(entry, "title", "")[:80],
+                    entry_url,
+                )
 
         items.append(
             {
@@ -96,18 +112,19 @@ def _fetch_rss_items(
                 "theme": source.get("theme"),
                 "type": source.get("type"),
                 "title": getattr(entry, "title", ""),
-                "url": getattr(entry, "link", ""),
+                "url": entry_url,
                 "published_at": published_at.isoformat() if published_at else None,
                 "summary": content_text,
             }
         )
 
     logger.info(
-        "RSS source %s: %d/%d items within last %d hours",
+        "RSS source %s: %d/%d items within last %d hours, %d enriched via full fetch",
         source.get("id"),
         kept_entries,
         total_entries,
         lookback_hours,
+        enriched_entries,
     )
     return items
 

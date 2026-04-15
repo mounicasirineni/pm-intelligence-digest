@@ -54,7 +54,8 @@
       "name": "TechCrunch",
       "url": "https://techcrunch.com/feed/",
       "theme": "startup_disruption",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "yc_blog",
@@ -79,7 +80,8 @@
       "url": "https://blog.google/rss/",
       "theme": "company_strategy",
       "company_id": "Google",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "meta_engineering",
@@ -97,7 +99,9 @@
       "url": "https://www.microsoft.com/en-us/research/feed/",
       "theme": "company_strategy",
       "company_id": "Microsoft",
-      "verified": false
+      "verified": false,
+      "thin_feed": true,
+      "fetch_blocked": true
     },
     {
       "id": "simon_willison_blog",
@@ -114,7 +118,9 @@
       "url": "https://openai.com/news/rss.xml",
       "theme": "company_strategy",
       "company_id": "OpenAI",
-      "verified": false
+      "verified": false,
+      "thin_feed": true,
+      "fetch_blocked": true
     },
     {
       "id": "rest_of_world",
@@ -122,7 +128,8 @@
       "name": "Rest of World",
       "url": "https://restofworld.org/feed/",
       "theme": "market_behavior",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "benedict_evans",
@@ -155,7 +162,8 @@
       "url": "https://www.apple.com/newsroom/rss-feed.rss",
       "theme": "company_strategy",
       "company_id": "Apple",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "amazon_news",
@@ -164,7 +172,8 @@
       "url": "https://www.aboutamazon.com/news/rss",
       "theme": "company_strategy",
       "company_id": "Amazon",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "nvidia_blog",
@@ -212,7 +221,9 @@
       "name": "Politico Tech",
       "url": "https://rss.politico.com/technology.xml",
       "theme": "regulation_policy",
-      "verified": false
+      "verified": false,
+      "thin_feed": true,
+      "fetch_blocked": true
     },
     {
       "id": "eff",
@@ -228,7 +239,9 @@
       "name": "Quartz",
       "url": "https://qz.com/feed",
       "theme": "consumer_behavior",
-      "verified": false
+      "verified": false,
+      "thin_feed": true,
+      "fetch_blocked": true
     },
     {
       "id": "axios_business",
@@ -284,7 +297,8 @@
       "name": "Sifted",
       "url": "https://sifted.eu/feed",
       "theme": "market_behavior",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "medianama",
@@ -326,7 +340,9 @@
       "url": "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml",
       "theme": "company_strategy",
       "company_id": "Anthropic",
-      "verified": false
+      "verified": false,
+      "thin_feed": true,
+      "_note": "Third-party GitHub mirror — no native Anthropic RSS exists as of 2026-04-15. Monitor https://www.anthropic.com/news for official feed."
     }
   ]
 }
