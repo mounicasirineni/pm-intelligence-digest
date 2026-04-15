@@ -9,10 +9,13 @@ from backend.app.services.synthesizer import synthesize_trends
 
 def main() -> None:
     print("Step 1: Fetching raw items from RSS/podcast sources...")
-    grouped_raw = fetch_items_grouped_by_theme()
+    grouped_raw, fetch_metadata = fetch_items_grouped_by_theme()
 
     if not grouped_raw:
         print("No items were fetched from any theme.")
+        empty_sources = fetch_metadata.get("empty_source_names") or []
+        if empty_sources:
+            print(f"Empty feeds: {', '.join(empty_sources)}")
         return
 
     print("=== Item counts by theme (raw) ===")

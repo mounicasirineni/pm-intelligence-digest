@@ -371,6 +371,9 @@ def _get_all_evals():
             "sources_configured": int(pf.get("sources_configured") or 0),
             "sources_active":     int(pf.get("sources_active") or 0),
             "sources_active_pct": float(pf.get("sources_active_pct") or 0.0),
+            "empty_source_names": [
+                str(name) for name in (pf.get("empty_source_names") or []) if name
+            ],
             "fetched":            int(pf.get("fetched") or 0),
             "confident":          int(pf.get("confident") or 0),
             "confident_pct":      float(pf.get("confident_pct") or 0.0),
