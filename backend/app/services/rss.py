@@ -9,8 +9,10 @@ from typing import Any, Dict, List, Tuple
 import feedparser
 
 from ..config import load_settings, load_sources_config
+from .fetcher import fetch_article_text
 
 logger = logging.getLogger(__name__)
+MIN_RSS_WORDS = 50  # threshold below which we attempt full fetch
 
 
 def _parse_published(entry: Any) -> datetime | None:
@@ -52,6 +54,32 @@ def _fetch_rss_items(
             content_text = getattr(entry, "summary", "") or getattr(
                 entry, "description", ""
             )
+        word_count = len(content_text.split())
+        if word_count < MIN_RSS_WORDS:
+            entry_url = getattr(entry, "link", "")
+            if entry_url:
+                logger.info(
+                    "RSS source %s: thin content (%d words) for '%s', attempting full fetch",
+                    source.get("id"),
+                    word_count,
+                    getattr(entry, "title", ""),
+                )
+                fetched_text = fetch_article_text(entry_url)
+                if fetched_text:
+                    content_text = fetched_text
+                    logger.info(
+                        "RSS source %s: full fetch succeeded (%d words) for '%s'",
+                        source.get("id"),
+                        len(fetched_text.split()),
+                        getattr(entry, "title", ""),
+                    )
+                else:
+                    logger.warning(
+                        "RSS source %s: full fetch failed for '%s' — url=%s",
+                        source.get("id"),
+                        getattr(entry, "title", ""),
+                        entry_url,
+                    )
 
         published_at = _parse_published(entry)
 
