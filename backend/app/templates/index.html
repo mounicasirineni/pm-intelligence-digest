@@ -569,7 +569,7 @@
 
       <div class="company-row" id="company-row">
         {% for name in companies %}
-          {% if cw.get(name) %}
+          {% if cw.get(name) and cw.get(name).paragraph %}
             <button type="button" class="company-pill" data-company="{{ name }}">
               {{ name }}
             </button>
@@ -577,12 +577,12 @@
         {% endfor %}
       </div>
 
-      {% if not cw %}
+      {% if not cw or not cw.values() | selectattr('paragraph') | list %}
         <p>Not available today.</p>
       {% endif %}
 
       {% for name in companies %}
-        {% if cw.get(name) %}
+        {% if cw.get(name) and cw.get(name).paragraph %}
           <div class="company-signal" data-company-signal="{{ name }}" style="display:none;">
             {% set company = cw.get(name) %}
             {% if company is mapping %}
