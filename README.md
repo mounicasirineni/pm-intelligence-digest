@@ -22,20 +22,20 @@ The pipeline is three stages plus evaluation, all orchestrated from `backend/app
 
 **2. Summarize** — `services/summarizer.py:summarize_item` sends each article to Claude Sonnet with a strict prompt: extract 3–5 bullets ordered most-specific-to-most-abstract, and label the article on `confidence` (how grounded the bullets can be in the content body), `pm_relevance_score`, `company_maturity`, and `scope`. The prompt enforces source fidelity, qualifier preservation, and a contradiction mandate so complicating bullets can't be silently dropped.
 
-**3. Synthesize** — `services/synthesizer.py:synthesize_trends` is the architecturally interesting step. Summarized items are filtered and then **partitioned** into two pools by routing eligibility. One Claude call sees only the *What's Shifting* pool and produces the cross-source trend paragraphs plus the Interview Angle. A second call sees only the *dedicated-section* pool and produces Company Watch, Startup Radar, and PM Craft. Because each call's context is partitioned, the model literally cannot cite across sections — routing is enforced structurally, not by prompt instruction. A battery of deterministic post-processors then runs: routing canaries that should stay silent forever, a Company Watch source-integrity check that clears any entry citing the wrong company, a theme audit, a date-in-the-past detector, and a split-implication heuristic.
+**3. Synthesize** — `services/synthesizer.py:synthesize_trends` is the architecturally interesting step. Summarized items are filtered (dropping low-confidence, low-relevance, and established-company-in-startup-disruption items) and then **partitioned** into two pools by routing eligibility. One Claude call sees only the *What's Shifting* pool and produces the cross-source trend paragraphs plus the Interview Angle. A second call sees only the *dedicated-section* pool and produces Company Watch, Startup Radar, and PM Craft. Because each call's context is partitioned, the model literally cannot cite across sections — routing is enforced structurally, not by prompt instruction. A battery of deterministic post-processors then runs: a source-concentration warning, a multi-thread / single-thesis check on Company Watch entries, a date-in-the-past validator that scans every paragraph, a cross-paragraph coherence check (same source cited in multiple company entries), two routing canaries that should stay silent forever given the partitioning, a Company Watch source-integrity check that clears any entry citing a non-`company_strategy` source or the wrong company, a PM Craft source-integrity check, a split-implication detector on closing sentences, and a theme audit that flags when one theme anchors more than one What's Shifting paragraph.
 
 **4. Persist** — `services/cache.py:save_digest` writes the synthesis, per-theme item map, and fetch metadata to SQLite, one row per date. An in-memory cache in `main.py` fronts it so page loads don't hit disk.
 
-**5. Evaluate** — `services/evaluator.py:run` computes two things. The deterministic **guardrails** (`pipeline_funnel`, `pm_relevance`) walk the 5-stage funnel from sources active → fetched → confident → relevant → utilized. The **quality scores** use a separate Claude Haiku model as a judge, scoring every paragraph on coherence, insight depth, and citation support, plus a topical-breadth score for What's Shifting as a whole. Sections that produced no output are excluded from both the score and the weight denominator, so the 0–100 overall score stays comparable across days. Eval rows are stored alongside the digest in the same SQLite file.
+**5. Evaluate** — `services/evaluator.py:run` runs immediately after persistence on a force-refresh. It computes two things. The deterministic **guardrails** (`pipeline_funnel`, `pm_relevance`) walk the 5-stage funnel from sources active → fetched → confident → relevant → utilized, where "utilized" is resolved against the actual `source_indices` cited in the synthesis output, not against the filtered pool. The **quality scores** use a separate Claude Haiku model as a judge, scoring every What's Shifting paragraph, Company Watch entry, and Startup Radar bullet on coherence, insight depth, and citation support, plus a whole-section topical-breadth score for What's Shifting, an insight-depth score for PM Craft, and a relevance score for the Interview Angle. Paragraph-level judge calls run concurrently via `asyncio.run_in_executor`. Sections that produced no output are excluded from both the score and the weight denominator, so the 0–100 overall score stays comparable across days. Eval rows are written to an `evals` table in the same SQLite file.
 
-**6. Serve** — `main.py` exposes `/`, `/<YYYY-MM-DD>`, `/history`, and `/evals`. `templates/index.html` renders the brief with inline citations, an expandable Source Details panel split into *utilized* vs *filtered out with reason*, and a visible quality-score bar that links to the evals dashboard. An APScheduler cron triggers the full pipeline daily at the configured time.
+**6. Serve** — `main.py` exposes `/`, `/<YYYY-MM-DD>`, `/history`, `/evals`, and `/refresh`. `templates/index.html` renders the brief with inline citations, an expandable Source Details panel split into *utilized* vs *filtered out with reason* (Low Confidence / Low Relevance / Not Selected, categorized in the template itself from the synthesis output), and a visible quality-score bar that links to the evals dashboard. An APScheduler cron in `_start_scheduler_if_needed` triggers the full pipeline daily at the configured timezone-aware hour; a process-level in-memory cache (`_CACHE`) fronts SQLite so page loads don't re-read disk.
 
 ### What the brief produces
 
 - **What's Shifting** — 4–5 cross-source insight paragraphs with inline `[n]` citations, distributed across AI & technology, market behavior, consumer behavior, regulation & policy, and design & UX. No single theme is allowed to anchor more than one paragraph.
 - **Interview Angle** — one specific debatable claim a PM should walk in prepared to defend, anchored to a source already cited in What's Shifting.
 - **PM Craft Today** — the single most actionable craft insight, drawn exclusively from product_craft or design_ux sources.
-- **Company Watch** — strategic signal for nine named companies, sourced exclusively from first-party feeds with a deterministic integrity check.
+- **Company Watch** — strategic signal for nine named companies (Google, Microsoft, Apple, Meta, Amazon, Netflix, NVIDIA, OpenAI, Anthropic), sourced exclusively from that company's own first-party feed with a deterministic integrity check that clears any entry citing the wrong company.
 - **Startup Radar** — 2–3 early-stage moves with a named "so what"; established companies are filtered out regardless of feed tag.
 - **Source Details** — every underlying article with its insight bullets, split into what the synthesizer actually cited vs. what it saw and rejected.
 
@@ -53,13 +53,13 @@ The pipeline is three stages plus evaluation, all orchestrated from `backend/app
 
 ## Stack
 
-- Python 3.12, Flask
-- Anthropic Claude Sonnet (synthesis), Claude Haiku (evaluation)
-- feedparser for RSS/podcast ingestion
-- APScheduler for the daily cron
-- SQLite for digest + eval persistence (one row per day, keyed by date)
-- Jinja2 templates for the editorial frontend
-- Railway for deployment, with a mounted volume for SQLite persistence
+- Python 3.12.8, Flask, Jinja2
+- Anthropic Claude Sonnet 4.5 (summarizer + synthesizer), Claude Haiku 4.5 (evaluator / LLM-as-judge)
+- `feedparser` for RSS/podcast ingestion
+- APScheduler for the daily cron, `pytz` for timezone-aware scheduling
+- SQLite for digest + eval persistence (one row per day in each of `digests` and `evals`, keyed by date)
+- `httpx` for the out-of-band feed health checker (`validate_sources.py`)
+- Railway for deployment, with a mounted volume so SQLite survives deploys
 - Nixpacks pinned to Python 3.12.8 (3.13 free-threaded builds break `mise` on Railway)
 
 ## Live demo
