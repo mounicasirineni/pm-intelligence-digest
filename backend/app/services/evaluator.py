@@ -95,19 +95,6 @@ def pipeline_funnel(
     synthesis: Dict[str, Any],
     fetch_metadata: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    """
-    Guardrail: 5-stage sequential funnel.
-
-      Stage 1: Active sources   — sources that returned ≥1 article (from fetch_metadata)
-      Stage 2: Fetched articles — total articles across all active sources
-      Stage 3: Confident        — high/medium confidence / fetched
-      Stage 4: Relevant         — high/medium pm_relevance / confident
-      Stage 5: Utilized         — articles actually cited in synthesis output / relevant
-
-    "Utilized" means the article's index appears in source_indices in at least one
-    of: whats_shifting, company_watch, startup_radar, or pm_craft_today.
-    Articles that passed filtering but were not selected are NOT counted as utilized.
-    """
     meta = fetch_metadata or {}
 
     sources_configured = int(meta.get("sources_configured") or 0)
@@ -134,10 +121,6 @@ def pipeline_funnel(
         and str(item.get("pm_relevance_score") or "medium").lower() in {"high", "medium"}
     )
 
-    # ── Stage 5: Utilized ────────────────────────────────────────────────────
-    # Collect only the indices Claude actually cited in synthesis output.
-    # source_index_lookup contains every article passed INTO synthesis —
-    # we must resolve to the subset referenced via source_indices in the output.
     source_index_lookup = synthesis.get("source_index_lookup") or {}
 
     used_indices: set[str] = set()
@@ -154,7 +137,6 @@ def pipeline_funnel(
     if isinstance(pm_craft, dict):
         used_indices.update(str(i) for i in (pm_craft.get("source_indices") or []))
 
-    # Titles of articles actually cited in output
     output_cited_titles: set[str] = {
         str(source_index_lookup[k]["title"])
         for k in used_indices
@@ -163,7 +145,6 @@ def pipeline_funnel(
         and source_index_lookup[k].get("title")
     }
 
-    # Titles of articles that passed confidence + relevance filters
     relevant_titles: set[str] = {
         str(item.get("title") or "")
         for item in all_items
@@ -175,20 +156,15 @@ def pipeline_funnel(
     utilized = len(output_cited_titles & relevant_titles)
 
     return {
-        # Stage 1
         "sources_configured": sources_configured,
         "sources_active": sources_active,
         "sources_active_pct": (sources_active / sources_configured * 100.0) if sources_configured else 0.0,
         "empty_source_names": empty_source_names,
-        # Stage 2
         "fetched": fetched,
-        # Stage 3
         "confident": confident,
         "confident_pct": (confident / fetched * 100.0) if fetched else 0.0,
-        # Stage 4
         "relevant": relevant,
         "relevant_pct": (relevant / confident * 100.0) if confident else 0.0,
-        # Stage 5
         "utilized": utilized,
         "utilized_pct": (utilized / relevant * 100.0) if relevant else 0.0,
     }
@@ -202,9 +178,6 @@ def pipeline_funnel(
 def pm_relevance(
     items_by_theme: Dict[str, List[Dict[str, Any]]],
 ) -> Dict[str, Any]:
-    """
-    Guardrail: distribution of pm_relevance_score across all fetched items.
-    """
     counts: Dict[str, int] = {"high": 0, "medium": 0, "low": 0, "unknown": 0}
 
     for items in (items_by_theme or {}).values():
@@ -242,22 +215,6 @@ async def llm_judge(
     items_by_theme: Dict[str, Any],
     ws_available_themes: Dict[str, int] | None = None,
 ) -> Dict[str, Any]:
-    """
-    Quality scores for whats_shifting, company_watch, and startup_radar.
-
-    Per-paragraph/bullet dimensions (1-5):
-      coherence, insight_depth, citation_support
-
-    Digest-level dimension on whats_shifting (1-5):
-      topical_breadth — does WS substantively cover non-AI topics?
-
-    Weights:
-      WS 40pts: coherence 10 + insight 10 + grounding 10 + topical_breadth 10
-      CW 25pts: coherence 8.3 + insight 8.3 + grounding 8.4
-      SR 20pts: coherence 6.7 + insight 6.7 + grounding 6.6
-      PM Craft 10pts: insight 10
-      IA 5pts: relevance 5
-    """
     client = _build_llm_client()
     whats_shifting = synthesis.get("whats_shifting") or []
     company_watch = synthesis.get("company_watch") or {}
@@ -372,21 +329,26 @@ async def llm_judge(
             "  - MULTI-SOURCE CITATIONS: For paragraphs citing multiple sources, check each specific claim against ALL cited sources before concluding it is unsourced. "
             "A claim may be sourced in one source even if it does not appear in another. "
             "Do not conclude a claim is unsourced until you have checked every cited source's bullet list individually.\n"
-            "  - INDEX COLLISION RULE: When writing your justification text, refer to sources by their SOURCE NAME only — never by index number. "
-            "The [n] indices in the synthesis paragraph are citation markers used by the synthesis, not source identifiers for your evaluation. "
-            "The [1], [2], [3] numbers in the evidence block above are internal evaluation references only. "
-            "These two numbering systems are completely independent and must never be mixed. "
-            "Always write 'Stratechery' or 'MIT Technology Review' — never 'Stratechery [3]' or 'MIT [1]'.\n\n"
+            "  - INDEX COLLISION RULE: The synthesis paragraph contains citation markers like [1], [4], [17], [23]. "
+            "The evidence block above contains internal evaluation reference numbers also written as [1], [2], [3]. "
+            "THESE ARE TWO COMPLETELY DIFFERENT NUMBERING SYSTEMS. They share the same bracket notation but have no relationship to each other. "
+            "The synthesis [n] refers to a source by its pool index. The evidence block [n] is just a bullet counter within each source's list. "
+            "NEVER use either set of numbers in your justification text. "
+            "When writing your coherence_reason, insight_depth_reason, and citation_support_reason: "
+            "refer to sources ONLY by their publication name (e.g. 'MIT Technology Review', 'Simon Willison Blog', 'TechCrunch'). "
+            "BAD examples — never write these: 'source [3]', 'bullet [2]', 'Amazon News [8]', 'TechCrunch [14]', 'the [5] source'. "
+            "GOOD examples — always write these: 'MIT Technology Review', 'the TechCrunch article on Monarch Tractor', 'the Amazon News source'. "
+            "If you reference an index number of any kind in your reason text, your evaluation is invalid.\n\n"
             f"Paragraph:\n{paragraph}\n\n"
             f"{evidence_block}\n\n"
             'Return only valid JSON:\n'
             '{\n'
             '  "coherence": N,\n'
-            '  "coherence_reason": "one sentence — identify whether unity is source-emergent or synthesizer-constructed, and note any ignored complicating evidence",\n'
+            '  "coherence_reason": "one sentence — identify whether unity is source-emergent or synthesizer-constructed, and note any ignored complicating evidence. Use source names only, never index numbers.",\n'
             '  "insight_depth": N,\n'
-            '  "insight_depth_reason": "one sentence — identify whether closing implication is sourced or inferred, and whether a stronger available insight was dropped",\n'
+            '  "insight_depth_reason": "one sentence — identify whether closing implication is sourced or inferred, and whether a stronger available insight was dropped. Use source names only, never index numbers.",\n'
             '  "citation_support": N,\n'
-            '  "citation_support_reason": "one sentence — identify the weakest forward traceability claim AND whether any significant source bullet was omitted that distorts the conclusion"\n'
+            '  "citation_support_reason": "one sentence — identify the weakest forward traceability claim AND whether any significant source bullet was omitted that distorts the conclusion. Use source names only, never index numbers."\n'
             '}'
         )
 
@@ -401,7 +363,11 @@ async def llm_judge(
                 "not by sounding confident or well-written. "
                 "You have access to ALL source bullets for each cited source, not just the ones the synthesis used. "
                 "Your job is to check both what the synthesis included AND what it omitted. "
-                "A well-constructed argument built on selectively chosen evidence does not earn a high score."
+                "A well-constructed argument built on selectively chosen evidence does not earn a high score. "
+                "CRITICAL OUTPUT RULE: In your reason text fields, refer to sources by publication name only. "
+                "Never include any index number, bracket number, or numeric reference in reason text. "
+                "Write 'MIT Technology Review' not 'source [1]'. Write 'the TechCrunch article' not 'TechCrunch [14]'. "
+                "Any index number in your output text invalidates the evaluation."
             ),
             messages=[{"role": "user", "content": user_prompt}],
         )
@@ -511,13 +477,6 @@ async def llm_judge(
             return None
 
     async def score_sr_one(bullet_entry: Any) -> Dict[str, Any] | None:
-        """
-        Score a startup_radar bullet.
-
-        Accepts the full SR dict (with source_indices) rather than a plain string,
-        so the evaluator has access to source evidence for backward completeness checks.
-        Falls back to extracting indices from bullet text if source_indices is absent.
-        """
         if isinstance(bullet_entry, dict):
             text = str(bullet_entry.get("bullet") or "").strip()
             indices = bullet_entry.get("source_indices") or []
@@ -561,8 +520,6 @@ async def llm_judge(
 
     sr_scores: List[Dict[str, Any]] = []
     for bullet_entry in startup_radar:
-        # Pass the full dict (not just the bullet string) so score_sr_one
-        # can read source_indices directly rather than extracting from text.
         scored = await score_sr_one(bullet_entry)
         if scored:
             sr_scores.append(scored)
@@ -634,7 +591,6 @@ async def llm_judge(
         "sr_coherence_reason": _representative_reason(sr_scores, "coherence"),
         "sr_insight_reason": _representative_reason(sr_scores, "insight_depth"),
         "sr_grounding_reason": _representative_reason(sr_scores, "citation_support"),
-        # legacy keys
         "avg_coherence": ws_avg_c,
         "avg_insight_depth": ws_avg_i,
         "avg_citation_support": ws_avg_g,
@@ -652,7 +608,6 @@ async def llm_judge(
 async def interview_angle_quality(
     synthesis: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Quality: Score the interview_angle on PM relevance (1-5). Weighted 20pts."""
     client = _build_llm_client()
     interview_angle = str(synthesis.get("interview_angle") or "").strip()
 
@@ -708,7 +663,6 @@ async def interview_angle_quality(
 async def pm_craft_quality(
     synthesis: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Quality: Score pm_craft_today on Insight Depth (1-5). Weighted 10pts."""
     client = _build_llm_client()
 
     pm_craft_raw = synthesis.get("pm_craft_today") or {}
@@ -769,30 +723,12 @@ def run(
     items_by_theme: Dict[str, Any],
     fetch_metadata: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    """
-    Run all evals, persist to SQLite, return structured result.
-
-    Quality (100pts):
-      WS 40: coherence 10 + insight 10 + grounding 10 + topical_breadth 10
-      CW 25: coherence 8.3 + insight 8.3 + grounding 8.4
-      SR 20: coherence 6.7 + insight 6.7 + grounding 6.6
-      PM Craft 10: insight 10
-      IA 5: relevance 5
-
-    Guardrails (diagnostic):
-      pipeline_funnel, pm_relevance
-
-    Scoring is dynamic — sections with no output are excluded from both
-    score_components and score_weights, and overall_score is normalized
-    to 100 based only on the weights of sections that produced output.
-    """
     if not date_str:
         date_str = date.today().isoformat()
 
     pipeline_funnel_result = pipeline_funnel(items_by_theme, synthesis, fetch_metadata)
     pm_relevance_result = pm_relevance(items_by_theme)
 
-    # Compute available WS themes for breadth scorer
     WHATS_SHIFTING_THEMES = {
         "ai_technology", "market_behavior", "consumer_behavior", "regulation_policy", "design_ux"
     }
@@ -851,7 +787,6 @@ def run(
     pc_insight   = float(pm_craft_result.get("insight_depth") or 0.0)
     ia_relevance = float(interview_angle_result.get("relevance") or 0.0)
 
-    # Build score components only for sections that produced output
     score_components: List[float] = []
     score_weights: List[float] = []
 
@@ -859,7 +794,6 @@ def run(
     cw_scores = llm_judge_result.get("cw_paragraph_scores") or []
     sr_scores = llm_judge_result.get("sr_paragraph_scores") or []
 
-    # What's Shifting — always included if paragraphs exist
     if ws_scores:
         score_components.extend([
             ws_coherence / 5.0 * 10.0,
@@ -869,7 +803,6 @@ def run(
         ])
         score_weights.extend([10.0, 10.0, 10.0, 10.0])
 
-    # Company Watch — only include if at least one company was scored
     if cw_scores:
         score_components.extend([
             cw_coherence / 5.0 * 8.3,
@@ -878,7 +811,6 @@ def run(
         ])
         score_weights.extend([8.3, 8.3, 8.4])
 
-    # Startup Radar — only include if bullets were scored
     if sr_scores:
         score_components.extend([
             sr_coherence / 5.0 * 6.7,
@@ -887,17 +819,14 @@ def run(
         ])
         score_weights.extend([6.7, 6.7, 6.6])
 
-    # PM Craft — only include if text exists and scored above 0
     if pc_insight > 0:
         score_components.append(pc_insight / 5.0 * 10.0)
         score_weights.append(10.0)
 
-    # Interview Angle — only include if scored
     if ia_relevance > 0:
         score_components.append(ia_relevance / 5.0 * 5.0)
         score_weights.append(5.0)
 
-    # Normalize to 100 based on weights actually present
     total_weight = sum(score_weights)
     if total_weight > 0:
         raw_score = sum(score_components)

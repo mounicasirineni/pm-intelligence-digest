@@ -75,8 +75,6 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
           "content_word_count": int  # words in content body sent to the model
         }
     """
-    client = _build_client()
-
     title = item.get("title") or ""
     url = item.get("url") or ""
     source_name = item.get("source_name") or ""
@@ -92,6 +90,25 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
         url,
     )
     print(f"Fetch quality for '{source_name}': {content_word_count} words | url={url}")
+
+    # Skip stub content before hitting the API
+    MINIMUM_CONTENT_WORDS = 100
+    if content_word_count < MINIMUM_CONTENT_WORDS:
+        logger.info(
+            "Skipping '%s' — content too short (%d words, minimum %d)",
+            title,
+            content_word_count,
+            MINIMUM_CONTENT_WORDS,
+        )
+        return {
+            "insights": [],
+            "pm_interview_relevance": "Content too short to summarize reliably.",
+            "pm_relevance_score": "low",
+            "confidence": "low",
+            "company_maturity": "not_applicable",
+            "scope": "cross_market",
+            "content_word_count": content_word_count,
+        }
 
     user_prompt = f"""
 You are analyzing a single content item for a Senior Product Manager.
@@ -161,6 +178,7 @@ Guidance:
 """.strip()
 
     settings = load_settings()
+    client = _build_client()
 
     response = client.messages.create(
         model=settings.claude_model,
@@ -176,10 +194,29 @@ Guidance:
     )
 
     # anthropic-python returns content as a list of blocks
+    # Guard against empty content list before index access
+    if not response.content:
+        logger.warning(
+            "Empty response content for '%s' — skipping item. "
+            "Full response: stop_reason=%s, usage=%s",
+            title,
+            getattr(response, "stop_reason", "unknown"),
+            getattr(response, "usage", "unknown"),
+        )
+        return {
+            "insights": [],
+            "pm_interview_relevance": "",
+            "pm_relevance_score": "low",
+            "confidence": "low",
+            "company_maturity": "not_applicable",
+            "scope": "cross_market",
+            "content_word_count": content_word_count,
+        }
+
     try:
         content_block = response.content[0]
         text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception as exc:
         logger.exception("Unexpected Claude response format: %s", exc)
         raise
 

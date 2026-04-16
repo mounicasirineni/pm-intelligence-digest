@@ -238,6 +238,21 @@
       line-height: 1.4;
       white-space: normal;
     }
+
+    /* Toggle button — matches the "reasons" style exactly */
+    .toggle-btn {
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+    }
+
+    .toggle-btn:hover {
+      color: var(--text);
+    }
   </style>
 </head>
 <body>
@@ -411,7 +426,6 @@
           </tbody>
         </table>
 
-
       {% else %}
         <p class="empty-state">No evals have been run yet.</p>
       {% endif %}
@@ -456,6 +470,7 @@
               <th>Relevant %</th>
               <th>Utilized %</th>
               <th>Weak %</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -480,10 +495,19 @@
               <td class="{% if row.weak_pct == 0 %}score-high{% elif row.weak_pct <= 20 %}score-mid{% else %}score-low{% endif %}">
                 {{ "%.1f"|format(row.weak_pct) if row.fetched else "—" }}{% if row.fetched %}%{% endif %}
               </td>
+              <td style="padding: 0.25rem 0.5rem;">
+                {% if row.empty_source_names %}
+                <button
+                  class="toggle-btn"
+                  onclick="toggleFeeds('{{ row.date }}')">
+                  empty feeds
+                </button>
+                {% endif %}
+              </td>
             </tr>
             {% if row.empty_source_names %}
-            <tr>
-              <td colspan="7" style="padding: 0 0 0.55rem 0;">
+            <tr id="feeds-{{ row.date }}" style="display: none;">
+              <td colspan="8" style="padding: 0 0 0.55rem 0;">
                 <div class="warning">
                   Empty feeds today: {{ row.empty_source_names | join(', ') }}
                 </div>
@@ -494,7 +518,6 @@
           </tbody>
         </table>
 
-
       {% else %}
         <p class="empty-state">No guardrail data available yet.</p>
       {% endif %}
@@ -504,6 +527,13 @@
   <script>
   function toggleReasoning(date) {
     const row = document.getElementById('reasoning-' + date);
+    if (row) {
+      row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+  }
+
+  function toggleFeeds(date) {
+    const row = document.getElementById('feeds-' + date);
     if (row) {
       row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
     }

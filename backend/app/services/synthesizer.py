@@ -67,29 +67,18 @@ def _build_client() -> Anthropic:
 
 
 def _extract_json(text: str) -> str:
-    """
-    Best-effort extraction of a JSON object from a Claude reply, handling
-    ```json ... ``` and ``` ... ``` fenced code blocks.
-    """
     if not text:
         return text
-
     json_fence = re.search(r"```json(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     if json_fence:
         return json_fence.group(1).strip()
-
     generic_fence = re.search(r"```(.*?)```", text, flags=re.DOTALL)
     if generic_fence:
         return generic_fence.group(1).strip()
-
     return text.strip()
 
 
 def _strip_date_check_flags(text: str) -> str:
-    """
-    Strip inline [DATE CHECK: ...] flags from paragraph text.
-    These are synthesizer self-check notations that must not appear in published output.
-    """
     if not text:
         return text
     return re.sub(r"\[DATE CHECK:[^\]]*\]", "", text).strip()
@@ -99,10 +88,6 @@ def _build_context_block(
     items: List[Dict[str, Any]],
     start_idx: int = 1,
 ) -> Tuple[str, List[Dict[str, Any]], int]:
-    """
-    Build a numbered context block from a list of items.
-    Returns (context_block, indexed_items, next_idx).
-    """
     lines: List[str] = []
     indexed_items: List[Dict[str, Any]] = []
     idx = start_idx
@@ -112,7 +97,6 @@ def _build_context_block(
         if not isinstance(insights, list):
             insights = [str(insights)]
 
-        # Derive allowed section from theme
         theme = item["theme"]
         if theme == "company_strategy":
             allowed_section = "company_watch ONLY"
@@ -123,8 +107,6 @@ def _build_context_block(
         else:
             allowed_section = "any dedicated section"
 
-        # Include company_id in context block for company_strategy items
-        # so the model has visibility into which company this source belongs to
         company_id = item.get("company_id")
 
         lines.append(f"Item [{idx}]:")
@@ -170,7 +152,6 @@ def _normalize_whats_shifting(raw: Any) -> List[Dict[str, Any]]:
                 cleaned.append(int(i))
             except Exception:
                 continue
-        # Strip DATE CHECK flags before storing
         paragraph = _strip_date_check_flags(paragraph)
         normalized.append({"paragraph": paragraph, "source_indices": cleaned})
     return normalized
@@ -199,7 +180,6 @@ def _normalize_company_watch(raw: Any) -> Dict[str, Dict[str, Any]]:
                 cleaned.append(int(i))
             except Exception:
                 continue
-        # Strip DATE CHECK flags before storing
         paragraph = _strip_date_check_flags(paragraph)
         normalized[company] = {"paragraph": paragraph, "source_indices": cleaned}
     return normalized
@@ -224,7 +204,6 @@ def _normalize_startup_radar(raw: Any) -> List[Dict[str, Any]]:
                 cleaned.append(int(i))
             except Exception:
                 continue
-        # Strip DATE CHECK flags before storing
         bullet = _strip_date_check_flags(bullet)
         normalized.append({"bullet": bullet, "source_indices": cleaned})
     return normalized
@@ -245,14 +224,12 @@ def _normalize_pm_craft(raw: Any) -> Dict[str, Any]:
             cleaned.append(int(i))
         except Exception:
             continue
-    # Strip DATE CHECK flags before storing
     text = _strip_date_check_flags(text)
     return {"text": text, "source_indices": cleaned}
 
 
 # ---------------------------------------------------------------------------
 # Call 1: What's Shifting + Interview Angle
-# Uses ONLY whats_shifting_eligible items — structural routing enforcement
 # ---------------------------------------------------------------------------
 
 def _call_whats_shifting(
@@ -261,10 +238,6 @@ def _call_whats_shifting(
     ws_items: List[Dict[str, Any]],
     today: str,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """
-    Generate whats_shifting paragraphs and interview_angle.
-    Only sees WHATS_SHIFTING_ELIGIBLE items — cannot cite dedicated section sources.
-    """
     context_block, ws_indexed, _ = _build_context_block(ws_items, start_idx=1)
 
     user_prompt = f"""
@@ -286,6 +259,10 @@ Produce a structured JSON object:
                    "(3) close with the strategic implication for a PM — what decision, risk, or opportunity does this pattern create? "
                    "The implication must be directly derivable from the cited sources. "
                    "Each sentence ends with inline [n] citations. Only cite [n] if a specific bullet from item [n] directly supports that sentence. "
+                   "CITATION CLAIM-LEVEL RULE: Citations are claim-level, not paragraph-level. "
+                   "When the topic shifts to content from a different source, drop the prior source citation unless it independently supports the new claim. "
+                   "Do not carry a citation forward from one sentence into the next if the new sentence draws from a different source. "
+                   "Every citation must answer: does this specific source contain a bullet that directly supports this specific sentence? If no, remove the citation. "
                    "READER CONTEXT RULE: Write for a reader who has NOT seen the source articles. Provide plain-language context for any unfamiliar term or company. "
                    "LEDE PRECISION RULE: Opening sentence makes a claim the paragraph must fully deliver. Avoid absolute framing unless a source explicitly uses it. "
                    "IMPLICATION FOCUS RULE: Closing PM implication makes exactly one claim. If writing 'and' connecting two consequences, cut one. "
@@ -314,8 +291,13 @@ Produce a structured JSON object:
                    "A paragraph that uses exactly 1 bullet from each source is likely skimming the surface of each source rather than engaging deeply. "
                    "Verify you have read all bullets for each source before concluding only 1 bullet is usable. "
                    "OMISSION CHECK RULE: Before finalizing each paragraph, review ALL insight bullets for every cited source — not just the ones you used. "
-                   "For each cited source, identify the highest-value bullet you did NOT use. Ask: does omitting it distort the paragraph's conclusion or bury a stronger insight? "
-                   "If yes, either incorporate it or revise the conclusion to reflect the more complete picture. "
+                   "For each cited source, work through every bullet you did NOT use and apply the following four tests: "
+                   "(1) CONCLUSION TEST: Does this dropped bullet change the conclusion a reader would draw from the closing implication? If yes, either incorporate it or revise the closing implication to reflect the more limited scope the full source set actually supports. "
+                   "(2) CONTRADICTION TEST: Does this dropped bullet name a data point, mechanism, or expert claim that directly contradicts or qualifies the paragraph's central claim? If yes, it must appear in the paragraph — you may steelman against it but you may not omit it. "
+                   "(3) STRONGER INSIGHT TEST: Does this dropped bullet contain a more specific, more actionable, or more non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
+                   "(4) SCOPE TEST: Does this dropped bullet limit the geographic, demographic, or use-case scope of the closing implication in a way that materially changes its applicability? If yes, either add the scope qualifier or remove the implication. "
+                   "A paragraph that passes all four tests for every dropped bullet is ready to publish. "
+                   "A paragraph that fails any test must be revised before finalizing. "
                    "A paragraph that selects only narrative-supporting bullets while dropping complicating evidence is a synthesis failure, not a synthesis. "
                    "HIGHEST-RISK OMISSION TYPE: Bullets that contradict the paragraph's central claim, extend it to a new domain, or apply it to a named product or company not yet mentioned in the paragraph are the most commonly dropped and the most damaging to omit. "
                    "A bullet that complicates your thesis is more valuable than a bullet that supports it — it either strengthens the paragraph by being addressed, or reveals that the thesis needs revision. "
@@ -330,6 +312,13 @@ Produce a structured JSON object:
                    "A bullet that reverses or limits the central implication is more valuable than a bullet that restates it from a different angle. "
                    "The trigger is not 'does this directly oppose the thesis' but 'does this change the conclusion a reader would draw.' "
                    "If yes, that bullet must be in the paragraph. Suppressing a complicating bullet to preserve narrative coherence is a citation integrity violation. "
+                   "CONTRADICTION FRAMING CHECK: Before finalizing the closing implication, explicitly check: does any dropped bullet from any cited source contradict or qualify the framing of that implication? "
+                   "This includes bullets that: (a) limit the scope of the claim to a specific geography, company size, or use case, "
+                   "(b) show a counter-example that the implication does not account for, "
+                   "(c) reveal a structural constraint that makes the implication inaccessible to some or most PMs, or "
+                   "(d) show that the mechanism the implication depends on does not apply universally. "
+                   "If any dropped bullet meets criteria (a)-(d), either incorporate it as a qualification in the closing sentence, or revise the closing implication to reflect the more limited scope that the full source set actually supports. "
+                   "A closing implication that is only true if you ignore a dropped bullet is not a synthesis — it is a selection. "
                    "INFERENCE BOUNDARY RULE: The closing PM implication must be traceable to a specific bullet in a cited source. "
                    "You may take one logical step beyond the source (identifying an implication), but you may not: "
                    "(a) introduce strategic frameworks or design principles not present in any source, "
@@ -346,6 +335,10 @@ Produce a structured JSON object:
                    "Before finalizing: identify the exact source bullet the closing sentence extends. "
                    "If the bullet names an observation and your closing names a specific action, ask whether the source actually supports that action or whether you constructed it. "
                    "If constructed, replace the specific directive with 'these cases suggest PMs should consider...' framing. "
+                   "SPECIFIC INFERENCE BOUNDARY TESTS: Before publishing any closing implication, verify it passes all three tests: "
+                   "(1) TIMELINE TEST: Does the closing sentence assert a specific timeline (e.g. 'weeks or months,' 'within a year,' 'before the window closes') that does not appear in any source bullet? If yes, remove the timeline or replace with 'these cases suggest the window may be limited.' "
+                   "(2) UNIVERSALITY TEST: Does the closing sentence assert that a pattern applies broadly ('all platforms,' 'any company,' 'every PM') when sources show only 1-3 examples? If yes, scope it: 'in categories where X applies...' "
+                   "(3) ACTION TEST: Does the closing sentence prescribe a specific PM action ('build independent consent infrastructure,' 'architect around publicly available models') that no source bullet recommends? If yes, reframe as 'these cases suggest considering...' not 'product teams must...' "
                    "THEMATIC COMBINATION RULE: Two stories may only appear in the same paragraph if they share a specific mechanism — "
                    "not just a shared category label ('AI', 'regulation', 'platforms', 'government'). "
                    "Ask: do these stories share the same causal chain, the same failure mode, or the same design implication? "
@@ -359,7 +352,11 @@ Produce a structured JSON object:
                    "A mechanism that only emerges when you read all bullets together and abstract upward is not a shared mechanism — it is a category label, not a mechanism. "
                    "In that case, do not combine: treat each source as a candidate for its own standalone paragraph, then apply the THEME AUDIT SELF-CHECK to confirm no theme appears more than once. "
                    "If combining would create a duplicate theme, keep the stronger standalone paragraph and drop the weaker. "
-                   "Do not proceed without completing this check.",
+                   "Do not proceed without completing this check. "
+                   "CLOSING IMPLICATION TRACEABILITY CHECK: After writing the closing PM implication, verify that it traces independently to at least one specific bullet from EACH cited source — not just one of them. "
+                   "Ask: if you removed Source A entirely, would the closing implication still hold? If yes, Source A is not genuinely contributing to the paragraph — it is decoration. "
+                   "If yes, either rewrite the closing implication to incorporate what Source A uniquely adds, or remove Source A and write a single-source paragraph. "
+                   "A closing implication that only traces to one source means the combination failed the mechanism test — the sources are not genuinely connected.",
       "source_indices": [1, 2]
     }}
   ],
@@ -425,7 +422,6 @@ Guidance:
 
 # ---------------------------------------------------------------------------
 # Call 2: Company Watch + Startup Radar + PM Craft
-# Uses ONLY dedicated_section_eligible items — structural routing enforcement
 # ---------------------------------------------------------------------------
 
 def _call_dedicated_sections(
@@ -435,10 +431,6 @@ def _call_dedicated_sections(
     today: str,
     start_idx: int,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """
-    Generate company_watch, startup_radar, and pm_craft_today.
-    Only sees DEDICATED_SECTION_ELIGIBLE items — cannot cite whats_shifting sources.
-    """
     context_block, dedicated_indexed, _ = _build_context_block(dedicated_items, start_idx=start_idx)
 
     user_prompt = f"""
@@ -471,8 +463,13 @@ Produce a structured JSON object:
                    "BULLET DEPTH RULE: Do not build this entry from the first insight bullet alone. Read all insight bullets for this company's sources before writing. "
                    "The most specific and verifiable content (named products, specific numbers, architectural details) is often in bullets 2-4, not bullet 1. "
                    "OMISSION CHECK RULE: Before finalizing each company entry, review ALL insight bullets for every cited source. "
-                   "For each cited source, identify the highest-value bullet you did NOT use. Ask: does omitting it distort the entry's conclusion or bury a stronger insight? "
-                   "If yes, either incorporate it or revise the conclusion to reflect the more complete picture. "
+                   "For each cited source, work through every bullet you did NOT use and apply the following four tests: "
+                   "(1) CONCLUSION TEST: Does this dropped bullet change the conclusion a reader would draw from the closing implication? If yes, either incorporate it or revise the closing implication. "
+                   "(2) CONTRADICTION TEST: Does this dropped bullet name a data point, mechanism, or product detail that directly contradicts or qualifies the entry's central claim? If yes, it must appear — you may steelman against it but you may not omit it. "
+                   "(3) STRONGER INSIGHT TEST: Does this dropped bullet contain a more specific, more actionable, or more non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
+                   "(4) SCOPE TEST: Does this dropped bullet limit the scope of the closing implication in a way that materially changes its applicability? If yes, add the qualifier or revise. "
+                   "A company entry that passes all four tests for every dropped bullet is ready to publish. "
+                   "A company entry that fails any test must be revised before finalizing. "
                    "COMPLICATION MANDATE: If any cited source contains a bullet that contradicts, qualifies, or significantly complicates the entry's central claim, "
                    "that bullet MUST appear in the entry or the framing must be revised. This is not optional. "
                    "You may steelman your thesis against it, but you may not omit it. "
@@ -486,7 +483,13 @@ Produce a structured JSON object:
                    "the entry's central framing, it must appear in the entry or the framing must be revised. "
                    "THEMATIC COMBINATION RULE: Multiple signals for the same company may only appear in the same entry if they share a specific mechanism — "
                    "not just a shared category label ('AI', 'cloud', 'regulation', 'growth'). "
-                   "If the best you can say is 'both involve X category,' cut to the stronger single signal.",
+                   "If the best you can say is 'both involve X category,' cut to the stronger single signal. "
+                   "SINGLE THREAD ENFORCEMENT: If a company has sources covering 3 or more separate business unit moves (e.g. infrastructure, consumer product, and advertising), "
+                   "do not attempt to combine all of them under one entry. Select the single richest thread — the one where the sources contain the most specific bullets, "
+                   "the sharpest contradiction, or the most non-obvious strategic implication — and build the entire entry around that thread. "
+                   "Mentioning every available story is a failure mode. A tight 2-sentence entry built on one deep thread is stronger than a 4-sentence entry that skims three stories. "
+                   "THREAD SELECTION TEST: Before writing, list all available threads for this company. Ask: which single thread has (a) the most specific source bullets, "
+                   "(b) a contradiction or tension available from the CONTRADICTION MANDATE, and (c) the most non-obvious closing implication? Write that thread only.",
       "source_indices": []
     }},
     "Meta": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
@@ -507,6 +510,13 @@ Produce a structured JSON object:
                 "METRICS PRESERVATION RULE: Include the funding amount, round size, or key metric from the source. Do not omit specific numbers that ground the strategic claim. "
                 "OMISSION CHECK RULE: Before finalizing each bullet, review ALL insight bullets for the cited source. "
                 "Identify the highest-value bullet you did NOT use. If omitting it buries the sharper strategic insight, use that one instead. "
+                "NON-OBVIOUS INSIGHT TEST: Before publishing each bullet, ask: would a PM who only read the headline already know this closing implication? "
+                "If yes, the bullet is restating the obvious. Rewrite it around the most non-obvious bullet in the source — "
+                "typically the bullet that names a structural constraint, a counter-intuitive tradeoff, an unintended consequence, or a mechanism that limits the headline's apparent conclusion. "
+                "The headline tells you what happened. The closing implication should tell you something the headline actively obscures or contradicts. "
+                "VERBATIM COPY CHECK: If your bullet text closely resembles the source bullet text word-for-word, you have copied rather than synthesized. "
+                "Rewrite: the bullet should name the pattern the source example reveals, not describe the example itself. "
+                "The source example is evidence. Your bullet is the insight the evidence supports. "
                 "COMPLICATION MANDATE: If any cited source contains a bullet that contradicts, qualifies, or significantly complicates the bullet's central claim, "
                 "that bullet MUST appear or the framing must be revised. This is not optional. "
                 "QUALIFIER PRESERVATION CHECK: If the source uses hedged language, your closing consequence must match that hedge level. "
@@ -585,23 +595,6 @@ Guidance:
 # ---------------------------------------------------------------------------
 
 def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
-    """
-    Run a two-call synthesis across all summarized items.
-
-    Call 1: What's Shifting + Interview Angle (WHATS_SHIFTING_ELIGIBLE items only)
-    Call 2: Company Watch + Startup Radar + PM Craft (DEDICATED_SECTION_ELIGIBLE items only)
-
-    Structural routing enforcement: each call only sees items it is allowed to cite.
-    The model cannot violate routing because the wrong items are never in its context.
-
-    Filters to items that are:
-      - confidence: high or medium
-      - pm_relevance_score: high or medium
-
-    Additional routing rules:
-      - regulation_policy items with scope=company_specific are excluded from WS
-        and eligible for company_watch only (handled by dedicated section routing)
-    """
     client = _build_client()
     settings = load_settings()
     today = date.today().strftime("%B %d, %Y")
@@ -635,7 +628,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
             company_maturity = str(item.get("company_maturity") or "not_applicable").lower()
 
-            # Drop established companies from startup_disruption items
             if theme == "startup_disruption" and company_maturity == "established":
                 logger.info(
                     "FILTER [step=3 reason=established_company_in_startup_radar] dropped: %s — %s",
@@ -686,7 +678,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         return empty_result
 
     # ---------------------------------------------------------------------------
-    # Source concentration check — observational, no items dropped
+    # Source concentration check — observational, runs on pre-cap pool
     # ---------------------------------------------------------------------------
     source_counts: Dict[str, List[str]] = {}
     for item in filtered_items:
@@ -712,12 +704,47 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             print(json.dumps(w, indent=2))
 
     # ---------------------------------------------------------------------------
+    # Source diversity cap — applied before synthesis
+    # High relevance items from each source are retained first.
+    # Once a source hits MAX_ITEMS_PER_SOURCE, additional items are held in
+    # overflow and only restored if their theme has zero other representation.
+    # ---------------------------------------------------------------------------
+    MAX_ITEMS_PER_SOURCE = 3
+
+    source_item_counts: Dict[str, int] = {}
+    diversity_capped_items: List[Dict[str, Any]] = []
+    diversity_overflow: List[Dict[str, Any]] = []
+
+    relevance_order = {"high": 0, "medium": 1}
+    filtered_items.sort(key=lambda x: relevance_order.get(x.get("pm_relevance_score", "medium"), 1))
+
+    for item in filtered_items:
+        src = item.get("source_name", "unknown")
+        current_count = source_item_counts.get(src, 0)
+        if current_count < MAX_ITEMS_PER_SOURCE:
+            diversity_capped_items.append(item)
+            source_item_counts[src] = current_count + 1
+        else:
+            diversity_overflow.append(item)
+            logger.info(
+                "DIVERSITY CAP: '%s' from '%s' held in overflow (source already at %d items)",
+                item.get("title"), src, MAX_ITEMS_PER_SOURCE
+            )
+
+    represented_themes = {item["theme"] for item in diversity_capped_items}
+    for item in diversity_overflow:
+        if item["theme"] not in represented_themes:
+            diversity_capped_items.append(item)
+            represented_themes.add(item["theme"])
+            logger.info(
+                "DIVERSITY CAP OVERRIDE: '%s' from '%s' restored — only item for theme '%s'",
+                item.get("title"), item.get("source_name"), item["theme"]
+            )
+
+    filtered_items = diversity_capped_items
+
+    # ---------------------------------------------------------------------------
     # Partition by routing eligibility
-    #
-    # NEW: regulation_policy items with scope=company_specific are excluded from
-    # WS and routed to dedicated sections instead. This prevents single-company
-    # regulatory stories (e.g. OpenAI military contract RTI filing) from appearing
-    # in What's Shifting, which is reserved for cross-market patterns.
     # ---------------------------------------------------------------------------
     ws_items = []
     dedicated_items = []
@@ -729,8 +756,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         if theme in DEDICATED_SECTION_THEMES:
             dedicated_items.append(item)
         elif theme in WHATS_SHIFTING_THEMES:
-            # regulation_policy items with company_specific scope go to dedicated
-            # sections (they may be relevant to a Company Watch entry) rather than WS
             if theme == "regulation_policy" and scope == "company_specific":
                 logger.info(
                     "FILTER [step=4 reason=regulation_policy_company_specific_excluded_from_ws] "
@@ -747,23 +772,13 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
     )
 
     try:
-        # ---------------------------------------------------------------------------
-        # Call 1: What's Shifting + Interview Angle
-        # ---------------------------------------------------------------------------
         call1_parsed, ws_indexed = _call_whats_shifting(client, settings, ws_items, today)
 
-        # ---------------------------------------------------------------------------
-        # Call 2: Company Watch + Startup Radar + PM Craft
-        # Sequential numbering continues from where Call 1 left off
-        # ---------------------------------------------------------------------------
         start_idx = len(ws_indexed) + 1
         call2_parsed, dedicated_indexed = _call_dedicated_sections(
             client, settings, dedicated_items, today, start_idx=start_idx
         )
 
-        # ---------------------------------------------------------------------------
-        # Merge indexed items and build source_index_lookup
-        # ---------------------------------------------------------------------------
         indexed_items = ws_indexed + dedicated_indexed
         source_index_lookup: Dict[str, Dict[str, Any]] = {}
         for entry in indexed_items:
@@ -774,9 +789,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "company_id": entry.get("company_id"),
             }
 
-        # ---------------------------------------------------------------------------
-        # Normalize outputs — DATE CHECK flags are stripped inside each normalizer
-        # ---------------------------------------------------------------------------
         normalized_whats_shifting = _normalize_whats_shifting(call1_parsed.get("whats_shifting") or [])
         interview_angle = _strip_date_check_flags(str(call1_parsed.get("interview_angle") or ""))
 
@@ -791,8 +803,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         ws_eligible_indices = {entry["index"] for entry in ws_indexed}
         dedicated_eligible_indices = {entry["index"] for entry in dedicated_indexed}
 
-        # Build a mapping from company_id to permitted source indices for CW integrity check.
-        # Only company_strategy sources with a matching company_id are permitted for each company entry.
         company_strategy_by_company: Dict[str, set] = {}
         for entry in dedicated_indexed:
             if entry["theme"] == "company_strategy":
@@ -802,13 +812,12 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                         company_strategy_by_company[cid] = set()
                     company_strategy_by_company[cid].add(entry["index"])
 
-        # Also keep a flat set of all company_strategy indices for legacy checks
         company_strategy_indices = {
             entry["index"] for entry in dedicated_indexed
             if entry["theme"] == "company_strategy"
         }
 
-        # 1. Multi-thread / single thesis check for company_watch
+        # 1. Multi-thread / single thesis check
         multi_thread_warnings = []
         for company, value in normalized_company_watch.items():
             indices = value.get("source_indices", [])
@@ -876,7 +885,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             for w in date_warnings:
                 print(json.dumps(w, indent=2))
 
-        # 3. Cross-paragraph coherence: flag sources shared across multiple company entries
+        # 3. Cross-paragraph coherence
         source_to_companies: Dict[int, List[str]] = {}
         for company, value in normalized_company_watch.items():
             for i in value.get("source_indices", []):
@@ -899,7 +908,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     "warning": "Same source cited in multiple company entries — review for contradictory framings"
                 })
 
-        # Sanity check: with two-call architecture WS and CW cannot share sources by design
         cw_all_indices = set()
         for value in normalized_company_watch.values():
             cw_all_indices.update(value.get("source_indices", []))
@@ -921,7 +929,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             for w in coherence_warnings:
                 print(json.dumps(w, indent=2))
 
-        # 4. Routing canary — should always be empty with two-call architecture
+        # 4. Routing canary
         routing_warnings = []
 
         for i, ws in enumerate(normalized_whats_shifting):
@@ -954,7 +962,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             for w in routing_warnings:
                 print(json.dumps(w, indent=2))
 
-        # 5. Omit rule canary — should always be empty with two-call architecture
+        # 5. Omit rule canary
         omit_rule_warnings = []
 
         for company, value in normalized_company_watch.items():
@@ -988,10 +996,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             for w in omit_rule_warnings:
                 print(json.dumps(w, indent=2))
 
-        # 5b. Company Watch source integrity check — extended to verify company_id match
-        # Clears any CW entry that cites:
-        #   (a) a non-company_strategy source, OR
-        #   (b) a company_strategy source whose company_id does not match the CW entry's company
+        # 5b. Company Watch source integrity check
         cw_source_integrity_violations = []
         companies_to_clear = []
 
@@ -1003,10 +1008,8 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 source_company_id = source_info.get("company_id")
 
                 if source_theme != "company_strategy":
-                    # Not a first-party company source at all
                     bad_indices.append((idx_val, "non_company_strategy", source_info))
                 elif source_company_id != company:
-                    # First-party source but belongs to a different company
                     bad_indices.append((idx_val, "company_id_mismatch", source_info))
 
             if bad_indices:
@@ -1109,7 +1112,10 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     if len(parts) == 2:
                         before_words = len(parts[0].split())
                         after_words = len(parts[1].split())
-                        if before_words >= 6 and after_words >= 6:
+                        # Raised threshold from 6 to 10 words on each side
+                        # to reduce false positives on list constructions
+                        # and single-implication sentences with conjunctions
+                        if before_words >= 10 and after_words >= 10:
                             split_implication_warnings.append({
                                 "section": section,
                                 "signal": signal.strip(),
@@ -1133,15 +1139,77 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 print(json.dumps(w, indent=2))
 
         # 7. Theme audit for What's Shifting
+        # Classification uses the paragraph's opening sentence content rather than
+        # the source's feed-level theme tag, which caused systematic miscounting
+        # when MIT Tech Review (tagged ai_technology) was cited in market_behavior
+        # or regulation_policy paragraphs.
+        THEME_KEYWORDS: Dict[str, List[str]] = {
+            "regulation_policy": [
+                "regulat", "law", "legal", "court", "legislat", "policy", "government",
+                "enforcement", "compliance", "antitrust", "jurisdiction", "decree",
+                "shutdown", "ban", "ruling", "verdict", "ftc", "doj", "gdpr",
+                "cybercrime", "arrest", "detained", "prosecution",
+            ],
+            "market_behavior": [
+                "market", "acqui", "merger", "ipo", "valuation", "invest", "fund",
+                "compet", "price", "pricing", "revenue", "monetiz", "platform",
+                "asset-light", "vertical integrat", "supply chain", "demand",
+                "abandon", "pivot", "writedown", "infrastructure", "capital",
+            ],
+            "consumer_behavior": [
+                "consumer", "user", "worker", "employee", "customer", "adoption",
+                "preference", "workforce", "talent", "credential", "overqualif",
+                "retention", "engagement", "behavior", "choice", "lifestyle",
+            ],
+            "design_ux": [
+                "design", "ux", "interface", "user experience", "interaction",
+                "consent", "onboarding", "friction", "accessibility", "pattern",
+                "navigation", "layout", "visual",
+            ],
+            "ai_technology": [
+                "ai ", "artificial intelligence", "model", "llm", "machine learning",
+                "gpt", "gemini", "claude", "neural", "inference", "token",
+                "foundation model", "generative", "autonomous", "robotaxi",
+                "compute", "gpu", "blackwell", "hopper",
+            ],
+        }
+
+        def _classify_paragraph_theme(paragraph: str) -> str:
+            """
+            Classify a paragraph's central theme from its opening sentence.
+            Uses keyword matching with priority ordering so more specific themes
+            win over ai_technology when both match.
+            """
+            if not paragraph:
+                return "unknown"
+            # Use first sentence only — the opening claim determines the theme
+            first_sentence = re.split(r"(?<=[.!?])\s+", paragraph.strip())[0].lower()
+            # Strip inline citations so [1] doesn't interfere
+            first_sentence = re.sub(r"\[\d+\]", "", first_sentence)
+
+            # Score each theme by keyword hit count
+            scores: Dict[str, int] = {}
+            for theme, keywords in THEME_KEYWORDS.items():
+                scores[theme] = sum(1 for kw in keywords if kw in first_sentence)
+
+            best_theme = max(scores, key=lambda t: scores[t])
+            # If no keywords matched at all, fall back to source tag
+            if scores[best_theme] == 0:
+                return "unknown"
+            return best_theme
+
         theme_audit_warnings = []
         ws_theme_counts: Dict[str, List[int]] = {}
         for i, ws in enumerate(normalized_whats_shifting):
-            indices = ws.get("source_indices", [])
-            if not indices:
-                continue
-            primary_idx = indices[0]
-            source_info = source_index_lookup.get(str(primary_idx), {})
-            theme = source_info.get("theme", "unknown")
+            paragraph = ws.get("paragraph", "")
+            theme = _classify_paragraph_theme(paragraph)
+            # Fall back to source tag only if keyword classifier returns unknown
+            if theme == "unknown":
+                indices = ws.get("source_indices", [])
+                if indices:
+                    primary_idx = indices[0]
+                    source_info = source_index_lookup.get(str(primary_idx), {})
+                    theme = source_info.get("theme", "unknown")
             if theme not in ws_theme_counts:
                 ws_theme_counts[theme] = []
             ws_theme_counts[theme].append(i)
