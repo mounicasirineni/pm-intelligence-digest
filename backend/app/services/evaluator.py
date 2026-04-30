@@ -155,6 +155,7 @@ def pipeline_funnel(
 
     utilized = len(output_cited_titles & relevant_titles)
 
+    # Per-theme breakdown: fetched / confident / relevant counts
     theme_funnel: Dict[str, Dict[str, int]] = {}
     for theme, items in (items_by_theme or {}).items():
         theme_items = [i for i in (items or []) if isinstance(i, dict)]

@@ -524,16 +524,11 @@
             {% endif %}
             {% if row.theme_funnel %}
             <tr id="theme-funnel-{{ row.date }}" style="display: none;">
-              <td colspan="8" style="padding: 0 0 0.75rem 0;">
-                <div style="font-size: 0.78rem; font-family: monospace; border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.75rem; background: var(--card-bg);">
-                  <div style="font-weight: 600; margin-bottom: 0.4rem; font-family: var(--font-body); font-size: 0.8rem;">Theme Funnel — fetched / confident / relevant</div>
+              <td colspan="8" style="padding: 0 0 0.55rem 0;">
+                <div class="warning" style="font-family: monospace; font-size: 0.78rem;">
+                  <strong>Theme funnel (fetched → confident → relevant):</strong><br>
                   {% for theme, counts in row.theme_funnel.items() | sort %}
-                  <div style="display: flex; gap: 1rem; padding: 0.15rem 0; {% if counts.relevant == 0 and counts.fetched > 0 %}color: var(--score-low);{% endif %}">
-                    <span style="min-width: 160px;">{{ theme }}</span>
-                    <span>{{ counts.fetched }} fetched</span>
-                    <span>→ {{ counts.confident }} confident</span>
-                    <span>→ {{ counts.relevant }} relevant{% if counts.relevant == 0 and counts.fetched > 0 %} ⚠{% endif %}</span>
-                  </div>
+                  {{ theme }}: {{ counts.fetched }} fetched / {{ counts.confident }} confident / {{ counts.relevant }} relevant<br>
                   {% endfor %}
                 </div>
               </td>
@@ -556,15 +551,16 @@
       row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
     }
   }
-  function toggleThemeFunnel(date) {
-    const row = document.getElementById('theme-funnel-' + date);
+
+  function toggleFeeds(date) {
+    const row = document.getElementById('feeds-' + date);
     if (row) {
       row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
     }
   }
 
-  function toggleFeeds(date) {
-    const row = document.getElementById('feeds-' + date);
+  function toggleThemeFunnel(date) {
+    const row = document.getElementById('theme-funnel-' + date);
     if (row) {
       row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
     }

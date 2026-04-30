@@ -4,7 +4,6 @@ import json
 import logging
 import re
 import traceback
-from collections import Counter
 from datetime import date
 from typing import Any, Dict, List, Tuple
 
@@ -240,14 +239,36 @@ def _call_whats_shifting(
     settings: Any,
     ws_items: List[Dict[str, Any]],
     today: str,
+    ws_theme_distribution: Dict[str, int] | None = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     context_block, ws_indexed, _ = _build_context_block(ws_items, start_idx=1)
+
+    # Build theme availability block for diversity enforcement
+    theme_availability_lines = []
+    must_cover_themes = []
+    for theme, count in sorted((ws_theme_distribution or {}).items(), key=lambda x: -x[1]):
+        theme_availability_lines.append(f"  - {theme}: {count} item{'s' if count != 1 else ''}")
+        if count >= 2:
+            must_cover_themes.append(theme)
+    if theme_availability_lines:
+        theme_availability_block = (
+            "Available items by theme in today's pool (for THEME DIVERSITY ENFORCEMENT):\n"
+            + "\n".join(theme_availability_lines)
+        )
+        if must_cover_themes:
+            theme_availability_block += (
+                "\nThemes with 2+ items that MUST be considered for inclusion before any theme repeats: "
+                + ", ".join(must_cover_themes)
+            )
+        theme_availability_block += "\n"
+    else:
+        theme_availability_block = ""
 
     user_prompt = f"""
 You are reasoning across multiple high/medium confidence items that a Senior PM is tracking.
 Today's date is {today}.
 
-You are given items eligible for What's Shifting analysis. Use these to produce whats_shifting paragraphs and an interview_angle.
+{theme_availability_block}You are given items eligible for What's Shifting analysis. Use these to produce whats_shifting paragraphs and an interview_angle.
 
 Items:
 {context_block}
@@ -335,12 +356,9 @@ Produce a structured JSON object:
                    "If you cannot point to a specific bullet, rewrite the implication using 'these cases suggest...' framing. "
                    "CLOSING SENTENCE SPECIFICITY TRAP: The most common inference boundary violation is a closing 'for PMs' sentence that adds operational details not present in any source bullet — "
                    "specific checklists, named thresholds, implementation steps, or design directives that go beyond what the source states. "
-                   "CLOSING SENTENCE TRACE TEST (blocking): Before finalizing the closing sentence, identify the exact source bullet it extends. "
-                   "Then identify every noun, verb, and named concept in your closing sentence that does NOT appear in that source bullet. "
-                   "Each unmatched term is a synthesizer addition — it must be cut or reframed as 'these cases suggest...' "
-                   "Example violation: source says 'platforms are removing human review from low-stakes decisions' but closing says 'PMs should build confidence scoring into every automated decision.' "
-                   "'Confidence scoring' is not in the source — remove it. Replace with 'PMs building automated decision flows should consider where removing human review creates accountability gaps.' "
-                   "If you cannot trace every specific directive in your closing sentence to a source bullet, rewrite using 'these cases suggest PMs should consider...' framing. "
+                   "Before finalizing: identify the exact source bullet the closing sentence extends. "
+                   "If the bullet names an observation and your closing names a specific action, ask whether the source actually supports that action or whether you constructed it. "
+                   "If constructed, replace the specific directive with 'these cases suggest PMs should consider...' framing. "
                    "SPECIFIC INFERENCE BOUNDARY TESTS: Before publishing any closing implication, verify it passes all three tests: "
                    "(1) TIMELINE TEST: Does the closing sentence assert a specific timeline (e.g. 'weeks or months,' 'within a year,' 'before the window closes') that does not appear in any source bullet? If yes, remove the timeline or replace with 'these cases suggest the window may be limited.' "
                    "(2) UNIVERSALITY TEST: Does the closing sentence assert that a pattern applies broadly ('all platforms,' 'any company,' 'every PM') when sources show only 1-3 examples? If yes, scope it: 'in categories where X applies...' "
@@ -349,20 +367,16 @@ Produce a structured JSON object:
                    "not just a shared category label ('AI', 'regulation', 'platforms', 'government'). "
                    "Ask: do these stories share the same causal chain, the same failure mode, or the same design implication? "
                    "If the best you can say is 'both involve X category,' they belong in separate paragraphs. "
-                   "THEMATIC COMBINATION GATE (blocking — complete before writing): Before writing any paragraph that cites 2+ sources, "
-                   "you MUST complete all four steps below. If any step fails, do not combine — write separate paragraphs instead. "
-                   "STEP 1 — Name the mechanism: In one sentence, name the specific shared mechanism (causal chain, failure mode, or design implication) that connects ALL cited sources. "
-                   "Do not write 'both involve AI' or 'both are about regulation.' Name a specific mechanism: e.g. 'both show platforms removing human-oversight checkpoints to reduce friction, creating accountability gaps.' "
-                   "STEP 2 — Source it: Identify the exact bullet in which cited source explicitly names or clearly implies this mechanism. "
-                   "If no single bullet does, the mechanism is synthesizer-constructed — STOP. Do not combine. "
-                   "STEP 3 — Verify it applies to ALL sources: Does this mechanism genuinely describe what EACH cited source is about? "
-                   "If it describes one source well but the second source only loosely fits, they do not share the mechanism — STOP. Do not combine. "
-                   "STEP 4 — Check for duplicate themes: Would combining these sources make your paragraph cover the same theme as another paragraph you have already written? "
-                   "If yes — STOP. Write the stronger standalone paragraph and drop the weaker. "
-                   "Only if all four steps pass should you proceed to write the combined paragraph. "
+                   "THEMATIC COMBINATION SELF-CHECK: Before finalizing each paragraph that cites 2+ sources, write one sentence naming "
+                   "the specific shared mechanism between all cited sources. If you cannot name it precisely — not 'both involve AI' "
+                   "or 'both involve regulation' but a specific causal chain, failure mode, or design implication — do not combine. "
                    "MECHANISM SOURCING REQUIREMENT: The shared mechanism you name must be explicitly present in at least one source bullet — not constructed by inference across bullets. "
+                   "Ask: which specific bullet uses this mechanism, causal chain, or failure mode by name or clear implication? "
+                   "If no single bullet names it, the mechanism is synthesizer-constructed and the combination is invalid. "
                    "A mechanism that only emerges when you read all bullets together and abstract upward is not a shared mechanism — it is a category label, not a mechanism. "
-                   "In that case, do not combine: treat each source as a candidate for its own standalone paragraph. "
+                   "In that case, do not combine: treat each source as a candidate for its own standalone paragraph, then apply the THEME AUDIT SELF-CHECK to confirm no theme appears more than once. "
+                   "If combining would create a duplicate theme, keep the stronger standalone paragraph and drop the weaker. "
+                   "Do not proceed without completing this check. "
                    "CLOSING IMPLICATION TRACEABILITY CHECK: After writing the closing PM implication, verify that it traces independently to at least one specific bullet from EACH cited source — not just one of them. "
                    "Ask: if you removed Source A entirely, would the closing implication still hold? If yes, Source A is not genuinely contributing to the paragraph — it is decoration. "
                    "If yes, either rewrite the closing implication to incorporate what Source A uniquely adds, or remove Source A and write a single-source paragraph. "
@@ -494,14 +508,12 @@ Produce a structured JSON object:
                    "THEMATIC COMBINATION RULE: Multiple signals for the same company may only appear in the same entry if they share a specific mechanism — "
                    "not just a shared category label ('AI', 'cloud', 'regulation', 'growth'). "
                    "If the best you can say is 'both involve X category,' cut to the stronger single signal. "
-                   "SINGLE THREAD ENFORCEMENT: If a company has sources covering 2 or more separate business unit moves or strategic stories, "
-                   "do not attempt to combine all of them under one entry. Select the single richest thread and build the entire entry around it. "
+                   "SINGLE THREAD ENFORCEMENT: If a company has sources covering 3 or more separate business unit moves (e.g. infrastructure, consumer product, and advertising), "
+                   "do not attempt to combine all of them under one entry. Select the single richest thread — the one where the sources contain the most specific bullets, "
+                   "the sharpest contradiction, or the most non-obvious strategic implication — and build the entire entry around that thread. "
                    "Mentioning every available story is a failure mode. A tight 2-sentence entry built on one deep thread is stronger than a 4-sentence entry that skims three stories. "
-                   "THREAD SELECTION GATE (blocking — complete before writing): Before writing this company entry, complete all three steps. "
-                   "STEP 1 — List threads: Write out each available thread for this company in one line each (e.g. 'Thread A: Cloud infrastructure pricing move', 'Thread B: Search AI integration', 'Thread C: Ad revenue miss'). "
-                   "STEP 2 — Score threads: For each thread, answer (a) how many specific bullets does this thread have? (b) is there a contradiction or tension in these bullets? (c) is the closing implication non-obvious? "
-                   "STEP 3 — Select ONE: Pick the thread with the highest combined score on (a)+(b)+(c). Write that thread only. Do not mention other threads in the entry. "
-                   "If you find yourself using the word 'while' or 'also' to connect two different business unit stories in the same sentence, you have violated this gate — rewrite around one thread.",
+                   "THREAD SELECTION TEST: Before writing, list all available threads for this company. Ask: which single thread has (a) the most specific source bullets, "
+                   "(b) a contradiction or tension available from the CONTRADICTION MANDATE, and (c) the most non-obvious closing implication? Write that thread only.",
       "source_indices": []
     }},
     "Meta": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
@@ -526,15 +538,9 @@ Produce a structured JSON object:
                 "If yes, the bullet is restating the obvious. Rewrite it around the most non-obvious bullet in the source — "
                 "typically the bullet that names a structural constraint, a counter-intuitive tradeoff, an unintended consequence, or a mechanism that limits the headline's apparent conclusion. "
                 "The headline tells you what happened. The closing implication should tell you something the headline actively obscures or contradicts. "
-                "VERBATIM COPY CHECK (blocking): Before finalizing each bullet, read it alongside the source bullets you drew from. "
-                "Ask: does my bullet use any 5-word sequence that appears in the source? If yes, you have copied rather than synthesized — rewrite. "
-                "The structural test: source bullets describe WHAT happened. Your bullet should name the PATTERN or SHIFT this example is evidence of. "
-                "Example of a copied bullet (WRONG): 'Gooseworks is hiring specialized roles that require domain expertise, showing early-stage startups are abandoning generalist hiring.' "
-                "Example of a synthesized bullet (RIGHT): 'Early AI-native startups are treating domain expertise as a hiring filter, not a training investment — a structural bet that verticalization is a moat before it appears in revenue.' "
-                "The pattern bullet answers: if this example is true, what broader hypothesis does it support or challenge? Write that hypothesis, not the example. "
-                "PATTERN NAMING GATE: Before finalizing, complete this sentence: 'This example is evidence that ___.' "
-                "Your bullet text should be the answer to that sentence — not the example itself. "
-                "If your bullet starts with the company name or 'A startup' or 'A new company,' it is almost certainly describing the example. Reframe from the pattern. "
+                "VERBATIM COPY CHECK: If your bullet text closely resembles the source bullet text word-for-word, you have copied rather than synthesized. "
+                "Rewrite: the bullet should name the pattern the source example reveals, not describe the example itself. "
+                "The source example is evidence. Your bullet is the insight the evidence supports. "
                 "COMPLICATION MANDATE: If any cited source contains a bullet that contradicts, qualifies, or significantly complicates the bullet's central claim, "
                 "that bullet MUST appear or the framing must be revised. This is not optional. "
                 "QUALIFIER PRESERVATION CHECK: If the source uses hedged language, your closing consequence must match that hedge level. "
@@ -548,7 +554,6 @@ Produce a structured JSON object:
   "pm_craft_today": {{
     "text": "Single most actionable PM craft insight from today's content. "
             "Draw ONLY from items tagged 'pm_craft_today ONLY' (theme: product_craft) OR items tagged 'pm_craft_today eligible (design_ux)'. "
-            "Both tag types are valid PM Craft sources. Check the Allowed section field — any item with either tag is eligible. "
             "Do NOT use startup_disruption or company_strategy items for PM Craft — even if no product_craft or design_ux item is available. "
             "If no product_craft or design_ux item is available today, set text to empty string. "
             "Must be non-obvious — a specific pattern, tradeoff, or reframe that changes how a PM would approach a real decision. "
@@ -568,7 +573,7 @@ Guidance:
     Items tagged "company_watch ONLY" may ONLY appear in the company_watch entry whose company name matches the item's Company field.
     Items tagged "startup_radar ONLY" (theme: startup_disruption) may ONLY appear in startup_radar bullets.
     Items tagged "pm_craft_today ONLY" (theme: product_craft) may ONLY appear in pm_craft_today.
-    Items tagged "pm_craft_today eligible (design_ux)" may ONLY appear in pm_craft_today — do NOT use them in company_watch or startup_radar.
+    Items tagged "pm_craft_today eligible (design_ux)" may ONLY appear in pm_craft_today.
   A TechCrunch article about Amazon is tagged startup_disruption → startup_radar ONLY. Do not use it in company_watch even if it describes a major company's strategy.
   A YourStory article about Anthropic is tagged startup_disruption → startup_radar ONLY. Do not use it in company_watch.
   An NVIDIA Blog item has Company field 'NVIDIA' → it may only appear in the NVIDIA company_watch entry. Do not use it for Google or any other company.
@@ -672,9 +677,13 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
     if dropped_low_relevance:
         logger.info("Dropped %d items with low PM relevance before synthesis.", dropped_low_relevance)
 
-    theme_funnel_after_filter = dict(Counter(item["theme"] for item in filtered_items))
-    logger.info("THEME FUNNEL [after_quality_filter]: %s", theme_funnel_after_filter)
-    print("THEME FUNNEL [after_quality_filter]:", theme_funnel_after_filter)
+    # Theme funnel stage 1: after quality/relevance filter
+    theme_funnel_after_filter: Dict[str, int] = {}
+    for item in filtered_items:
+        t = item["theme"]
+        theme_funnel_after_filter[t] = theme_funnel_after_filter.get(t, 0) + 1
+    logger.info("THEME FUNNEL [stage=after_quality_filter]: %s", json.dumps(theme_funnel_after_filter))
+    print(f"THEME FUNNEL [stage=after_quality_filter]: {theme_funnel_after_filter}")
 
     empty_result = {
         "whats_shifting": [],
@@ -694,6 +703,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             "cw_source_integrity_violations": [],
             "pm_craft_source_violations": [],
             "source_concentration_warnings": [],
+            "theme_diversity_warnings": [],
         },
     }
 
@@ -767,9 +777,13 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
     filtered_items = diversity_capped_items
 
-    theme_funnel_after_cap = dict(Counter(item["theme"] for item in filtered_items))
-    logger.info("THEME FUNNEL [after_diversity_cap]: %s", theme_funnel_after_cap)
-    print("THEME FUNNEL [after_diversity_cap]:", theme_funnel_after_cap)
+    # Theme funnel stage 2: after diversity cap
+    theme_funnel_after_cap: Dict[str, int] = {}
+    for item in filtered_items:
+        t = item["theme"]
+        theme_funnel_after_cap[t] = theme_funnel_after_cap.get(t, 0) + 1
+    logger.info("THEME FUNNEL [stage=after_diversity_cap]: %s", json.dumps(theme_funnel_after_cap))
+    print(f"THEME FUNNEL [stage=after_diversity_cap]: {theme_funnel_after_cap}")
 
     # ---------------------------------------------------------------------------
     # Partition by routing eligibility
@@ -793,30 +807,37 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 dedicated_items.append(item)
             else:
                 ws_items.append(item)
-                # design_ux items are dual-routed: they anchor WS paragraphs AND are
-                # eligible for PM Craft in Call 2. Without this, Call 2 never sees them
-                # and PM Craft silently falls back to empty when no product_craft item exists.
                 if theme == "design_ux":
+                    # design_ux items are eligible for both WS and PM Craft
                     dedicated_items.append(item)
                     logger.info(
-                        "ROUTING [dual_route=design_ux] added to dedicated_items for PM Craft: %s — %s",
+                        "ROUTING [design_ux dual-routed to ws_items + dedicated_items]: %s — %s",
                         item.get("source_name"), item.get("title")
                     )
 
-    ws_theme_counts = dict(Counter(item["theme"] for item in ws_items))
-    dedicated_theme_counts = dict(Counter(item["theme"] for item in dedicated_items))
+    # Theme funnel stage 3: after partition
+    ws_theme_dist: Dict[str, int] = {}
+    for item in ws_items:
+        t = item["theme"]
+        ws_theme_dist[t] = ws_theme_dist.get(t, 0) + 1
+    dedicated_theme_dist: Dict[str, int] = {}
+    for item in dedicated_items:
+        t = item["theme"]
+        dedicated_theme_dist[t] = dedicated_theme_dist.get(t, 0) + 1
+    logger.info("THEME FUNNEL [stage=ws_items_post_partition]: %s", json.dumps(ws_theme_dist))
+    logger.info("THEME FUNNEL [stage=dedicated_items_post_partition]: %s", json.dumps(dedicated_theme_dist))
+    print(f"THEME FUNNEL [stage=ws_items_post_partition]: {ws_theme_dist}")
+    print(f"THEME FUNNEL [stage=dedicated_items_post_partition]: {dedicated_theme_dist}")
+
     logger.info(
-        "Routing: %d whats_shifting items, %d dedicated section items (%d design_ux dual-routed)",
-        len(ws_items), len(dedicated_items),
-        sum(1 for item in dedicated_items if item["theme"] == "design_ux"),
+        "Routing: %d whats_shifting items, %d dedicated section items",
+        len(ws_items), len(dedicated_items)
     )
-    logger.info("THEME FUNNEL [ws_items]: %s", ws_theme_counts)
-    logger.info("THEME FUNNEL [dedicated_items]: %s", dedicated_theme_counts)
-    print("THEME FUNNEL [ws_items]:", ws_theme_counts)
-    print("THEME FUNNEL [dedicated_items]:", dedicated_theme_counts)
 
     try:
-        call1_parsed, ws_indexed = _call_whats_shifting(client, settings, ws_items, today)
+        call1_parsed, ws_indexed = _call_whats_shifting(
+            client, settings, ws_items, today, ws_theme_distribution=ws_theme_dist
+        )
 
         start_idx = len(ws_indexed) + 1
         call2_parsed, dedicated_indexed = _call_dedicated_sections(
@@ -1273,6 +1294,31 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             for w in theme_audit_warnings:
                 print(json.dumps(w, indent=2))
 
+        # 8. Theme diversity warnings
+        # Check if any theme with 2+ items in the WS pool anchors zero paragraphs.
+        theme_diversity_warnings = []
+        ws_paragraph_theme_counts = {t: len(idxs) for t, idxs in ws_theme_counts.items()}
+        for theme, item_count in ws_theme_dist.items():
+            if item_count >= 2:
+                anchored = ws_paragraph_theme_counts.get(theme, 0)
+                if anchored == 0:
+                    theme_diversity_warnings.append({
+                        "theme": theme,
+                        "pool_item_count": item_count,
+                        "ws_paragraph_count": 0,
+                        "warning": (
+                            f"Theme '{theme}' has {item_count} items in the WS pool "
+                            "but anchors 0 What's Shifting paragraphs — possible selection bias"
+                        ),
+                        "action": "REVIEW_THEME_COVERAGE",
+                    })
+
+        if theme_diversity_warnings:
+            logger.warning("THEME DIVERSITY WARNINGS: %s", json.dumps(theme_diversity_warnings, indent=2))
+            print("THEME DIVERSITY WARNINGS:")
+            for w in theme_diversity_warnings:
+                print(json.dumps(w, indent=2))
+
         # ---------------------------------------------------------------------------
         # Return
         # ---------------------------------------------------------------------------
@@ -1294,6 +1340,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "source_concentration_warnings": source_concentration_warnings,
                 "split_implication_warnings": split_implication_warnings,
                 "theme_audit_warnings": theme_audit_warnings,
+                "theme_diversity_warnings": theme_diversity_warnings,
             },
         }
 
