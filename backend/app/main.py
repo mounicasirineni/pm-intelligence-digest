@@ -381,6 +381,7 @@ def _get_all_evals():
             "relevant_pct":       float(pf.get("relevant_pct") or 0.0),
             "utilized":           int(pf.get("utilized") or 0),
             "utilized_pct":       float(pf.get("utilized_pct") or 0.0),
+            "theme_funnel":       pf.get("theme_funnel") or {},
             "pm_high":   float(pm.get("high_pct") or 0.0),
             "pm_med":    float(pm.get("medium_pct") or 0.0),
             "pm_low":    float(pm.get("low_pct") or 0.0),

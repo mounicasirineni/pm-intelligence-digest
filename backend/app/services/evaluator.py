@@ -155,6 +155,24 @@ def pipeline_funnel(
 
     utilized = len(output_cited_titles & relevant_titles)
 
+    theme_funnel: Dict[str, Dict[str, int]] = {}
+    for theme, items in (items_by_theme or {}).items():
+        theme_items = [i for i in (items or []) if isinstance(i, dict)]
+        t_confident = sum(
+            1 for i in theme_items
+            if str(i.get("confidence") or "medium").lower() in {"high", "medium"}
+        )
+        t_relevant = sum(
+            1 for i in theme_items
+            if str(i.get("confidence") or "medium").lower() in {"high", "medium"}
+            and str(i.get("pm_relevance_score") or "medium").lower() in {"high", "medium"}
+        )
+        theme_funnel[theme] = {
+            "fetched": len(theme_items),
+            "confident": t_confident,
+            "relevant": t_relevant,
+        }
+
     return {
         "sources_configured": sources_configured,
         "sources_active": sources_active,
@@ -167,6 +185,7 @@ def pipeline_funnel(
         "relevant_pct": (relevant / confident * 100.0) if confident else 0.0,
         "utilized": utilized,
         "utilized_pct": (utilized / relevant * 100.0) if relevant else 0.0,
+        "theme_funnel": theme_funnel,
     }
 
 
