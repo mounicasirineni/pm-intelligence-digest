@@ -46,6 +46,16 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS synthesizer_inputs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_date TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                grouped_summaries TEXT NOT NULL
+            )
+            """
+        )
         # Migrate existing tables that lack fetch_metadata_json
         try:
             conn.execute("ALTER TABLE digests ADD COLUMN fetch_metadata_json TEXT")

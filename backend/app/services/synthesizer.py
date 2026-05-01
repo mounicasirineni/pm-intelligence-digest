@@ -291,7 +291,7 @@ Produce a structured JSON object:
 {{
   "whats_shifting": [
     {{
-      "paragraph": "4-5 paragraph-length insights. Each paragraph must: "
+      "paragraph": "Each paragraph must: "
                    "(1) open with a single declarative sentence naming the underlying force or pattern — not an event description; "
                    "(2) develop the insight across 3-4 sentences by connecting signals from different sources or themes to reveal something non-obvious; "
                    "(3) close with the strategic implication for a PM — what decision, risk, or opportunity does this pattern create? "
@@ -301,117 +301,61 @@ Produce a structured JSON object:
                    "When the topic shifts to content from a different source, drop the prior source citation unless it independently supports the new claim. "
                    "Do not carry a citation forward from one sentence into the next if the new sentence draws from a different source. "
                    "Every citation must answer: does this specific source contain a bullet that directly supports this specific sentence? If no, remove the citation. "
-                   "READER CONTEXT RULE: Write for a reader who has NOT seen the source articles. Provide plain-language context for any unfamiliar term or company. "
-                   "LEDE PRECISION RULE: Opening sentence makes a claim the paragraph must fully deliver. Avoid absolute framing unless a source explicitly uses it. "
-                   "IMPLICATION FOCUS RULE: Closing PM implication makes exactly one claim. If writing 'and' connecting two consequences, cut one. "
-                   "SPLIT IMPLICATION SELF-CHECK: Count distinct actionable consequences in closing sentence. If more than one, cut the weaker. "
-                   "EXAMPLE DISCIPLINE RULE: No more than three distinct examples per paragraph. "
-                   "MINIMUM VIABLE PARAGRAPH RULE: If fewer than two examples pass the connective tissue test, do not publish the paragraph. "
-                   "SINGLE-SOURCE PRIORITY RULE: If a single source contributes 4 or more high-quality insight bullets, it should anchor its own standalone paragraph rather than being combined with a second source. "
-                   "A deep single-source paragraph that fully develops one insight is stronger than a multi-source paragraph that skims two insights. "
-                   "Only combine sources when the shared mechanism adds something neither source could deliver alone. "
-                   "If you are combining sources primarily because you prefer multi-source paragraphs, do not combine — write the single-source paragraph and move to the next theme. "
-                   "MINIMUM BULLET COVERAGE RULE: Each paragraph must draw from at least 3 distinct insight bullets across its cited sources. "
-                   "If you cannot find 3 distinct bullets that genuinely connect, do not publish the paragraph — it is too thin. "
-                   "Count bullets used before finalizing. A paragraph built from 1-2 bullets padded with synthesizer reasoning does not qualify. "
-                   "Additionally, at least one cited source must contribute 2 or more bullets to the paragraph. "
-                   "A paragraph that uses exactly 1 bullet from each source is likely skimming the surface of each source rather than engaging deeply. "
-                   "Verify you have read all bullets for each source before concluding only 1 bullet is usable. "
-                   "OMISSION CHECK RULE: Before finalizing each paragraph, review ALL insight bullets for every cited source — not just the ones you used. "
-                   "For each cited source, work through every bullet you did NOT use and apply the following four tests: "
-                   "(1) CONCLUSION TEST: Does this dropped bullet change the conclusion a reader would draw from the closing implication? If yes, either incorporate it or revise the closing implication to reflect the more limited scope the full source set actually supports. "
-                   "(2) CONTRADICTION TEST: Does this dropped bullet name a data point, mechanism, or expert claim that directly contradicts or qualifies the paragraph's central claim? If yes, it must appear in the paragraph — you may steelman against it but you may not omit it. "
-                   "(3) STRONGER INSIGHT TEST: Does this dropped bullet contain a more specific, more actionable, or more non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
-                   "(4) SCOPE TEST: Does this dropped bullet limit the geographic, demographic, or use-case scope of the closing implication in a way that materially changes its applicability? If yes, either add the scope qualifier or remove the implication. "
-                   "A paragraph that passes all four tests for every dropped bullet is ready to publish. "
-                   "A paragraph that fails any test must be revised before finalizing. "
-                   "A paragraph that selects only narrative-supporting bullets while dropping complicating evidence is a synthesis failure, not a synthesis. "
-                   "HIGHEST-RISK OMISSION TYPE: Bullets that contradict the paragraph's central claim, extend it to a new domain, or apply it to a named product or company not yet mentioned in the paragraph are the most commonly dropped and the most damaging to omit. "
-                   "A bullet that complicates your thesis is more valuable than a bullet that supports it — it either strengthens the paragraph by being addressed, or reveals that the thesis needs revision. "
-                   "If you find yourself dropping a bullet because it 'doesn't quite fit,' that is a signal to stop and ask whether the paragraph's central claim is too narrow. "
-                   "OMISSION CHECK DEPTH: This check applies most critically to bullets ranked 2-4 in each source. "
-                   "The summarizer orders bullets from most specific to most abstract — bullet 1 is often the most abstract framing, "
-                   "while bullets 2-4 contain the most specific mechanisms, named products, concrete tradeoffs, and verifiable numbers. "
-                   "Do not stop reading after bullet 1. The strongest strategic insight is frequently not the first bullet. "
-                   "COMPLICATION MANDATE: If any cited source contains a bullet that contradicts, qualifies, or significantly complicates the paragraph's central claim, "
-                   "that bullet MUST appear in the paragraph. This is not optional. "
-                   "You may steelman your thesis against it, but you may not omit it. "
-                   "A bullet that reverses or limits the central implication is more valuable than a bullet that restates it from a different angle. "
-                   "The trigger is not 'does this directly oppose the thesis' but 'does this change the conclusion a reader would draw.' "
-                   "If yes, that bullet must be in the paragraph. Suppressing a complicating bullet to preserve narrative coherence is a citation integrity violation. "
-                   "CONTRADICTION FRAMING CHECK: Before finalizing the closing implication, explicitly check: does any dropped bullet from any cited source contradict or qualify the framing of that implication? "
-                   "This includes bullets that: (a) limit the scope of the claim to a specific geography, company size, or use case, "
-                   "(b) show a counter-example that the implication does not account for, "
-                   "(c) reveal a structural constraint that makes the implication inaccessible to some or most PMs, or "
-                   "(d) show that the mechanism the implication depends on does not apply universally. "
-                   "If any dropped bullet meets criteria (a)-(d), either incorporate it as a qualification in the closing sentence, or revise the closing implication to reflect the more limited scope that the full source set actually supports. "
-                   "A closing implication that is only true if you ignore a dropped bullet is not a synthesis — it is a selection. "
-                   "INFERENCE BOUNDARY RULE: The closing PM implication must be traceable to a specific bullet in a cited source. "
-                   "You may take one logical step beyond the source (identifying an implication), but you may not: "
-                   "(a) introduce strategic frameworks or design principles not present in any source, "
-                   "(b) assert that a pattern is universal or industry-wide when sources show 1-2 examples, "
-                   "(c) recommend a specific PM action that no source suggests or supports. "
-                   "If your implication goes beyond what sources support, frame it explicitly as inference: 'these cases suggest...' not 'this demonstrates that PMs should...' "
-                   "QUALIFIER PRESERVATION CHECK: If the source uses hedged language ('suggests,' 'implies,' 'may,' 'could,' 'changes,' 'shifts'), "
-                   "your closing implication must match that hedge level. "
-                   "Converting a source observation into a prescription ('PMs must,' 'always,' 'from day one') when the source uses suggestive language is an inference boundary violation. "
-                   "INFERENCE BOUNDARY SELF-CHECK: Before finalizing the closing implication, identify the specific source bullet it traces to. "
-                   "If you cannot point to a specific bullet, rewrite the implication using 'these cases suggest...' framing. "
-                   "CLOSING SENTENCE SPECIFICITY TRAP: The most common inference boundary violation is a closing 'for PMs' sentence that adds operational details not present in any source bullet — "
-                   "specific checklists, named thresholds, implementation steps, or design directives that go beyond what the source states. "
-                   "Before finalizing: identify the exact source bullet the closing sentence extends. "
-                   "If the bullet names an observation and your closing names a specific action, ask whether the source actually supports that action or whether you constructed it. "
-                   "If constructed, replace the specific directive with 'these cases suggest PMs should consider...' framing. "
-                   "SPECIFIC INFERENCE BOUNDARY TESTS: Before publishing any closing implication, verify it passes all three tests: "
-                   "(1) TIMELINE TEST: Does the closing sentence assert a specific timeline (e.g. 'weeks or months,' 'within a year,' 'before the window closes') that does not appear in any source bullet? If yes, remove the timeline or replace with 'these cases suggest the window may be limited.' "
-                   "(2) UNIVERSALITY TEST: Does the closing sentence assert that a pattern applies broadly ('all platforms,' 'any company,' 'every PM') when sources show only 1-3 examples? If yes, scope it: 'in categories where X applies...' "
-                   "(3) ACTION TEST: Does the closing sentence prescribe a specific PM action ('build independent consent infrastructure,' 'architect around publicly available models') that no source bullet recommends? If yes, reframe as 'these cases suggest considering...' not 'product teams must...' "
-                   "THEMATIC COMBINATION RULE: Two stories may only appear in the same paragraph if they share a specific mechanism — "
-                   "not just a shared category label ('AI', 'regulation', 'platforms', 'government'). "
-                   "Ask: do these stories share the same causal chain, the same failure mode, or the same design implication? "
-                   "If the best you can say is 'both involve X category,' they belong in separate paragraphs. "
-                   "THEMATIC COMBINATION SELF-CHECK: Before finalizing each paragraph that cites 2+ sources, write one sentence naming "
-                   "the specific shared mechanism between all cited sources. If you cannot name it precisely — not 'both involve AI' "
-                   "or 'both involve regulation' but a specific causal chain, failure mode, or design implication — do not combine. "
-                   "MECHANISM SOURCING REQUIREMENT: The shared mechanism you name must be explicitly present in at least one source bullet — not constructed by inference across bullets. "
-                   "Ask: which specific bullet uses this mechanism, causal chain, or failure mode by name or clear implication? "
-                   "If no single bullet names it, the mechanism is synthesizer-constructed and the combination is invalid. "
-                   "A mechanism that only emerges when you read all bullets together and abstract upward is not a shared mechanism — it is a category label, not a mechanism. "
-                   "In that case, do not combine: treat each source as a candidate for its own standalone paragraph. "
-                   "Do not proceed without completing this check. "
-                   "CLOSING IMPLICATION TRACEABILITY CHECK: After writing the closing PM implication, verify that it traces independently to at least one specific bullet from EACH cited source — not just one of them. "
-                   "Ask: if you removed Source A entirely, would the closing implication still hold? If yes, Source A is not genuinely contributing to the paragraph — it is decoration. "
-                   "If yes, either rewrite the closing implication to incorporate what Source A uniquely adds, or remove Source A and write a single-source paragraph. "
-                   "A closing implication that only traces to one source means the combination failed the mechanism test — the sources are not genuinely connected.",
+                   "READER CONTEXT RULE: Assume the reader has not heard of any company or product mentioned — provide one clause of context on first mention. "
+                   "LEDE PRECISION RULE: Opening sentence makes a claim the paragraph must fully deliver. "
+                   "PARAGRAPH INTEGRITY RULE: These constraints apply to every sentence in the paragraph, not just the closing: "
+                   "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere in the paragraph. 'This suggests...' not 'This demonstrates...' "
+                   "(2) NO TIMELINE: Do not assert a specific timeline ('within weeks,' 'before the window closes,' 'within a year') unless that timeline appears verbatim in a source bullet. If no source names it, remove it. "
+                   "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly ('all platforms,' 'every PM,' 'any company') when sources show 1-3 examples. Scope it: 'in categories where X applies...' or 'among companies that...' "
+                   "ANCHOR SELECTION RULE: Before drafting each paragraph, complete these steps in order: "
+                   "(1) Rank ALL insight bullets across every source eligible for that theme by non-obviousness. The most non-obvious bullet is the one that: "
+                   "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
+                   "(b) contradicts or qualifies the headline's apparent conclusion, or "
+                   "(c) reveals a mechanism the headline actively obscures. "
+                   "(2) Identify the highest-ranked bullet. This is your anchor — build the paragraph's opening claim around it. "
+                   "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
+                   "For each one found, the paragraph must contain a sentence that directly addresses it — either incorporating it as a qualification or steelmanning your thesis against it. "
+                   "If no such sentence exists in your draft, the paragraph is not ready to publish. "
+                   "(4) Use remaining bullets as supporting evidence or complication. Do not start from bullet 1 of the first source unless it is genuinely the most non-obvious — "
+                   "it rarely is. Bullets 2-4 contain the most specific mechanisms, named products, concrete tradeoffs, and verifiable numbers. "
+                   "COMBINATION AND CONSTRUCTION RULE: "
+                   "Before combining two sources into one paragraph, ask: can I complete this sentence from a specific source bullet — "
+                   "'These sources both demonstrate that [specific causal chain / failure mode / design implication]'? "
+                   "If you cannot complete that sentence using words or clear implications from at least one source bullet, do not combine. "
+                   "A shared category label ('AI', 'regulation') is not a mechanism. "
+                   "If one source contributes 4+ strong bullets, write a single-source paragraph instead of combining. "
+                   "Regardless of source count, the paragraph must draw from at least 3 distinct insight bullets. If you cannot find 3, do not publish the paragraph. "
+                   "DROPPED BULLET REVIEW: After writing, review every bullet you did NOT use from every cited source and apply these two tests: "
+                   "(1) STRONGER INSIGHT TEST: Does this bullet contain a more specific, actionable, or non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
+                   "(2) SCOPE TEST: Does this bullet limit the geographic, demographic, or use-case scope of the closing implication in a way that materially changes its applicability? If yes, add the qualifier or revise the implication. "
+                   "If yes to either, revise before publishing. "
+                   "CLOSING SENTENCE RULE: The closing implication must pass all three tests before publishing: "
+                   "(1) SINGLE CONSEQUENCE: Contains exactly one actionable consequence. Do not use 'and,' 'but also,' 'as well as,' or 'while also.' If you find yourself writing a conjunction, stop — delete everything after it. "
+                   "(2) SOURCE TRACEABILITY: Traces directly to a specific bullet in a cited source. If you cannot identify that bullet, reframe as 'these cases suggest...' not 'this demonstrates that PMs should...' "
+                   "(3) NO CONSTRUCTED ACTION: Does not prescribe a specific PM action ('build X,' 'architect around Y') that no source bullet recommends. If constructed, reframe as 'these cases suggest considering...' "
+                   "If the closing sentence fails any of (1)-(3), rewrite before publishing. ",
       "source_indices": [1, 2]
     }}
   ],
   "interview_angle": "One specific thing a PM should have a prepared opinion on before interviews this week. "
-                     "SOURCE RESTRICTION: The interview angle must derive from a source already cited in one of the whats_shifting paragraphs above. "
+                     "SOURCE RESTRICTION: Must derive from a source already cited in one of the whats_shifting paragraphs above. "
                      "Do not introduce a new source that did not appear in whats_shifting. "
                      "If no whats_shifting paragraph was produced, set interview_angle to empty string. "
-                     "Anchor to a specific named company, case, or development from today's sources. "
-                     "Frame as a debatable claim or tradeoff, not a fact to recite. "
-                     "Rotate focus across product strategy, consumer insight, regulatory navigation, and AI. "
+                     "ANCHOR RULE: Anchor to a specific named company, case, product decision, design tradeoff, or architectural choice from today's sources. "
+                     "Prefer stories where the source explicitly names a product decision or design tradeoff over stories where the PM implication must be inferred from a business event. "
+                     "Weak anchors — do not use: company shutdowns where motivation is unconfirmed, exec org changes, fundraising rounds without product detail. "
                      "PM DECISION LEVEL RULE: The angle must be grounded in a decision a PM actually owns — "
                      "feature prioritization, product architecture, safety design, retention mechanics, "
                      "compliance strategy, pricing tradeoffs, or go-to-market sequencing. "
-                     "Do not anchor to decisions owned by executives, infrastructure teams, or investors "
-                     "(e.g. compute allocation, M&A timing, fundraising strategy, CEO org changes). "
+                     "Do not anchor to decisions owned by executives, infrastructure teams, or investors. "
                      "If the most interesting story today is an exec-level decision, reframe it as: "
                      "what should a PM building on that platform or in that market decide differently as a result? "
-                     "VERIFIED MOTIVATION RULE: Only assert a company's strategic motivation if it is explicitly "
-                     "stated in the source. Do not infer why a company made a decision and present it as fact. "
-                     "If the motivation is unclear, frame the angle around the observable outcome and the "
-                     "PM-level tradeoff it reveals, not the company's presumed intent. "
-                     "STRONG ANCHOR PREFERENCE: Prefer stories where the source explicitly names a product "
-                     "decision, design tradeoff, or architectural choice over stories where the PM implication "
-                     "must be inferred from a business event. "
-                     "Good anchors from today's typical sources: permission model design tradeoffs, "
-                     "content moderation architecture, safety-as-product-surface decisions, "
-                     "platform protocol design, compliance-as-feature tradeoffs. "
-                     "Weak anchors: company shutdowns where motivation is unconfirmed, exec org changes, "
-                     "fundraising rounds without product detail."
+                     "FRAMING RULE: Frame as a debatable tradeoff a PM must take a position on — not a fact to recite, not a trend to acknowledge. "
+                     "Only assert a company's strategic motivation if it is explicitly stated in the source. "
+                     "If motivation is unclear, frame around the observable outcome and the PM-level tradeoff it reveals. "
+                     "PARAGRAPH INTEGRITY RULE: "
+                     "(1) HEDGE MATCH: Match the hedge level of the source. Do not assert motivations, outcomes, or patterns not explicitly stated. "
+                     "(2) NO UNIVERSALITY: Do not assert the tradeoff applies to all PMs or all companies. Scope it to the context the source describes."
 }}
 
 Guidance:
@@ -420,7 +364,6 @@ Guidance:
 - GROUNDING RULE: Do not introduce external statistics, historical references, or general knowledge in implication sentences. Use 'this suggests...' or 'this implies...' rather than asserting as established fact.
 - CITATION RULE: Only cite item [n] if a specific insight bullet from that item directly supports the exact claim. Every sentence in whats_shifting must have at least one citation.
 - REFRAMING RULE: Do not reproduce a named framework from a source as your insight. Ask what it reveals when placed alongside other signals.
-- MULTI-SOURCE DEPTH RULE: When a paragraph draws from 3+ sources, verify that at least one source contributes content from beyond its first insight bullet. If all evidence comes from bullet 1 of each source, the paragraph is missing the most specific and verifiable content.
 """.strip()
 
     response = client.messages.create(
@@ -476,46 +419,42 @@ Produce a structured JSON object:
                    "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
                    "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
                    "Sentence 3 (optional): name the implication — one claim only, the most specific and directly grounded. "
-                   "Only include this company if there is genuine signal today from the items provided. "
                    "COMPANY WATCH OMIT RULE: If no item directly covers this company's strategy or product moves, set paragraph to empty string. Do not substitute a tangentially related item. "
+                   "If no item has Company field matching this company, set paragraph to empty string. Do not cite any other company's source. "
                    "COMPANY WATCH SOURCE RULE: Company Watch entries may ONLY cite sources tagged 'company_watch ONLY' in their Allowed section field AND whose Company field matches this company. "
                    "An item tagged 'company_watch ONLY' whose Company field is 'NVIDIA' must NOT be used in the Google entry. "
                    "An item tagged 'company_watch ONLY' whose Company field is 'Google' may ONLY be used in the Google entry. "
-                   "If no item has Company field matching this company, set paragraph to empty string. Do not cite any other company's source. "
-                   "COMPANY WATCH CONVERGENCE RULE: Multiple threads allowed only if all threads converge on a single closing implication. "
-                   "If the closing sentence does not follow from all threads, cut to the strongest single thread. "
-                   "LEDE PRECISION RULE: Avoid absolute framing unless a source explicitly uses it. "
-                   "IMPLICATION FOCUS RULE: Sentence 3 must make exactly one claim. Cut any 'and' connecting two consequences. "
-                   "BULLET DEPTH RULE: Do not build this entry from the first insight bullet alone. Read all insight bullets for this company's sources before writing. "
-                   "The most specific and verifiable content (named products, specific numbers, architectural details) is often in bullets 2-4, not bullet 1. "
-                   "OMISSION CHECK RULE: Before finalizing each company entry, review ALL insight bullets for every cited source. "
-                   "For each cited source, work through every bullet you did NOT use and apply the following four tests: "
-                   "(1) CONCLUSION TEST: Does this dropped bullet change the conclusion a reader would draw from the closing implication? If yes, either incorporate it or revise the closing implication. "
-                   "(2) CONTRADICTION TEST: Does this dropped bullet name a data point, mechanism, or product detail that directly contradicts or qualifies the entry's central claim? If yes, it must appear — you may steelman against it but you may not omit it. "
-                   "(3) STRONGER INSIGHT TEST: Does this dropped bullet contain a more specific, more actionable, or more non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
-                   "(4) SCOPE TEST: Does this dropped bullet limit the scope of the closing implication in a way that materially changes its applicability? If yes, add the qualifier or revise. "
-                   "A company entry that passes all four tests for every dropped bullet is ready to publish. "
-                   "A company entry that fails any test must be revised before finalizing. "
-                   "COMPLICATION MANDATE: If any cited source contains a bullet that contradicts, qualifies, or significantly complicates the entry's central claim, "
-                   "that bullet MUST appear in the entry or the framing must be revised. This is not optional. "
-                   "You may steelman your thesis against it, but you may not omit it. "
-                   "QUALIFIER PRESERVATION CHECK: If the source uses hedged language ('suggests,' 'implies,' 'may,' 'could,' 'changes,' 'shifts'), "
-                   "your closing implication must match that hedge level. Do not convert a source observation into a prescription. "
+                   "PARAGRAPH INTEGRITY RULE: These constraints apply to every sentence in the entry, not just the closing: "
+                   "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere. 'This suggests...' not 'This demonstrates...' "
+                   "(2) NO TIMELINE: Do not assert a specific timeline unless it appears verbatim in a source bullet. If no source names it, remove it. "
+                   "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly when sources show 1-3 examples. Scope it: 'in categories where X applies...' "
+                   "ANCHOR SELECTION RULE: Before drafting, complete these steps in order: "
+                   "(1) Rank ALL insight bullets for this company's sources by non-obviousness. The most non-obvious bullet is the one that: "
+                   "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
+                   "(b) contradicts or qualifies the headline's apparent conclusion, or "
+                   "(c) reveals a mechanism the headline actively obscures. "
+                   "Do not build this entry from bullet 1 alone — the most specific and verifiable content is often in bullets 2-4. "
+                   "(2) Identify the highest-ranked bullet. Build the entry's opening claim around it. "
+                   "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
+                   "For each one found, the entry must contain a sentence that directly addresses it — either incorporating it as a qualification or steelmanning your thesis against it. "
+                   "If no such sentence exists in your draft, the entry is not ready to publish. "
+                   "(4) Use remaining bullets as supporting evidence or complication. "
+                   "THREAD SELECTION RULE: Before writing, identify all available threads for this company. "
+                   "Ask: can I identify a single thread where the sources contain the most specific bullets and at least one contradicting bullet? Write that thread only. "
+                   "Do not combine threads unless they share a specific mechanism — a specific causal chain, failure mode, or design implication. A shared category label ('AI', 'cloud', 'regulation') is not a mechanism. "
+                   "If you cannot name a mechanism that meets this condition from at least one source bullet, cut to the strongest single thread. "
+                   "A tight 2-sentence entry built on one deep thread is stronger than a 4-sentence entry that skims three stories. "
+                   "DROPPED BULLET REVIEW: After writing, review every bullet you did NOT use and apply these two tests: "
+                   "(1) STRONGER INSIGHT TEST: Does this bullet contain a more specific, actionable, or non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
+                   "(2) SCOPE TEST: Does this bullet limit the scope of the closing implication in a way that materially changes its applicability? If yes, add the qualifier or revise. "
+                   "If yes to either, revise before publishing. "
                    "METRICS PRESERVATION RULE: If a source contains a specific number (dollar amount, percentage, named product, date), include it if it supports the entry. Named companies, products, and dollar figures ground the entry. "
                    "SCOPE FIDELITY RULE: Reflect the actual scope stated in the source. If a source explicitly limits scope (e.g. 'non-safety parts only'), the entry must reflect that limit, not expand it. "
-                   "INFERENCE BOUNDARY RULE: Do not assert competitive framings, strategic motivations, or market positions not explicitly stated in the source. "
-                   "The closing implication must be traceable to a specific bullet in a cited source. Frame synthesizer reasoning as inference: 'this suggests...' not 'this demonstrates...' "
-                   "CONTRADICTION MANDATE: If any cited source contains a named data point, explicit claim, or product detail that directly challenges or complicates "
-                   "the entry's central framing, it must appear in the entry or the framing must be revised. "
-                   "THEMATIC COMBINATION RULE: Multiple signals for the same company may only appear in the same entry if they share a specific mechanism — "
-                   "not just a shared category label ('AI', 'cloud', 'regulation', 'growth'). "
-                   "If the best you can say is 'both involve X category,' cut to the stronger single signal. "
-                   "SINGLE THREAD ENFORCEMENT: If a company has sources covering 3 or more separate business unit moves (e.g. infrastructure, consumer product, and advertising), "
-                   "do not attempt to combine all of them under one entry. Select the single richest thread — the one where the sources contain the most specific bullets, "
-                   "the sharpest contradiction, or the most non-obvious strategic implication — and build the entire entry around that thread. "
-                   "Mentioning every available story is a failure mode. A tight 2-sentence entry built on one deep thread is stronger than a 4-sentence entry that skims three stories. "
-                   "THREAD SELECTION TEST: Before writing, list all available threads for this company. Ask: which single thread has (a) the most specific source bullets, "
-                   "(b) a contradiction or tension available from the CONTRADICTION MANDATE, and (c) the most non-obvious closing implication? Write that thread only.",
+                   "CLOSING SENTENCE RULE: Sentence 3 must pass all three tests before publishing: "
+                   "(1) SINGLE CONSEQUENCE: Contains exactly one actionable consequence. Do not use 'and,' 'but also,' 'as well as,' or 'while also.' If you find yourself writing a conjunction, stop — delete everything after it. "
+                   "(2) SOURCE TRACEABILITY: Traces directly to a specific bullet in a cited source. If you cannot identify that bullet, reframe as 'this suggests...' not 'this demonstrates...' "
+                   "(3) NO CONSTRUCTED ACTION: Does not assert competitive framings, strategic motivations, or market positions not explicitly stated in the source. If inferred, frame as 'this suggests...' not 'this demonstrates...' "
+                   "If sentence 3 fails any of (1)-(3), rewrite before publishing.",
       "source_indices": []
     }},
     "Meta": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
@@ -532,46 +471,80 @@ Produce a structured JSON object:
       "bullet": "2-3 items on early-stage or emerging companies making unexpected moves. "
                 "Structure each bullet as: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. "
                 "Only include early-stage or emerging companies — do not include established large-cap companies. "
-                "IMPLICATION FOCUS RULE: Each bullet must close with exactly one strategic consequence. Cut any 'and' connecting two separate consequences. "
-                "METRICS PRESERVATION RULE: Include the funding amount, round size, or key metric from the source. Do not omit specific numbers that ground the strategic claim. "
-                "ANCHOR SELECTION RULE: Before writing each bullet, rank ALL insight bullets "
-                "for that source by non-obviousness. The most non-obvious bullet is the one that: "
+                "PARAGRAPH INTEGRITY RULE: These constraints apply to the entire bullet, not just the closing: "
+                "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere. 'This suggests...' not 'This demonstrates...' "
+                "(2) NO TIMELINE: Do not assert a specific timeline unless it appears verbatim in a source bullet. If no source names it, remove it. "
+                "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly when sources show 1-3 examples. Scope it: 'in categories where X applies...' "
+                "ANCHOR SELECTION RULE: Before writing each bullet, complete these steps in order: "
+                "(1) Rank ALL insight bullets for that source by non-obviousness. The most non-obvious bullet is the one that: "
                 "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
                 "(b) contradicts or qualifies the headline's apparent conclusion, or "
                 "(c) reveals a mechanism the headline actively obscures. "
-                "Start from the highest-ranked bullet. Build your radar bullet around it. "
-                "Use remaining bullets as supporting evidence only. "
-                "Do not start from bullet 1 unless it is genuinely the most non-obvious — "
-                "it rarely is. The summarizer orders bullets from most abstract to most specific. "
-                "The strongest insight is almost never the first bullet. "
-                "OMISSION CHECK: After writing, identify the highest-value bullet you did NOT use. "
-                "If it contains a sharper insight than what you anchored to, restart from that bullet instead. "
-                "VERBATIM COPY CHECK: If your bullet text closely resembles the source bullet text word-for-word, you have copied rather than synthesized. "
-                "Rewrite: the bullet should name the pattern the source example reveals, not describe the example itself. "
-                "The source example is evidence. Your bullet is the insight the evidence supports. "
-                "COMPLICATION MANDATE: If any cited source contains a bullet that contradicts, qualifies, or significantly complicates the bullet's central claim, "
-                "that bullet MUST appear or the framing must be revised. This is not optional. "
-                "QUALIFIER PRESERVATION CHECK: If the source uses hedged language, your closing consequence must match that hedge level. "
-                "INFERENCE BOUNDARY RULE: Do not assert a specific multiplier, ratio, or benchmark unless it appears verbatim in the source. Inferred benchmarks must use 'suggests' or 'implies' framing, never assertion. "
-                "THEMATIC COMBINATION RULE: Each startup_radar bullet must cover a single company or a single strategic pattern. "
-                "Do not combine two unrelated companies or two unrelated stories into one bullet under a shared category label. "
-                "If two stories share only a category but not a specific causal mechanism or shared implication, they belong in separate bullets.",
+                "(2) Identify the highest-ranked bullet. Build your radar bullet around it. "
+                "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
+                "For each one found, the bullet must contain a sentence that directly addresses it — either incorporating it as a qualification or steelmanning your thesis against it. "
+                "If no such sentence exists in your draft, the bullet is not ready to publish. "
+                "(4) Use remaining bullets as supporting evidence only. Do not start from bullet 1 unless it is genuinely the most non-obvious — it rarely is. Bullets 2-4 contain the most specific mechanisms, named products, concrete tradeoffs, and verifiable numbers. "
+                "VERBATIM COPY CHECK: After writing each bullet, read the source bullet text and your output side by side. "
+                "If more than 4 consecutive words appear in the same order in both, you have copied rather than synthesized — rewrite. "
+                "The structural test: your bullet must name the PATTERN or MECHANISM the source example reveals, not describe the example itself. "
+                "Apply this two-step rewrite test before finalizing: "
+                "(1) EXAMPLE TEST: Identify the named company or event in your bullet. Ask: is my bullet primarily describing what this company did? "
+                "If yes, rewrite to lead with what this example reveals about a broader pattern, constraint, or market dynamic — then use the company as evidence. "
+                "(2) SUBSTITUTION TEST: Ask: if I replaced this company with a different company doing the same thing, would my bullet still be true? "
+                "If no, your bullet is too tied to the specific event. Rewrite to name the underlying mechanism that makes the example significant. "
+                "The source example is evidence. Your bullet is the insight the evidence supports. These are different sentences. "
+                "DROPPED BULLET REVIEW: After writing, review every bullet you did NOT use and apply these two tests: "
+                "(1) STRONGER INSIGHT TEST: Does this bullet contain a more specific, actionable, or non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
+                "(2) SCOPE TEST: Does this bullet limit the scope of the closing consequence in a way that materially changes its applicability? If yes, add the qualifier or revise. "
+                "If yes to either, revise before publishing. "
+                "METRICS PRESERVATION RULE: Include the funding amount, round size, or key metric from the source. Do not omit specific numbers that ground the strategic claim. "
+                "THEMATIC COMBINATION RULE: Each bullet must cover a single company or a single strategic pattern. "
+                "Before combining two companies or stories into one bullet, ask: can I complete this sentence from a specific source bullet — "
+                "'These cases both demonstrate that [specific causal chain / failure mode / design implication]'? "
+                "If you cannot complete that sentence using words or clear implications from at least one source bullet, do not combine. "
+                "A shared category label ('AI', 'fintech', 'regulation') is not a mechanism. "
+                "If two stories share only a category but not a specific causal mechanism, they belong in separate bullets. "
+                "CLOSING SENTENCE RULE: The closing consequence must pass all three tests before publishing: "
+                "(1) SINGLE CONSEQUENCE: Contains exactly one strategic consequence. Do not use 'and,' 'but also,' 'as well as,' or 'while also.' If you find yourself writing a conjunction, stop — delete everything after it. "
+                "(2) SOURCE TRACEABILITY: Traces directly to a specific bullet in the cited source. If you cannot identify that bullet, reframe as 'this suggests...' not 'this demonstrates...' "
+                "(3) NO CONSTRUCTED ACTION: Does not assert a specific outcome, ratio, or benchmark not present in any source bullet. If inferred, use 'suggests' or 'implies' framing, never assertion. "
+                "If the closing consequence fails any of (1)-(3), rewrite before publishing.",
       "source_indices": []
     }}
   ],
   "pm_craft_today": {{
     "text": "Single most actionable PM craft insight from today's content. "
             "Draw ONLY from items tagged 'pm_craft_today ONLY' (theme: product_craft) OR items tagged 'pm_craft_today eligible (design_ux)'. "
-            "Do NOT use startup_disruption or company_strategy items for PM Craft — even if no product_craft or design_ux item is available. "
+            "Do NOT use startup_disruption or company_strategy items — even if no product_craft or design_ux item is available. "
             "If no product_craft or design_ux item is available today, set text to empty string. "
-            "Must be non-obvious — a specific pattern, tradeoff, or reframe that changes how a PM would approach a real decision. "
+            "INSIGHT QUALITY RULE: The insight must be non-obvious — a specific pattern, tradeoff, or reframe that changes how a PM would approach a real decision. "
             "Avoid generic advice. Name the specific insight: what assumption does it challenge, what decision does it change, or what pattern does it reveal? "
             "Write for a reader who has NOT read the source. "
-            "OMISSION CHECK RULE: Before finalizing, review ALL insight bullets for every cited source. "
-            "The most actionable PM craft insight may not be the first bullet — check all of them before selecting. "
-            "COMPLICATION MANDATE: If any source bullet contradicts, qualifies, or complicates the central craft insight, it must appear or the framing must be revised. "
-            "QUALIFIER PRESERVATION CHECK: Match the hedge level of the source. Do not convert 'suggests' into 'must.' "
-            "If no craft-relevant insight exists, set text to empty string.",
+            "PARAGRAPH INTEGRITY RULE: These constraints apply to the entire entry, not just the closing: "
+            "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere. "
+            "(2) NO TIMELINE: Do not assert a specific timeline unless it appears verbatim in a source bullet. If no source names it, remove it. "
+            "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly when sources show 1-3 examples. Scope it: 'in contexts where X applies...' "
+            "ANCHOR SELECTION RULE: Before drafting, complete these steps in order: "
+            "(1) Rank ALL insight bullets for every eligible source by non-obviousness. The most non-obvious bullet is the one that: "
+            "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
+            "(b) contradicts or qualifies the headline's apparent conclusion, or "
+            "(c) reveals a mechanism the headline actively obscures. "
+            "(2) Identify the highest-ranked bullet. Build the insight around it. "
+            "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
+            "For each one found, the entry must contain a sentence that directly addresses it — either incorporating it as a qualification or steelmanning your thesis against it. "
+            "If no such sentence exists in your draft, the entry is not ready to publish. "
+            "(4) Use remaining bullets as supporting evidence. Do not start from bullet 1 unless it is genuinely the most non-obvious — bullets 2-4 contain the most specific mechanisms and concrete tradeoffs. "
+            "DROPPED BULLET REVIEW: After writing, review every bullet you did NOT use and apply these two tests: "
+            "(1) STRONGER INSIGHT TEST: Does this bullet contain a more specific, actionable, or non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
+            "(2) SCOPE TEST: Does this bullet limit the scope of the closing insight in a way that materially changes its applicability? If yes, add the qualifier or revise. "
+            "If yes to either, revise before publishing. "
+            "CLOSING SENTENCE RULE: The closing sentence must pass all three tests before publishing: "
+            "(1) SINGLE CONSEQUENCE: Contains exactly one actionable consequence. Do not use 'and,' 'but also,' 'as well as,' or 'while also.' If you find yourself writing a conjunction, stop — delete everything after it. "
+            "(2) SOURCE TRACEABILITY: Traces directly to a specific bullet in a cited source. If you cannot identify that bullet, reframe as 'this suggests...' not 'this demonstrates...' "
+            "(3) NO CONSTRUCTED ACTION: Does not prescribe a specific PM action not present in any source bullet. If constructed, reframe as 'this suggests considering...' "
+            "If the closing sentence fails any of (1)-(3), rewrite before publishing. "
+            "If no craft-relevant insight exists after applying all rules above, set text to empty string.",
     "source_indices": []
   }}
 }}
@@ -587,12 +560,8 @@ Guidance:
   An NVIDIA Blog item has Company field 'NVIDIA' → it may only appear in the NVIDIA company_watch entry. Do not use it for Google or any other company.
   Company Watch entries must be built exclusively from items tagged "company_watch ONLY" whose Company field matches that company.
   If no such item exists for a given company today, set that company's paragraph to empty string.
-- COMPANY WATCH GROUNDING RULE: Do not connect two separate signals for the same company into a causal narrative unless that connection is explicitly made in the sources. Each sentence must be traceable to a specific cited source. Do not infer competitive intent, strategic motivation, or market position that the source does not explicitly state.
 - COMPANY WATCH INSIGHT RULE: Each company paragraph must answer 'what is strategically shifting for this company today' — not just 'what did they do.'
-- STARTUP RADAR RULE: Each bullet must contain a genuine 'so what' — the strategic implication, competitive threat, or market pattern revealed, not just a description of the event.
-- PM CRAFT OMIT RULE: If no item contains a craft-relevant insight, set pm_craft_today text to empty string rather than forcing a weak insight.
 - PM ACTIONABILITY RULE: Prefer concrete product design consequences over strategic observations. Does this tell a PM what to build or decide differently?
-- IMPLICATION FOCUS RULE: Every closing implication must make exactly one claim.
 - CITATION RULE: Only cite item [n] if a specific insight bullet directly supports the exact claim.
 """.strip()
 
@@ -627,10 +596,45 @@ Guidance:
 # Main orchestrator
 # ---------------------------------------------------------------------------
 
+def _persist_synthesizer_input(
+    grouped_summaries: Dict[str, List[Dict[str, Any]]],
+    today: str,
+) -> None:
+    import sqlite3
+    settings = load_settings()
+    db_path = settings.database_path
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS synthesizer_inputs ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "run_date TEXT NOT NULL, "
+            "created_at TEXT NOT NULL, "
+            "grouped_summaries TEXT NOT NULL"
+            ")"
+        )
+        conn.execute(
+            "INSERT INTO synthesizer_inputs (run_date, created_at, grouped_summaries) VALUES (?, ?, ?)",
+            (
+                today,
+                date.today().isoformat(),
+                json.dumps(grouped_summaries),
+            )
+        )
+        conn.commit()
+        conn.close()
+        logger.info("Synthesizer input persisted for %s", today)
+    except Exception as exc:
+        logger.warning("Failed to persist synthesizer input: %s", exc)
+
+
 def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
     client = _build_client()
     settings = load_settings()
     today = date.today().strftime("%B %d, %Y")
+
+    # Persist input for controlled re-runs
+    _persist_synthesizer_input(grouped_summaries, today)
 
     # ---------------------------------------------------------------------------
     # Filter items
@@ -919,11 +923,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                         company_strategy_by_company[cid] = set()
                     company_strategy_by_company[cid].add(entry["index"])
 
-        company_strategy_indices = {
-            entry["index"] for entry in dedicated_indexed
-            if entry["theme"] == "company_strategy"
-        }
-
         # 1. Multi-thread / single thesis check
         multi_thread_warnings = []
         for company, value in normalized_company_watch.items():
@@ -1181,11 +1180,11 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     "source_index": idx_val,
                     "source_title": source_info.get("title", "unknown"),
                     "source_theme": source_info.get("theme", "unknown"),
-                    "action": "VIOLATION_LOGGED",
+                    "action": "ENTRY_CLEARED",
                     "warning": (
                         f"PM Craft cites a non-product_craft source "
                         f"(theme: {source_info.get('theme', 'unknown')}). "
-                        "PM Craft should only draw from product_craft or design_ux sources."
+                        "Entry cleared — only product_craft or design_ux sources are permitted."
                     )
                 })
             logger.warning(
@@ -1195,6 +1194,8 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             print("PM CRAFT SOURCE VIOLATIONS:")
             for v in pm_craft_source_violations:
                 print(json.dumps(v, indent=2))
+            # Clear the entry — same enforcement as CW source integrity
+            pm_craft_today = {"text": "", "source_indices": []}
 
         # 6. Split implication detector
         SPLIT_SIGNALS = [
@@ -1326,13 +1327,13 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 theme_audit_warnings.append({
                     "theme": theme,
                     "paragraph_indices": paragraph_indices,
-                    "warning": f"Theme '{theme}' anchors {len(paragraph_indices)} What's Shifting paragraphs — should appear at most once",
-                    "action": "REWRITE_DUPLICATE_RECOMMENDED"
+                    "warning": f"Theme '{theme}' anchors {len(paragraph_indices)} What's Shifting paragraphs — required_anchors constraint may have failed upstream",
+                    "action": "INVESTIGATE_UPSTREAM"
                 })
 
         if theme_audit_warnings:
-            logger.warning("THEME AUDIT WARNINGS: %s", json.dumps(theme_audit_warnings, indent=2))
-            print("THEME AUDIT WARNINGS:")
+            logger.error("THEME AUDIT WARNINGS: %s", json.dumps(theme_audit_warnings, indent=2))
+            print("THEME AUDIT WARNINGS — INVESTIGATE UPSTREAM:")
             for w in theme_audit_warnings:
                 print(json.dumps(w, indent=2))
 
@@ -1352,12 +1353,12 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                             f"Theme '{theme}' has {item_count} items in the WS pool "
                             "but anchors 0 What's Shifting paragraphs — possible selection bias"
                         ),
-                        "action": "REVIEW_THEME_COVERAGE",
+                        "action": "INVESTIGATE_UPSTREAM",
                     })
 
         if theme_diversity_warnings:
-            logger.warning("THEME DIVERSITY WARNINGS: %s", json.dumps(theme_diversity_warnings, indent=2))
-            print("THEME DIVERSITY WARNINGS:")
+            logger.error("THEME DIVERSITY WARNINGS: %s", json.dumps(theme_diversity_warnings, indent=2))
+            print("THEME DIVERSITY WARNINGS — INVESTIGATE UPSTREAM (required_anchors may have failed):")
             for w in theme_diversity_warnings:
                 print(json.dumps(w, indent=2))
 
