@@ -240,27 +240,41 @@ def _call_whats_shifting(
     ws_items: List[Dict[str, Any]],
     today: str,
     ws_theme_distribution: Dict[str, int] | None = None,
+    required_anchors: List[Dict[str, Any]] | None = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     context_block, ws_indexed, _ = _build_context_block(ws_items, start_idx=1)
 
-    # Build theme availability block for diversity enforcement
+    # Build required anchors block
+    required_anchors_block = ""
+    if required_anchors:
+        anchor_lines = []
+        for a in required_anchors:
+            anchor_lines.append(f"  - {a['theme']}: \"{a['anchor_item']['title']}\"")
+        required_anchors_block = (
+            "REQUIRED PARAGRAPH ANCHORS:\n"
+            "You must produce exactly one paragraph per theme listed below.\n"
+            "Each paragraph must cover exactly one theme.\n"
+            "Do not produce more paragraphs than anchors listed.\n"
+            "Do not combine themes across paragraphs.\n"
+            "For each anchor, build the strongest possible paragraph from ALL items "
+            "in the pool that share that theme — the anchor item is your starting point, "
+            "not your only source. Pull from multiple bullets across same-theme items "
+            "to build a unified insight. Do not limit yourself to the anchor item alone.\n\n"
+            "Anchors:\n"
+            + "\n".join(anchor_lines)
+            + "\n"
+        )
+
+    # Build theme availability block (kept for evaluator transparency, no longer drives selection)
     theme_availability_lines = []
-    must_cover_themes = []
     for theme, count in sorted((ws_theme_distribution or {}).items(), key=lambda x: -x[1]):
         theme_availability_lines.append(f"  - {theme}: {count} item{'s' if count != 1 else ''}")
-        if count >= 2:
-            must_cover_themes.append(theme)
     if theme_availability_lines:
         theme_availability_block = (
-            "Available items by theme in today's pool (for THEME DIVERSITY ENFORCEMENT):\n"
+            "Available items by theme in today's pool (for reference):\n"
             + "\n".join(theme_availability_lines)
+            + "\n"
         )
-        if must_cover_themes:
-            theme_availability_block += (
-                "\nThemes with 2+ items that MUST be considered for inclusion before any theme repeats: "
-                + ", ".join(must_cover_themes)
-            )
-        theme_availability_block += "\n"
     else:
         theme_availability_block = ""
 
@@ -268,7 +282,7 @@ def _call_whats_shifting(
 You are reasoning across multiple high/medium confidence items that a Senior PM is tracking.
 Today's date is {today}.
 
-{theme_availability_block}You are given items eligible for What's Shifting analysis. Use these to produce whats_shifting paragraphs and an interview_angle.
+{required_anchors_block}{theme_availability_block}You are given items eligible for What's Shifting analysis. Use these to produce whats_shifting paragraphs and an interview_angle.
 
 Items:
 {context_block}
@@ -293,17 +307,6 @@ Produce a structured JSON object:
                    "SPLIT IMPLICATION SELF-CHECK: Count distinct actionable consequences in closing sentence. If more than one, cut the weaker. "
                    "EXAMPLE DISCIPLINE RULE: No more than three distinct examples per paragraph. "
                    "MINIMUM VIABLE PARAGRAPH RULE: If fewer than two examples pass the connective tissue test, do not publish the paragraph. "
-                   "THEME AUDIT SELF-CHECK: Before finalizing, list the central theme of each paragraph opening sentence. "
-                   "Eligible themes: AI & technology, market behavior, consumer behavior, regulation & policy, design & UX. "
-                   "No theme should appear as the central claim of more than one paragraph. "
-                   "If any theme appears twice, rewrite the weaker paragraph around a different theme. "
-                   "A four-paragraph brief with four distinct themes is better than five paragraphs with a duplicate theme. "
-                   "THEME DIVERSITY ENFORCEMENT: Before finalizing paragraph selection, actively check the available source pool for eligible themes not yet represented. "
-                   "If consumer behavior, market behavior, or design & UX sources are available in the pool but none of those themes anchor a paragraph, that is a selection failure — not a sourcing gap. "
-                   "Eligible themes with 2+ source items available must be considered for inclusion before adding a second paragraph of any already-represented theme. "
-                   "Replace the weakest duplicate-theme paragraph with a paragraph anchored to the most underrepresented eligible theme that has sufficient source material. "
-                   "A brief where AI & technology or regulation & policy anchors 3+ paragraphs while consumer behavior and design & UX are entirely absent is a breadth failure regardless of individual paragraph quality. "
-                   "The goal is maximum theme coverage across the available pool — not maximum depth on the most obvious themes. "
                    "SINGLE-SOURCE PRIORITY RULE: If a single source contributes 4 or more high-quality insight bullets, it should anchor its own standalone paragraph rather than being combined with a second source. "
                    "A deep single-source paragraph that fully develops one insight is stronger than a multi-source paragraph that skims two insights. "
                    "Only combine sources when the shared mechanism adds something neither source could deliver alone. "
@@ -374,8 +377,7 @@ Produce a structured JSON object:
                    "Ask: which specific bullet uses this mechanism, causal chain, or failure mode by name or clear implication? "
                    "If no single bullet names it, the mechanism is synthesizer-constructed and the combination is invalid. "
                    "A mechanism that only emerges when you read all bullets together and abstract upward is not a shared mechanism — it is a category label, not a mechanism. "
-                   "In that case, do not combine: treat each source as a candidate for its own standalone paragraph, then apply the THEME AUDIT SELF-CHECK to confirm no theme appears more than once. "
-                   "If combining would create a duplicate theme, keep the stronger standalone paragraph and drop the weaker. "
+                   "In that case, do not combine: treat each source as a candidate for its own standalone paragraph. "
                    "Do not proceed without completing this check. "
                    "CLOSING IMPLICATION TRACEABILITY CHECK: After writing the closing PM implication, verify that it traces independently to at least one specific bullet from EACH cited source — not just one of them. "
                    "Ask: if you removed Source A entirely, would the closing implication still hold? If yes, Source A is not genuinely contributing to the paragraph — it is decoration. "
@@ -532,12 +534,18 @@ Produce a structured JSON object:
                 "Only include early-stage or emerging companies — do not include established large-cap companies. "
                 "IMPLICATION FOCUS RULE: Each bullet must close with exactly one strategic consequence. Cut any 'and' connecting two separate consequences. "
                 "METRICS PRESERVATION RULE: Include the funding amount, round size, or key metric from the source. Do not omit specific numbers that ground the strategic claim. "
-                "OMISSION CHECK RULE: Before finalizing each bullet, review ALL insight bullets for the cited source. "
-                "Identify the highest-value bullet you did NOT use. If omitting it buries the sharper strategic insight, use that one instead. "
-                "NON-OBVIOUS INSIGHT TEST: Before publishing each bullet, ask: would a PM who only read the headline already know this closing implication? "
-                "If yes, the bullet is restating the obvious. Rewrite it around the most non-obvious bullet in the source — "
-                "typically the bullet that names a structural constraint, a counter-intuitive tradeoff, an unintended consequence, or a mechanism that limits the headline's apparent conclusion. "
-                "The headline tells you what happened. The closing implication should tell you something the headline actively obscures or contradicts. "
+                "ANCHOR SELECTION RULE: Before writing each bullet, rank ALL insight bullets "
+                "for that source by non-obviousness. The most non-obvious bullet is the one that: "
+                "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
+                "(b) contradicts or qualifies the headline's apparent conclusion, or "
+                "(c) reveals a mechanism the headline actively obscures. "
+                "Start from the highest-ranked bullet. Build your radar bullet around it. "
+                "Use remaining bullets as supporting evidence only. "
+                "Do not start from bullet 1 unless it is genuinely the most non-obvious — "
+                "it rarely is. The summarizer orders bullets from most abstract to most specific. "
+                "The strongest insight is almost never the first bullet. "
+                "OMISSION CHECK: After writing, identify the highest-value bullet you did NOT use. "
+                "If it contains a sharper insight than what you anchored to, restart from that bullet instead. "
                 "VERBATIM COPY CHECK: If your bullet text closely resembles the source bullet text word-for-word, you have copied rather than synthesized. "
                 "Rewrite: the bullet should name the pattern the source example reveals, not describe the example itself. "
                 "The source example is evidence. Your bullet is the insight the evidence supports. "
@@ -834,9 +842,43 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         len(ws_items), len(dedicated_items)
     )
 
+    # ---------------------------------------------------------------------------
+    # Build required anchors — one per WS theme with at least one filtered item
+    # Guarantees every eligible theme gets a paragraph, not just the ones
+    # the synthesizer would naturally gravitate toward.
+    # ---------------------------------------------------------------------------
+    WHATS_SHIFTING_THEMES_ORDERED = [
+        "ai_technology",
+        "market_behavior",
+        "regulation_policy",
+        "consumer_behavior",
+        "design_ux",
+    ]
+
+    required_anchors = []
+    for theme in WHATS_SHIFTING_THEMES_ORDERED:
+        candidates = [i for i in ws_items if i["theme"] == theme]
+        if candidates:
+            best = sorted(
+                candidates,
+                key=lambda x: (
+                    0 if x.get("pm_relevance_score") == "high" else 1,
+                    0 if x.get("confidence") == "high" else 1,
+                )
+            )[0]
+            required_anchors.append({"theme": theme, "anchor_item": best})
+
+    logger.info(
+        "REQUIRED ANCHORS: %s",
+        json.dumps([{"theme": a["theme"], "title": a["anchor_item"]["title"]} for a in required_anchors])
+    )
+    print(f"REQUIRED ANCHORS: {[{'theme': a['theme'], 'title': a['anchor_item']['title']} for a in required_anchors]}")
+
     try:
         call1_parsed, ws_indexed = _call_whats_shifting(
-            client, settings, ws_items, today, ws_theme_distribution=ws_theme_dist
+            client, settings, ws_items, today,
+            ws_theme_distribution=ws_theme_dist,
+            required_anchors=required_anchors,
         )
 
         start_idx = len(ws_indexed) + 1
