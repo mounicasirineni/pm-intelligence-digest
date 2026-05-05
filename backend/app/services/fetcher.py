@@ -15,7 +15,7 @@ HEADERS = {
     )
 }
 
-MIN_WORD_THRESHOLD = 50
+MIN_WORD_THRESHOLD = 100
 
 BLOCKED_DOMAINS = {
     "blogs.microsoft.com",
@@ -24,12 +24,26 @@ BLOCKED_DOMAINS = {
     "www.politico.com",
 }
 
+PAYWALL_SIGNALS = [
+    "subscribe to continue",
+    "create a free account",
+    "sign in to read",
+    "already a subscriber",
+    "get unlimited access",
+    "this article is for subscribers",
+]
+
 
 def _get_domain(url: str) -> str:
     try:
         return urlparse(url).netloc.lower()
     except Exception:
         return ""
+
+
+def _is_paywalled(text: str) -> bool:
+    lower = text.lower()
+    return any(signal in lower for signal in PAYWALL_SIGNALS)
 
 
 def fetch_article_text(url: str, timeout: int = 10) -> str:
@@ -62,11 +76,17 @@ def fetch_article_text(url: str, timeout: int = 10) -> str:
                          "header", "aside", "form"]):
             tag.decompose()
 
-        for selector in ["article", "main", "[role='main']", "body"]:
+        for selector in ["article", "main", "[role='main']"]:
             container = soup.select_one(selector)
             if container:
                 text = container.get_text(separator=" ", strip=True)
                 if len(text.split()) >= MIN_WORD_THRESHOLD:
+                    if _is_paywalled(text):
+                        logger.warning(
+                            "Paywall detected for %s — "
+                            "will use RSS summary only", url
+                        )
+                        return ""
                     return text
 
         return ""

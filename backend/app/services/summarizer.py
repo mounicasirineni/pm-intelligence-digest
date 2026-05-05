@@ -161,6 +161,14 @@ Guidance:
     medium = tangentially relevant; useful context but not a likely interview topic
     low    = not relevant to PM interview prep (e.g. sports tech, celebrity news, off-topic content)
   ROUTINE UPDATE RULE: Content that reports routine operational activity without revealing strategic intent scores low, even if published by a major company. This includes: weekly content additions (new games, new titles, new episodes), cadence-driven posts (GFN Thursday, weekly roundups), minor feature releases with no architectural significance, and event listings or award announcements. A post scores medium or high only if it explains WHY the company made a move, WHAT it reveals about competitive positioning or product direction, or WHAT new capability it demonstrates. The company name alone does not determine the score — the strategic signal does.
+  DOMAIN FILTER RULE: The following content domains score low regardless of
+  whether a PM analogy can be constructed from them: foreign policy, military
+  operations, geopolitical negotiations, domestic party politics, celebrity news,
+  and sports. A story about naval operations in the Strait of Hormuz is a foreign
+  policy story even if a regulatory framing analogy exists. A PM analogy that
+  requires translating the content through two or more conceptual layers (military
+  posture → negotiation strategy → compliance framing) does not qualify as
+  tangential relevance — it qualifies as inference. Score low.
 - COMPANY MATURITY RULE: If this article's primary subject is a named company, assess whether that company is early-stage or established. Set "company_maturity" to:
     startup     = primary subject is an early-stage, emerging, or privately held company valued below $1B without dominant market position
     established = primary subject is (a) a publicly traded company, (b) a subsidiary of one, OR (c) a privately held company with $1B+ valuation AND significant market presence
@@ -171,7 +179,16 @@ Guidance:
 - SCOPE RULE: Assess whether this article describes a pattern affecting multiple companies or an entire product category ('cross_market'), or whether it is primarily about one named company's specific regulatory situation, legal case, government contract, or product decision ('company_specific').
     cross_market    = the article's central claim applies to an industry, a product category, or a regulatory framework that affects multiple companies or builders. Example: an EFF article about how 3D printer regulations create repurposable censorship infrastructure is cross_market. An MIT Technology Review article about plastics supply chain vulnerabilities is cross_market.
     company_specific = the article is primarily about what one named company did, faces, or decided. Example: a TechCrunch article about Google's new API is company_specific. An RTI filing about OpenAI's military contract is company_specific.
-  This field is used downstream to route regulation_policy articles — only cross_market articles are eligible for What's Shifting. Company_specific articles route to Company Watch or are dropped.
+  DESIGN_UX SCOPE NOTE: Articles about design patterns, UX frameworks, or product
+  craft that use named companies as examples (not as primary subjects) are
+  cross_market. The test is whether the central claim applies to any builder in
+  that category, not whether a company name appears in the article. An article
+  arguing that AI products require trust infrastructure — illustrated with AWS as
+  an example — is cross_market because the claim applies to any AI product builder,
+  not only to AWS.
+  This field is used downstream to route regulation_policy and design_ux articles —
+  only cross_market articles are eligible for What's Shifting.
+  Company_specific articles route to Company Watch or are dropped.
 - "pm_interview_relevance" should be a one-line text explanation supporting your pm_relevance_score judgment.
 - "confidence" should reflect how well the content body above supports producing accurate, grounded insight bullets — it is a self-assessment of source quality, NOT a judgment of topic interest. Ask: how much of what I would write comes from the content body vs. from my own training knowledge?
     high   = content body is substantive (300+ words of original reporting, analysis, or primary source material) and provides enough specific detail to write 3-5 grounded bullets without drawing on outside knowledge
@@ -265,6 +282,22 @@ Guidance:
     scope = str(parsed.get("scope") or "cross_market").lower()
     if scope not in {"cross_market", "company_specific"}:
         scope = "cross_market"
+
+    # FIX: Log scope and all key output fields so routing decisions are
+    # visible in Railway logs and can be verified per-item.
+    logger.info(
+        "SUMMARIZER OUTPUT for '%s': score=%s, confidence=%s, scope=%s, maturity=%s",
+        title,
+        pm_relevance_score,
+        confidence,
+        scope,
+        company_maturity,
+    )
+    print(
+        f"SUMMARIZER OUTPUT for '{title}': "
+        f"score={pm_relevance_score}, confidence={confidence}, "
+        f"scope={scope}, maturity={company_maturity}"
+    )
 
     return {
         "insights": insights,

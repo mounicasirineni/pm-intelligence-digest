@@ -4,8 +4,9 @@ import json
 import logging
 import re
 import traceback
+import uuid
 from datetime import date
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 from anthropic import Anthropic
 
@@ -29,6 +30,7 @@ DEDICATED_SECTION_THEMES = {
     "startup_disruption",
     "product_craft",
 }
+
 
 # ---------------------------------------------------------------------------
 # System prompt — shared across both calls
@@ -125,6 +127,9 @@ def _build_context_block(
 
         indexed_items.append({
             "index": idx,
+            # FIX 2+3: Carry stable item_id so post-Call-1 deduplication
+            # can match consumed items without relying on title strings.
+            "item_id": item.get("item_id"),
             "theme": item["theme"],
             "title": item["title"],
             "source_name": item["source_name"],
@@ -265,7 +270,7 @@ def _call_whats_shifting(
             + "\n"
         )
 
-    # Build theme availability block (kept for evaluator transparency, no longer drives selection)
+    # Build theme availability block
     theme_availability_lines = []
     for theme, count in sorted((ws_theme_distribution or {}).items(), key=lambda x: -x[1]):
         theme_availability_lines.append(f"  - {theme}: {count} item{'s' if count != 1 else ''}")
@@ -283,6 +288,16 @@ You are reasoning across multiple high/medium confidence items that a Senior PM 
 Today's date is {today}.
 
 {required_anchors_block}{theme_availability_block}You are given items eligible for What's Shifting analysis. Use these to produce whats_shifting paragraphs and an interview_angle.
+
+WHAT'S SHIFTING CONTENT BOUNDARY:
+What's Shifting covers structural shifts in markets, technology landscapes, or regulatory
+environments — forces that are changing the conditions under which products are built or
+compete. It does NOT cover practitioner process advice, sprint methodology, documentation
+practices, or product craft frameworks — even when those topics are derived from market
+shifts. If a bullet tells a practitioner what to do differently in their day-to-day work
+(reframe sprint planning, change documentation habits, adopt a new design process), it
+belongs in PM Craft, not What's Shifting. The test: does this bullet describe a change in
+the world, or a change in what a PM should do? The former belongs here. The latter does not.
 
 Items:
 {context_block}
@@ -307,17 +322,18 @@ Produce a structured JSON object:
                    "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere in the paragraph. 'This suggests...' not 'This demonstrates...' "
                    "(2) NO TIMELINE: Do not assert a specific timeline ('within weeks,' 'before the window closes,' 'within a year') unless that timeline appears verbatim in a source bullet. If no source names it, remove it. "
                    "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly ('all platforms,' 'every PM,' 'any company') when sources show 1-3 examples. Scope it: 'in categories where X applies...' or 'among companies that...' "
-                   "ANCHOR SELECTION RULE: Before drafting each paragraph, complete these steps in order: "
+                   "ANCHOR SELECTION RULE: Before drafting each paragraph, complete these steps in order AND include a brief ANCHOR REASONING comment before the paragraph text showing your work: "
                    "(1) Rank ALL insight bullets across every source eligible for that theme by non-obviousness. The most non-obvious bullet is the one that: "
                    "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
                    "(b) contradicts or qualifies the headline's apparent conclusion, or "
                    "(c) reveals a mechanism the headline actively obscures. "
                    "(2) Identify the highest-ranked bullet. This is your anchor — build the paragraph's opening claim around it. "
+                   "Do not default to bullet 1 of the first source. Bullets 2-5 often contain the most specific mechanisms, "
+                   "named products, concrete tradeoffs, and diagnostic tests. Start there. "
                    "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
                    "For each one found, the paragraph must contain a sentence that directly addresses it — either incorporating it as a qualification or steelmanning your thesis against it. "
                    "If no such sentence exists in your draft, the paragraph is not ready to publish. "
-                   "(4) Use remaining bullets as supporting evidence or complication. Do not start from bullet 1 of the first source unless it is genuinely the most non-obvious — "
-                   "it rarely is. Bullets 2-4 contain the most specific mechanisms, named products, concrete tradeoffs, and verifiable numbers. "
+                   "(4) Use remaining bullets as supporting evidence or complication. "
                    "COMBINATION AND CONSTRUCTION RULE: "
                    "Before combining two sources into one paragraph, ask: can I complete this sentence from a specific source bullet — "
                    "'These sources both demonstrate that [specific causal chain / failure mode / design implication]'? "
@@ -428,7 +444,7 @@ Produce a structured JSON object:
                    "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere. 'This suggests...' not 'This demonstrates...' "
                    "(2) NO TIMELINE: Do not assert a specific timeline unless it appears verbatim in a source bullet. If no source names it, remove it. "
                    "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly when sources show 1-3 examples. Scope it: 'in categories where X applies...' "
-                   "ANCHOR SELECTION RULE: Before drafting, complete these steps in order: "
+                   "ANCHOR SELECTION RULE: Before drafting, complete these steps in order AND include a brief ANCHOR REASONING comment showing your work: "
                    "(1) Rank ALL insight bullets for this company's sources by non-obviousness. The most non-obvious bullet is the one that: "
                    "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
                    "(b) contradicts or qualifies the headline's apparent conclusion, or "
@@ -475,16 +491,17 @@ Produce a structured JSON object:
                 "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere. 'This suggests...' not 'This demonstrates...' "
                 "(2) NO TIMELINE: Do not assert a specific timeline unless it appears verbatim in a source bullet. If no source names it, remove it. "
                 "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly when sources show 1-3 examples. Scope it: 'in categories where X applies...' "
-                "ANCHOR SELECTION RULE: Before writing each bullet, complete these steps in order: "
+                "ANCHOR SELECTION RULE: Before writing each bullet, complete these steps in order AND include a brief ANCHOR REASONING comment showing your work: "
                 "(1) Rank ALL insight bullets for that source by non-obviousness. The most non-obvious bullet is the one that: "
                 "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
                 "(b) contradicts or qualifies the headline's apparent conclusion, or "
                 "(c) reveals a mechanism the headline actively obscures. "
                 "(2) Identify the highest-ranked bullet. Build your radar bullet around it. "
+                "Do not default to bullet 1 — bullets 2-4 contain the most specific mechanisms, named tradeoffs, and verifiable numbers. "
                 "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
-                "For each one found, the bullet must contain a sentence that directly addresses it — either incorporating it as a qualification or steelmanning your thesis against it. "
+                "For each one found, the bullet must contain a sentence that directly addresses it. "
                 "If no such sentence exists in your draft, the bullet is not ready to publish. "
-                "(4) Use remaining bullets as supporting evidence only. Do not start from bullet 1 unless it is genuinely the most non-obvious — it rarely is. Bullets 2-4 contain the most specific mechanisms, named products, concrete tradeoffs, and verifiable numbers. "
+                "(4) Use remaining bullets as supporting evidence only. "
                 "VERBATIM COPY CHECK: After writing each bullet, read the source bullet text and your output side by side. "
                 "If more than 4 consecutive words appear in the same order in both, you have copied rather than synthesized — rewrite. "
                 "The structural test: your bullet must name the PATTERN or MECHANISM the source example reveals, not describe the example itself. "
@@ -525,23 +542,24 @@ Produce a structured JSON object:
             "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere. "
             "(2) NO TIMELINE: Do not assert a specific timeline unless it appears verbatim in a source bullet. If no source names it, remove it. "
             "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly when sources show 1-3 examples. Scope it: 'in contexts where X applies...' "
-            "ANCHOR SELECTION RULE: Before drafting, complete these steps in order: "
+            "ANCHOR SELECTION RULE: Before drafting, complete these steps in order AND include a brief ANCHOR REASONING comment showing your work: "
             "(1) Rank ALL insight bullets for every eligible source by non-obviousness. The most non-obvious bullet is the one that: "
             "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
             "(b) contradicts or qualifies the headline's apparent conclusion, or "
             "(c) reveals a mechanism the headline actively obscures. "
             "(2) Identify the highest-ranked bullet. Build the insight around it. "
+            "Do not default to bullet 1 — bullets 2-4 contain the most specific mechanisms and concrete tradeoffs. "
             "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
-            "For each one found, the entry must contain a sentence that directly addresses it — either incorporating it as a qualification or steelmanning your thesis against it. "
+            "For each one found, the entry must contain a sentence that directly addresses it. "
             "If no such sentence exists in your draft, the entry is not ready to publish. "
-            "(4) Use remaining bullets as supporting evidence. Do not start from bullet 1 unless it is genuinely the most non-obvious — bullets 2-4 contain the most specific mechanisms and concrete tradeoffs. "
+            "(4) Use remaining bullets as supporting evidence. "
             "DROPPED BULLET REVIEW: After writing, review every bullet you did NOT use and apply these two tests: "
             "(1) STRONGER INSIGHT TEST: Does this bullet contain a more specific, actionable, or non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
             "(2) SCOPE TEST: Does this bullet limit the scope of the closing insight in a way that materially changes its applicability? If yes, add the qualifier or revise. "
             "If yes to either, revise before publishing. "
             "CLOSING SENTENCE RULE: The closing sentence must pass all three tests before publishing: "
             "(1) SINGLE CONSEQUENCE: Contains exactly one actionable consequence. Do not use 'and,' 'but also,' 'as well as,' or 'while also.' If you find yourself writing a conjunction, stop — delete everything after it. "
-            "(2) SOURCE TRACEABILITY: Traces directly to a specific bullet in a cited source. If you cannot identify that bullet, reframe as 'this suggests...' not 'this demonstrates...' "
+            "(2) SOURCE TRACEABILITY: Traces directly to a specific bullet in a cited source. If you cannot identify that bullet, reframe as 'this suggests considering...' not 'this demonstrates...' "
             "(3) NO CONSTRUCTED ACTION: Does not prescribe a specific PM action not present in any source bullet. If constructed, reframe as 'this suggests considering...' "
             "If the closing sentence fails any of (1)-(3), rewrite before publishing. "
             "If no craft-relevant insight exists after applying all rules above, set text to empty string.",
@@ -645,6 +663,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
     for theme, items in grouped_summaries.items():
         for item in items:
+
             conf_raw = str(item.get("confidence") or "low").lower()
             if conf_raw not in {"high", "medium"}:
                 dropped_low_confidence += 1
@@ -665,14 +684,17 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
             company_maturity = str(item.get("company_maturity") or "not_applicable").lower()
 
-            if theme == "startup_disruption" and company_maturity == "established":
+            if theme == "startup_disruption" and company_maturity != "startup":
                 logger.info(
-                    "FILTER [step=3 reason=established_company_in_startup_radar] dropped: %s — %s",
-                    item.get("source_name"), item.get("title")
+                "FILTER [step=3 reason=non_startup_in_startup_radar] dropped: %s — %s",
+                item.get("source_name"), item.get("title")
                 )
                 continue
 
             filtered_items.append({
+                # FIX 2+3: Assign a stable item_id here so deduplication
+                # after Call 1 can match by ID rather than title string.
+                "item_id": str(uuid.uuid4()),
                 "theme": theme,
                 "title": item.get("title", ""),
                 "source_name": item.get("source_name", ""),
@@ -751,9 +773,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
     # ---------------------------------------------------------------------------
     # Source diversity cap — applied before synthesis
-    # High relevance items from each source are retained first.
-    # Once a source hits MAX_ITEMS_PER_SOURCE, additional items are held in
-    # overflow and only restored if their theme has zero other representation.
     # ---------------------------------------------------------------------------
     MAX_ITEMS_PER_SOURCE = 3
 
@@ -799,6 +818,8 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
     # ---------------------------------------------------------------------------
     # Partition by routing eligibility
+    # FIX 3: design_ux items only enter ws_items if scope is cross_market.
+    # Company_specific design_ux items go to dedicated only (PM Craft).
     # ---------------------------------------------------------------------------
     ws_items = []
     dedicated_items = []
@@ -817,15 +838,24 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     item.get("source_name"), item.get("title")
                 )
                 dedicated_items.append(item)
-            else:
-                ws_items.append(item)
-                if theme == "design_ux":
-                    # design_ux items are eligible for both WS and PM Craft
-                    dedicated_items.append(item)
+            elif theme == "design_ux":
+                # FIX 3: Only route design_ux to WS if cross_market scope.
+                # Always add to dedicated for PM Craft eligibility;
+                # consumed state resolved after Call 1 (FIX 2).
+                if scope == "cross_market":
+                    ws_items.append(item)
                     logger.info(
-                        "ROUTING [design_ux dual-routed to ws_items + dedicated_items]: %s — %s",
+                        "ROUTING [design_ux cross_market → ws_items + dedicated_items]: %s — %s",
                         item.get("source_name"), item.get("title")
                     )
+                else:
+                    logger.info(
+                        "ROUTING [design_ux company_specific → dedicated_items only]: %s — %s",
+                        item.get("source_name"), item.get("title")
+                    )
+                dedicated_items.append(item)
+            else:
+                ws_items.append(item)
 
     # Theme funnel stage 3: after partition
     ws_theme_dist: Dict[str, int] = {}
@@ -848,8 +878,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
     # ---------------------------------------------------------------------------
     # Build required anchors — one per WS theme with at least one filtered item
-    # Guarantees every eligible theme gets a paragraph, not just the ones
-    # the synthesizer would naturally gravitate toward.
     # ---------------------------------------------------------------------------
     WHATS_SHIFTING_THEMES_ORDERED = [
         "ai_technology",
@@ -884,6 +912,40 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             ws_theme_distribution=ws_theme_dist,
             required_anchors=required_anchors,
         )
+
+        # FIX 2: After Call 1, identify which item_ids were actually consumed
+        # in WS paragraphs and remove them from dedicated_items so PM Craft
+        # (Call 2) cannot reuse the same article.
+        normalized_ws_early = _normalize_whats_shifting(call1_parsed.get("whats_shifting") or [])
+        ws_used_indices: Set[int] = set()
+        for ws in normalized_ws_early:
+            ws_used_indices.update(ws.get("source_indices", []))
+
+        # Map consumed WS indices back to item_ids via ws_indexed
+        ws_used_item_ids: Set[str] = set()
+        for entry in ws_indexed:
+            if entry["index"] in ws_used_indices and entry.get("item_id"):
+                ws_used_item_ids.add(entry["item_id"])
+
+        if ws_used_item_ids:
+            before_count = len(dedicated_items)
+            dedicated_items = [
+                item for item in dedicated_items
+                if item.get("item_id") not in ws_used_item_ids
+            ]
+            after_count = len(dedicated_items)
+            removed = before_count - after_count
+            if removed:
+                logger.info(
+                    "DEDUP [ws_consumed]: Removed %d design_ux item(s) from dedicated_items "
+                    "already consumed by WS. item_ids=%s",
+                    removed,
+                    ws_used_item_ids,
+                )
+                print(
+                    f"DEDUP [ws_consumed]: Removed {removed} item(s) from dedicated_items "
+                    f"already consumed by WS."
+                )
 
         start_idx = len(ws_indexed) + 1
         call2_parsed, dedicated_indexed = _call_dedicated_sections(
@@ -1194,7 +1256,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             print("PM CRAFT SOURCE VIOLATIONS:")
             for v in pm_craft_source_violations:
                 print(json.dumps(v, indent=2))
-            # Clear the entry — same enforcement as CW source integrity
             pm_craft_today = {"text": "", "source_indices": []}
 
         # 6. Split implication detector
@@ -1220,9 +1281,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     if len(parts) == 2:
                         before_words = len(parts[0].split())
                         after_words = len(parts[1].split())
-                        # Raised threshold from 6 to 10 words on each side
-                        # to reduce false positives on list constructions
-                        # and single-implication sentences with conjunctions
                         if before_words >= 10 and after_words >= 10:
                             split_implication_warnings.append({
                                 "section": section,
@@ -1247,10 +1305,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 print(json.dumps(w, indent=2))
 
         # 7. Theme audit for What's Shifting
-        # Classification uses the paragraph's opening sentence content rather than
-        # the source's feed-level theme tag, which caused systematic miscounting
-        # when MIT Tech Review (tagged ai_technology) was cited in market_behavior
-        # or regulation_policy paragraphs.
         THEME_KEYWORDS: Dict[str, List[str]] = {
             "regulation_policy": [
                 "regulat", "law", "legal", "court", "legislat", "policy", "government",
@@ -1283,25 +1337,16 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         }
 
         def _classify_paragraph_theme(paragraph: str) -> str:
-            """
-            Classify a paragraph's central theme from its opening sentence.
-            Uses keyword matching with priority ordering so more specific themes
-            win over ai_technology when both match.
-            """
             if not paragraph:
                 return "unknown"
-            # Use first sentence only — the opening claim determines the theme
             first_sentence = re.split(r"(?<=[.!?])\s+", paragraph.strip())[0].lower()
-            # Strip inline citations so [1] doesn't interfere
             first_sentence = re.sub(r"\[\d+\]", "", first_sentence)
 
-            # Score each theme by keyword hit count
             scores: Dict[str, int] = {}
             for theme, keywords in THEME_KEYWORDS.items():
                 scores[theme] = sum(1 for kw in keywords if kw in first_sentence)
 
             best_theme = max(scores, key=lambda t: scores[t])
-            # If no keywords matched at all, fall back to source tag
             if scores[best_theme] == 0:
                 return "unknown"
             return best_theme
@@ -1311,7 +1356,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         for i, ws in enumerate(normalized_whats_shifting):
             paragraph = ws.get("paragraph", "")
             theme = _classify_paragraph_theme(paragraph)
-            # Fall back to source tag only if keyword classifier returns unknown
             if theme == "unknown":
                 indices = ws.get("source_indices", [])
                 if indices:
@@ -1338,7 +1382,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 print(json.dumps(w, indent=2))
 
         # 8. Theme diversity warnings
-        # Check if any theme with 2+ items in the WS pool anchors zero paragraphs.
         theme_diversity_warnings = []
         ws_paragraph_theme_counts = {t: len(idxs) for t, idxs in ws_theme_counts.items()}
         for theme, item_count in ws_theme_dist.items():
