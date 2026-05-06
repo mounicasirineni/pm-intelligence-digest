@@ -143,14 +143,16 @@ def _build_context_block(
 def _normalize_whats_shifting(raw: Any) -> List[Dict[str, Any]]:
     normalized: List[Dict[str, Any]] = []
     if not isinstance(raw, list):
-        return [{"paragraph": str(raw), "source_indices": []}]
+        return [{"paragraph": str(raw), "source_indices": [], "anchor_reasoning": ""}]
     for entry in raw:
         if isinstance(entry, dict):
             paragraph = entry.get("paragraph") or entry.get("text") or ""
             indices = entry.get("source_indices") or entry.get("sources") or []
+            anchor_reasoning = str(entry.get("anchor_reasoning") or "")
         else:
             paragraph = str(entry)
             indices = []
+            anchor_reasoning = ""
         if not isinstance(indices, list):
             indices = [indices]
         cleaned: List[int] = []
@@ -160,7 +162,11 @@ def _normalize_whats_shifting(raw: Any) -> List[Dict[str, Any]]:
             except Exception:
                 continue
         paragraph = _strip_date_check_flags(paragraph)
-        normalized.append({"paragraph": paragraph, "source_indices": cleaned})
+        normalized.append({
+            "paragraph": paragraph,
+            "source_indices": cleaned,
+            "anchor_reasoning": anchor_reasoning,
+        })
     return normalized
 
 
@@ -306,6 +312,14 @@ Produce a structured JSON object:
 {{
   "whats_shifting": [
     {{
+      "anchor_reasoning": "Record your anchor selection work here before drafting. "
+                          "(1) List ALL insight bullets across every source eligible for this theme, ranked by non-obviousness. "
+                          "The most non-obvious bullet: (a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
+                          "(b) contradicts or qualifies the headline's apparent conclusion, or "
+                          "(c) reveals a mechanism the headline actively obscures. "
+                          "(2) Name the highest-ranked bullet and explain why it is the anchor. "
+                          "(3) List any bullets that contradict or qualify the anchor's claim and how you will address them. "
+                          "This field is for internal reasoning only — it will not appear in the digest.",
       "paragraph": "Each paragraph must: "
                    "(1) open with a single declarative sentence naming the underlying force or pattern — not an event description; "
                    "(2) develop the insight across 3-4 sentences by connecting signals from different sources or themes to reveal something non-obvious; "
@@ -322,18 +336,13 @@ Produce a structured JSON object:
                    "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere in the paragraph. 'This suggests...' not 'This demonstrates...' "
                    "(2) NO TIMELINE: Do not assert a specific timeline ('within weeks,' 'before the window closes,' 'within a year') unless that timeline appears verbatim in a source bullet. If no source names it, remove it. "
                    "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly ('all platforms,' 'every PM,' 'any company') when sources show 1-3 examples. Scope it: 'in categories where X applies...' or 'among companies that...' "
-                   "ANCHOR SELECTION RULE: Before drafting each paragraph, complete these steps in order AND include a brief ANCHOR REASONING comment before the paragraph text showing your work: "
-                   "(1) Rank ALL insight bullets across every source eligible for that theme by non-obviousness. The most non-obvious bullet is the one that: "
-                   "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
-                   "(b) contradicts or qualifies the headline's apparent conclusion, or "
-                   "(c) reveals a mechanism the headline actively obscures. "
-                   "(2) Identify the highest-ranked bullet. This is your anchor — build the paragraph's opening claim around it. "
+                   "ANCHOR SELECTION RULE: Record your anchor selection reasoning in the anchor_reasoning field. Then draft the paragraph opening around the highest-ranked bullet identified there. "
                    "Do not default to bullet 1 of the first source. Bullets 2-5 often contain the most specific mechanisms, "
                    "named products, concrete tradeoffs, and diagnostic tests. Start there. "
-                   "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
+                   "Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
                    "For each one found, the paragraph must contain a sentence that directly addresses it — either incorporating it as a qualification or steelmanning your thesis against it. "
                    "If no such sentence exists in your draft, the paragraph is not ready to publish. "
-                   "(4) Use remaining bullets as supporting evidence or complication. "
+                   "Use remaining bullets as supporting evidence or complication. "
                    "COMBINATION AND CONSTRUCTION RULE: "
                    "Before combining two sources into one paragraph, ask: can I complete this sentence from a specific source bullet — "
                    "'These sources both demonstrate that [specific causal chain / failure mode / design implication]'? "
@@ -431,6 +440,14 @@ Produce a structured JSON object:
 {{
   "company_watch": {{
     "Google": {{
+      "anchor_reasoning": "Record your anchor selection work here before drafting. "
+                          "(1) List ALL insight bullets for this company's sources, ranked by non-obviousness. "
+                          "The most non-obvious bullet: (a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
+                          "(b) contradicts or qualifies the headline's apparent conclusion, or "
+                          "(c) reveals a mechanism the headline actively obscures. "
+                          "(2) Name the highest-ranked bullet and explain why it is the anchor. "
+                          "(3) List any bullets that contradict or qualify the anchor's claim and how you will address them. "
+                          "This field is for internal reasoning only — it will not appear in the digest.",
       "paragraph": "2-3 sentences of strategic signal. "
                    "Sentence 1: name what is strategically changing for this company — not news, but a shift in positioning, priority, or competitive stance. "
                    "Sentence 2: provide the evidence from cited sources with inline [n] citations. "
@@ -444,17 +461,12 @@ Produce a structured JSON object:
                    "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere. 'This suggests...' not 'This demonstrates...' "
                    "(2) NO TIMELINE: Do not assert a specific timeline unless it appears verbatim in a source bullet. If no source names it, remove it. "
                    "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly when sources show 1-3 examples. Scope it: 'in categories where X applies...' "
-                   "ANCHOR SELECTION RULE: Before drafting, complete these steps in order AND include a brief ANCHOR REASONING comment showing your work: "
-                   "(1) Rank ALL insight bullets for this company's sources by non-obviousness. The most non-obvious bullet is the one that: "
-                   "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
-                   "(b) contradicts or qualifies the headline's apparent conclusion, or "
-                   "(c) reveals a mechanism the headline actively obscures. "
+                   "ANCHOR SELECTION RULE: Record your anchor selection reasoning in the anchor_reasoning field. Then build the entry's opening claim around the highest-ranked bullet identified there. "
                    "Do not build this entry from bullet 1 alone — the most specific and verifiable content is often in bullets 2-4. "
-                   "(2) Identify the highest-ranked bullet. Build the entry's opening claim around it. "
-                   "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
+                   "Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
                    "For each one found, the entry must contain a sentence that directly addresses it — either incorporating it as a qualification or steelmanning your thesis against it. "
                    "If no such sentence exists in your draft, the entry is not ready to publish. "
-                   "(4) Use remaining bullets as supporting evidence or complication. "
+                   "Use remaining bullets as supporting evidence or complication. "
                    "THREAD SELECTION RULE: Before writing, identify all available threads for this company. "
                    "Ask: can I identify a single thread where the sources contain the most specific bullets and at least one contradicting bullet? Write that thread only. "
                    "Do not combine threads unless they share a specific mechanism — a specific causal chain, failure mode, or design implication. A shared category label ('AI', 'cloud', 'regulation') is not a mechanism. "
@@ -473,17 +485,25 @@ Produce a structured JSON object:
                    "If sentence 3 fails any of (1)-(3), rewrite before publishing.",
       "source_indices": []
     }},
-    "Meta": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
-    "Apple": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
-    "Amazon": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
-    "Netflix": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
-    "Microsoft": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
-    "NVIDIA": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
-    "OpenAI": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
-    "Anthropic": {{"paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}}
+    "Meta": {{"anchor_reasoning": "", "paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
+    "Apple": {{"anchor_reasoning": "", "paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
+    "Amazon": {{"anchor_reasoning": "", "paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
+    "Netflix": {{"anchor_reasoning": "", "paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
+    "Microsoft": {{"anchor_reasoning": "", "paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
+    "NVIDIA": {{"anchor_reasoning": "", "paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
+    "OpenAI": {{"anchor_reasoning": "", "paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}},
+    "Anthropic": {{"anchor_reasoning": "", "paragraph": "2-3 sentences of strategic signal. Same rules as Google.", "source_indices": []}}
   }},
   "startup_radar": [
     {{
+      "anchor_reasoning": "Record your anchor selection work here before drafting. "
+                          "(1) List ALL insight bullets for this source, ranked by non-obviousness. "
+                          "The most non-obvious bullet: (a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
+                          "(b) contradicts or qualifies the headline's apparent conclusion, or "
+                          "(c) reveals a mechanism the headline actively obscures. "
+                          "(2) Name the highest-ranked bullet and explain why it is the anchor. "
+                          "(3) List any bullets that contradict or qualify the anchor's claim and how you will address them. "
+                          "This field is for internal reasoning only — it will not appear in the digest.",
       "bullet": "2-3 items on early-stage or emerging companies making unexpected moves. "
                 "Structure each bullet as: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. "
                 "Only include early-stage or emerging companies — do not include established large-cap companies. "
@@ -491,17 +511,12 @@ Produce a structured JSON object:
                 "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere. 'This suggests...' not 'This demonstrates...' "
                 "(2) NO TIMELINE: Do not assert a specific timeline unless it appears verbatim in a source bullet. If no source names it, remove it. "
                 "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly when sources show 1-3 examples. Scope it: 'in categories where X applies...' "
-                "ANCHOR SELECTION RULE: Before writing each bullet, complete these steps in order AND include a brief ANCHOR REASONING comment showing your work: "
-                "(1) Rank ALL insight bullets for that source by non-obviousness. The most non-obvious bullet is the one that: "
-                "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
-                "(b) contradicts or qualifies the headline's apparent conclusion, or "
-                "(c) reveals a mechanism the headline actively obscures. "
-                "(2) Identify the highest-ranked bullet. Build your radar bullet around it. "
+                "ANCHOR SELECTION RULE: Record your anchor selection reasoning in the anchor_reasoning field. Then build your radar bullet around the highest-ranked bullet identified there. "
                 "Do not default to bullet 1 — bullets 2-4 contain the most specific mechanisms, named tradeoffs, and verifiable numbers. "
-                "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
+                "Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
                 "For each one found, the bullet must contain a sentence that directly addresses it. "
                 "If no such sentence exists in your draft, the bullet is not ready to publish. "
-                "(4) Use remaining bullets as supporting evidence only. "
+                "Use remaining bullets as supporting evidence only. "
                 "VERBATIM COPY CHECK: After writing each bullet, read the source bullet text and your output side by side. "
                 "If more than 4 consecutive words appear in the same order in both, you have copied rather than synthesized — rewrite. "
                 "The structural test: your bullet must name the PATTERN or MECHANISM the source example reveals, not describe the example itself. "
@@ -531,6 +546,14 @@ Produce a structured JSON object:
     }}
   ],
   "pm_craft_today": {{
+    "anchor_reasoning": "Record your anchor selection work here before drafting. "
+                        "(1) List ALL insight bullets for every eligible source (product_craft or design_ux), ranked by non-obviousness. "
+                        "The most non-obvious bullet: (a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
+                        "(b) contradicts or qualifies the headline's apparent conclusion, or "
+                        "(c) reveals a mechanism the headline actively obscures. "
+                        "(2) Name the highest-ranked bullet and explain why it is the anchor. "
+                        "(3) List any bullets that contradict or qualify the anchor's claim and how you will address them. "
+                        "This field is for internal reasoning only — it will not appear in the digest.",
     "text": "Single most actionable PM craft insight from today's content. "
             "Draw ONLY from items tagged 'pm_craft_today ONLY' (theme: product_craft) OR items tagged 'pm_craft_today eligible (design_ux)'. "
             "Do NOT use startup_disruption or company_strategy items — even if no product_craft or design_ux item is available. "
@@ -542,17 +565,12 @@ Produce a structured JSON object:
             "(1) HEDGE MATCH: Match the hedge level of your sources throughout. If a source says 'suggests,' 'implies,' 'may,' or 'could,' use equivalent hedged language at every claim that traces to that source. Do not convert a source observation into an assertion anywhere. "
             "(2) NO TIMELINE: Do not assert a specific timeline unless it appears verbatim in a source bullet. If no source names it, remove it. "
             "(3) NO UNIVERSALITY: Do not assert a pattern applies broadly when sources show 1-3 examples. Scope it: 'in contexts where X applies...' "
-            "ANCHOR SELECTION RULE: Before drafting, complete these steps in order AND include a brief ANCHOR REASONING comment showing your work: "
-            "(1) Rank ALL insight bullets for every eligible source by non-obviousness. The most non-obvious bullet is the one that: "
-            "(a) names a structural constraint, counter-intuitive tradeoff, or unintended consequence, "
-            "(b) contradicts or qualifies the headline's apparent conclusion, or "
-            "(c) reveals a mechanism the headline actively obscures. "
-            "(2) Identify the highest-ranked bullet. Build the insight around it. "
+            "ANCHOR SELECTION RULE: Record your anchor selection reasoning in the anchor_reasoning field. Then build the insight around the highest-ranked bullet identified there. "
             "Do not default to bullet 1 — bullets 2-4 contain the most specific mechanisms and concrete tradeoffs. "
-            "(3) Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
+            "Before drafting, scan ALL remaining bullets for any that contradict, qualify, or limit the anchor's claim. "
             "For each one found, the entry must contain a sentence that directly addresses it. "
             "If no such sentence exists in your draft, the entry is not ready to publish. "
-            "(4) Use remaining bullets as supporting evidence. "
+            "Use remaining bullets as supporting evidence. "
             "DROPPED BULLET REVIEW: After writing, review every bullet you did NOT use and apply these two tests: "
             "(1) STRONGER INSIGHT TEST: Does this bullet contain a more specific, actionable, or non-obvious insight than the bullets you used? If yes, replace the weakest used bullet with this one. "
             "(2) SCOPE TEST: Does this bullet limit the scope of the closing insight in a way that materially changes its applicability? If yes, add the qualifier or revise. "
@@ -1405,11 +1423,30 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             for w in theme_diversity_warnings:
                 print(json.dumps(w, indent=2))
 
+        # Keep anchor reasoning available for debugging, but do not expose it to display layers.
+        ws_anchor_reasoning_debug = []
+        for i, ws in enumerate(normalized_whats_shifting):
+            reasoning = str(ws.get("anchor_reasoning") or "").strip()
+            if reasoning:
+                ws_anchor_reasoning_debug.append({
+                    "paragraph_index": i,
+                    "source_indices": ws.get("source_indices", []),
+                    "anchor_reasoning": reasoning,
+                })
+
+        ws_display_payload = [
+            {
+                "paragraph": ws.get("paragraph", ""),
+                "source_indices": ws.get("source_indices", []),
+            }
+            for ws in normalized_whats_shifting
+        ]
+
         # ---------------------------------------------------------------------------
         # Return
         # ---------------------------------------------------------------------------
         return {
-            "whats_shifting": normalized_whats_shifting,
+            "whats_shifting": ws_display_payload,
             "company_watch": normalized_company_watch,
             "startup_radar": normalized_startup_radar,
             "pm_craft_today": pm_craft_today,
@@ -1427,6 +1464,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "split_implication_warnings": split_implication_warnings,
                 "theme_audit_warnings": theme_audit_warnings,
                 "theme_diversity_warnings": theme_diversity_warnings,
+                "whats_shifting_anchor_reasoning_debug": ws_anchor_reasoning_debug,
             },
         }
 
