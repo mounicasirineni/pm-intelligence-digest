@@ -23,6 +23,25 @@ SYSTEM_PROMPT = (
     "Format each bullet as plain text only. Do not bold, italicize, or use any markdown formatting inside bullet text."
 )
 
+# Hard skip — don't hit the API at all below this word count.
+# Raised from 100 to 200: articles between 100–199 words were reaching Claude,
+# consuming tokens, and producing low-confidence outputs that got filtered anyway.
+# Jina and og:description fallbacks in fetcher.py now recover most of these sources,
+# so legitimate thin content is rarer. The ones that still come in below 200 after
+# three fetch tiers are truly unrecoverable (hard paywalls, login walls, stubs).
+MINIMUM_CONTENT_WORDS = 200
+
+# Articles below this word count get confidence capped at "medium" in code,
+# regardless of what Claude returns. Claude's prompt guidance on confidence levels
+# is not always respected for borderline cases — this is the hard enforcement.
+CONFIDENCE_FLOOR_WORDS = 400
+
+# Prefix written by fetcher.py when content came from og:description fallback.
+# Content sourced this way is always capped at confidence="low" regardless of
+# what Claude returns, since og:description is a 20–80 word meta tag, not the
+# article body.
+OG_DESCRIPTION_PREFIX = "OG_DESCRIPTION:"
+
 
 def _build_client() -> Anthropic:
     settings = load_settings()
@@ -72,14 +91,28 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
           "confidence": "high" | "medium" | "low",
           "company_maturity": "startup" | "established" | "not_applicable",
           "scope": "cross_market" | "company_specific",
-          "content_word_count": int  # words in content body sent to the model
+          "content_word_count": int,         # words in content body sent to the model
+          "is_og_fallback": bool,            # True if content came from og:description
         }
     """
     title = item.get("title") or ""
     url = item.get("url") or ""
     source_name = item.get("source_name") or ""
     theme = item.get("theme") or ""
-    content = item.get("summary") or item.get("content") or ""
+    raw_content = item.get("summary") or item.get("content") or ""
+
+    # --- Detect and strip OG_DESCRIPTION prefix set by fetcher.py ---
+    is_og_fallback = raw_content.startswith(OG_DESCRIPTION_PREFIX)
+    if is_og_fallback:
+        content = raw_content[len(OG_DESCRIPTION_PREFIX):].strip()
+        logger.info(
+            "Content for '%s' sourced from og:description fallback — "
+            "confidence will be capped at low regardless of Claude output",
+            title,
+        )
+    else:
+        content = raw_content
+
     content_word_count = len(content.split())
     logger.info("Content word count for '%s': %d words", title, content_word_count)
     print(f"Content word count for '{title}': {content_word_count} words")
@@ -91,8 +124,7 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     )
     print(f"Fetch quality for '{source_name}': {content_word_count} words | url={url}")
 
-    # Skip stub content before hitting the API
-    MINIMUM_CONTENT_WORDS = 100
+    # --- Hard skip: don't hit the API below MINIMUM_CONTENT_WORDS ---
     if content_word_count < MINIMUM_CONTENT_WORDS:
         logger.info(
             "Skipping '%s' — content too short (%d words, minimum %d)",
@@ -108,6 +140,7 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
             "company_maturity": "not_applicable",
             "scope": "cross_market",
             "content_word_count": content_word_count,
+            "is_og_fallback": is_og_fallback,
         }
 
     user_prompt = f"""
@@ -214,14 +247,35 @@ Guidance:
         ],
     )
 
-    # anthropic-python returns content as a list of blocks
-    # Guard against empty content list before index access
+    # --- Check stop_reason before touching response.content ---
+    # Claude can refuse to summarize content (e.g. military/defence articles)
+    # with stop_reason="refusal". This must be checked explicitly — a refusal
+    # response may still have content blocks containing an explanation, so
+    # checking `not response.content` alone is insufficient and leads to the
+    # refusal text being parsed as JSON, producing garbage output silently.
+    stop_reason = getattr(response, "stop_reason", None)
+    if stop_reason == "refusal":
+        logger.warning(
+            "Claude refused to summarize '%s' (stop_reason=refusal) — skipping item.",
+            title,
+        )
+        return {
+            "insights": [],
+            "pm_interview_relevance": "Claude declined to summarize this content.",
+            "pm_relevance_score": "low",
+            "confidence": "low",
+            "company_maturity": "not_applicable",
+            "scope": "cross_market",
+            "content_word_count": content_word_count,
+            "is_og_fallback": is_og_fallback,
+        }
+
     if not response.content:
         logger.warning(
             "Empty response content for '%s' — skipping item. "
             "Full response: stop_reason=%s, usage=%s",
             title,
-            getattr(response, "stop_reason", "unknown"),
+            stop_reason,
             getattr(response, "usage", "unknown"),
         )
         return {
@@ -232,6 +286,7 @@ Guidance:
             "company_maturity": "not_applicable",
             "scope": "cross_market",
             "content_word_count": content_word_count,
+            "is_og_fallback": is_og_fallback,
         }
 
     try:
@@ -283,20 +338,51 @@ Guidance:
     if scope not in {"cross_market", "company_specific"}:
         scope = "cross_market"
 
-    # FIX: Log scope and all key output fields so routing decisions are
-    # visible in Railway logs and can be verified per-item.
+    # --- Code-level confidence enforcement ---
+    # These caps override whatever Claude returned. Prompt guidance alone is
+    # insufficient for borderline cases.
+    #
+    # Cap 1: og:description fallback — always low confidence.
+    # A 20–80 word meta tag cannot support grounded bullets regardless of topic.
+    if is_og_fallback:
+        if confidence != "low":
+            logger.info(
+                "Overriding confidence from '%s' to 'low' for '%s' — "
+                "content sourced from og:description fallback",
+                confidence,
+                title,
+            )
+        confidence = "low"
+
+    # Cap 2: thin content — cap at medium.
+    # Articles below CONFIDENCE_FLOOR_WORDS can produce at most medium-confidence
+    # bullets. Claude's prompt defines this threshold but doesn't enforce it in code.
+    elif content_word_count < CONFIDENCE_FLOOR_WORDS and confidence == "high":
+        logger.info(
+            "Overriding confidence from 'high' to 'medium' for '%s' — "
+            "content only %d words (floor is %d)",
+            title,
+            content_word_count,
+            CONFIDENCE_FLOOR_WORDS,
+        )
+        confidence = "medium"
+
     logger.info(
-        "SUMMARIZER OUTPUT for '%s': score=%s, confidence=%s, scope=%s, maturity=%s",
+        "SUMMARIZER OUTPUT for '%s': score=%s, confidence=%s, scope=%s, maturity=%s, "
+        "og_fallback=%s, words=%d",
         title,
         pm_relevance_score,
         confidence,
         scope,
         company_maturity,
+        is_og_fallback,
+        content_word_count,
     )
     print(
         f"SUMMARIZER OUTPUT for '{title}': "
         f"score={pm_relevance_score}, confidence={confidence}, "
-        f"scope={scope}, maturity={company_maturity}"
+        f"scope={scope}, maturity={company_maturity}, "
+        f"og_fallback={is_og_fallback}, words={content_word_count}"
     )
 
     return {
@@ -307,4 +393,5 @@ Guidance:
         "company_maturity": company_maturity,
         "scope": scope,
         "content_word_count": content_word_count,
+        "is_og_fallback": is_og_fallback,
     }
