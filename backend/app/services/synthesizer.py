@@ -180,6 +180,19 @@ def _normalize_whats_shifting(raw: Any) -> List[Dict[str, Any]]:
                 continue
         headline = _strip_date_check_flags(headline)
         paragraph = _strip_date_check_flags(paragraph)
+
+        # Hard-cap headline to 20 words regardless of what Claude produced.
+        # The prompt instructs 20 words max but Claude occasionally exceeds it
+        # for complex topics. This is the code-level enforcement.
+        headline_words = headline.split()
+        if len(headline_words) > 20:
+            logger.info(
+                "HEADLINE TRUNCATED: %d words → 20 for paragraph starting '%s'",
+                len(headline_words),
+                paragraph[:60],
+            )
+            headline = " ".join(headline_words[:20]) + "…"
+
         normalized.append({
             "headline": headline,
             "paragraph": paragraph,

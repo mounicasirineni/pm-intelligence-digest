@@ -491,9 +491,8 @@
         {% for insight in synthesis.whats_shifting %}
           <article class="insight-block">
             {% set paragraph = insight.paragraph if insight is mapping else insight %}
-            {% set parts = paragraph.split('.', 1) %}
-            {% set headline = parts[0] ~ ('.' if parts|length > 1 else '') %}
-            {% set body = parts[1].lstrip() if parts|length > 1 else '' %}
+            {% set headline = insight.headline if (insight is mapping and insight.headline) else paragraph.split('.', 1)[0] ~ '.' %}
+            {% set body = paragraph if (insight is mapping and insight.headline) else (paragraph.split('.', 1)[1].lstrip() if '.' in paragraph else '') %}
             {% set has_sources = insight is mapping and insight.source_indices and synthesis.source_index_lookup %}
             <p class="insight-headline">
               <span>{{ headline | bold_md | safe }}</span>
