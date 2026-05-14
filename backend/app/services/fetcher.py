@@ -158,7 +158,6 @@ def fetch_article_text(url: str, timeout: int = 10) -> str:
         return ""
 
     # --- Tier 1: Primary httpx fetch (skip for known JS-heavy domains) ---
-    primary_result = ""
     og_description = ""
 
     if domain not in JINA_PREFERRED_DOMAINS:
@@ -220,10 +219,27 @@ def fetch_article_text(url: str, timeout: int = 10) -> str:
     if jina_result:
         return jina_result
 
+    # JINA-preferred domains skip tier 1, so og:description was never extracted.
+    # Small HTML GET (HEAD has no body) to read meta tags for tier 3 only.
+    if domain in JINA_PREFERRED_DOMAINS and not og_description:
+        try:
+            response = httpx.get(
+                url,
+                headers=HEADERS,
+                timeout=min(5, timeout),
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            og_description = _extract_og_description(soup)
+        except Exception as exc:
+            logger.debug(
+                "Og meta-only fetch failed for JINA-preferred URL %s: %s", url, exc
+            )
+
     # --- Tier 3: og:description ---
-    # For JINA_PREFERRED_DOMAINS we haven't fetched the page yet,
-    # so we don't have og:description. Only fall back to it if we got
-    # a soup from tier 1.
+    # Non-JINA-preferred: usually extracted during tier 1. JINA-preferred may
+    # have been filled by the small meta fetch above.
     if og_description:
         logger.info(
             "Falling back to og:description for %s (%d words) — confidence will be low",

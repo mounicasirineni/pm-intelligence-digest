@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import datetime, timezone, timedelta
+from http.client import IncompleteRead
 from time import mktime
 from typing import Any, Dict, List, Tuple
 
@@ -12,6 +14,8 @@ from ..config import load_settings, load_sources_config
 from .fetcher import fetch_article_text, MIN_WORD_THRESHOLD
 
 logger = logging.getLogger(__name__)
+
+MAX_FEED_RETRIES = 2
 
 
 def _parse_published(entry: Any) -> datetime | None:
@@ -35,19 +39,44 @@ def _fetch_rss_items(
     url = source["url"]
     is_thin_feed = source.get("thin_feed", False)
     is_fetch_blocked = source.get("fetch_blocked", False)
-    parsed = feedparser.parse(url)
+
+    parsed = None
+    for attempt in range(MAX_FEED_RETRIES + 1):
+        try:
+            parsed = feedparser.parse(url)
+            break
+        except IncompleteRead as exc:
+            if attempt < MAX_FEED_RETRIES:
+                logger.warning(
+                    "RSS source %s: IncompleteRead on attempt %d, retrying — %s",
+                    source.get("id"),
+                    attempt + 1,
+                    exc,
+                )
+                time.sleep(2**attempt)  # 1s, 2s
+            else:
+                raise
+
+    # Loop exits via `break` after a successful parse, or raises on the last
+    # IncompleteRead — so `parsed` is always set here (helps strict type checkers).
+    assert parsed is not None
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
     total_entries = 0
     kept_entries = 0
     enriched_entries = 0
 
-    # Log fetch_blocked status once at feed level
-    if is_thin_feed and is_fetch_blocked:
+    # Log fetch policy once at feed level (fetch_blocked is independent of thin_feed).
+    if is_fetch_blocked:
         logger.warning(
-            "RSS source %s: full fetch disabled — "
-            "domain blocks automated requests, using RSS summary only",
-            source.get("id")
+            "RSS source %s: full fetch disabled — using RSS summary only",
+            source.get("id"),
+        )
+    elif is_thin_feed:
+        logger.info(
+            "RSS source %s: thin_feed=true — full fetch when entry text is below %d words",
+            source.get("id"),
+            MIN_WORD_THRESHOLD,
         )
 
     items: List[Dict[str, Any]] = []
@@ -77,6 +106,24 @@ def _fetch_rss_items(
         word_count = len(content_text.split())
         needs_fetch = (is_thin_feed or word_count < MIN_WORD_THRESHOLD) \
                       and not is_fetch_blocked
+
+        # Organic short RSS blurbs would normally trigger a full fetch; when
+        # fetch_blocked, we keep weak RSS text — log so it is not silent.
+        if (
+            is_fetch_blocked
+            and not is_thin_feed
+            and entry_url
+            and word_count < MIN_WORD_THRESHOLD
+        ):
+            logger.info(
+                "RSS source %s: fetch_blocked, short RSS text (%d words) for '%s' — "
+                "skipping full fetch, using RSS summary only",
+                source.get("id"),
+                word_count,
+                getattr(entry, "title", "")[:80],
+            )
+
+        original_rss_summary = content_text
 
         if needs_fetch and entry_url:
             logger.info(
@@ -115,6 +162,7 @@ def _fetch_rss_items(
                 "url": entry_url,
                 "published_at": published_at.isoformat() if published_at else None,
                 "summary": content_text,
+                "rss_summary": original_rss_summary,
             }
         )
 

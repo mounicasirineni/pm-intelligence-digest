@@ -81,7 +81,9 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
 
     Args:
         item: dict with at least title, url, summary (or full content),
-              source_name, and theme.
+              source_name, and theme. Optional ``rss_summary``: RSS text before
+              any full-article enrichment (used to retry once if Claude returns
+              ``stop_reason=refusal`` on the full body).
 
     Returns:
         {
@@ -115,14 +117,12 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
 
     content_word_count = len(content.split())
     logger.info("Content word count for '%s': %d words", title, content_word_count)
-    print(f"Content word count for '{title}': {content_word_count} words")
     logger.info(
         "Fetch quality for '%s': %d words | url=%s",
         source_name,
         content_word_count,
         url,
     )
-    print(f"Fetch quality for '{source_name}': {content_word_count} words | url={url}")
 
     # --- Hard skip: don't hit the API below MINIMUM_CONTENT_WORDS ---
     if content_word_count < MINIMUM_CONTENT_WORDS:
@@ -195,13 +195,15 @@ Guidance:
     low    = not relevant to PM interview prep (e.g. sports tech, celebrity news, off-topic content)
   ROUTINE UPDATE RULE: Content that reports routine operational activity without revealing strategic intent scores low, even if published by a major company. This includes: weekly content additions (new games, new titles, new episodes), cadence-driven posts (GFN Thursday, weekly roundups), minor feature releases with no architectural significance, and event listings or award announcements. A post scores medium or high only if it explains WHY the company made a move, WHAT it reveals about competitive positioning or product direction, or WHAT new capability it demonstrates. The company name alone does not determine the score — the strategic signal does.
   DOMAIN FILTER RULE: The following content domains score low regardless of
-  whether a PM analogy can be constructed from them: foreign policy, military
-  operations, geopolitical negotiations, domestic party politics, celebrity news,
-  and sports. A story about naval operations in the Strait of Hormuz is a foreign
-  policy story even if a regulatory framing analogy exists. A PM analogy that
-  requires translating the content through two or more conceptual layers (military
-  posture → negotiation strategy → compliance framing) does not qualify as
-  tangential relevance — it qualifies as inference. Score low.
+  whether a PM analogy can be constructed: foreign policy, military operations,
+  armed conflict, domestic party politics, celebrity news, and sports.
+  Country-level technology investment, industrial AI policy, or startup ecosystem
+  coverage is NOT in scope of this filter — score it on PM relevance as normal.
+  A story about naval operations in the Strait of Hormuz is a foreign policy
+  story even if a regulatory framing analogy exists. A PM analogy that requires
+  translating the content through two or more conceptual layers (military posture
+  → negotiation strategy → compliance framing) does not qualify as tangential
+  relevance — it qualifies as inference. Score low.
 - COMPANY MATURITY RULE: If this article's primary subject is a named company, assess whether that company is early-stage or established. Set "company_maturity" to:
     startup     = primary subject is an early-stage, emerging, or privately held company valued below $1B without dominant market position
     established = primary subject is (a) a publicly traded company, (b) a subsidiary of one, OR (c) a privately held company with $1B+ valuation AND significant market presence
@@ -256,9 +258,31 @@ Guidance:
     stop_reason = getattr(response, "stop_reason", None)
     if stop_reason == "refusal":
         logger.warning(
-            "Claude refused to summarize '%s' (stop_reason=refusal) — skipping item.",
+            "Claude refused to summarize '%s' (stop_reason=refusal) — "
+            "retrying with RSS summary only",
             title,
         )
+        rss_fallback = item.get("rss_summary") or ""
+        if (
+            rss_fallback
+            and len(rss_fallback.split()) >= MINIMUM_CONTENT_WORDS
+            and not item.get("_refusal_retry")
+        ):
+            fallback_item = {**item, "summary": rss_fallback, "_refusal_retry": True}
+            return summarize_item(fallback_item)
+        if not rss_fallback:
+            logger.warning("No rss_summary available for '%s' — skipping.", title)
+        elif len(rss_fallback.split()) < MINIMUM_CONTENT_WORDS:
+            logger.warning(
+                "rss_summary too short for '%s' (%d words, minimum %d) — skipping.",
+                title,
+                len(rss_fallback.split()),
+                MINIMUM_CONTENT_WORDS,
+            )
+        elif item.get("_refusal_retry"):
+            logger.warning("Refusal on RSS fallback for '%s' — skipping.", title)
+        else:
+            logger.warning("No usable fallback for '%s' — skipping.", title)
         return {
             "insights": [],
             "pm_interview_relevance": "Claude declined to summarize this content.",
@@ -297,8 +321,6 @@ Guidance:
         raise
 
     logger.debug("Raw Claude response text: %s", text)
-    print("Raw Claude response text from summarizer:")
-    print(text)
 
     cleaned_text = _extract_json(text)
 
@@ -377,12 +399,6 @@ Guidance:
         company_maturity,
         is_og_fallback,
         content_word_count,
-    )
-    print(
-        f"SUMMARIZER OUTPUT for '{title}': "
-        f"score={pm_relevance_score}, confidence={confidence}, "
-        f"scope={scope}, maturity={company_maturity}, "
-        f"og_fallback={is_og_fallback}, words={content_word_count}"
     )
 
     return {
