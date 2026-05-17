@@ -532,7 +532,7 @@
       <div class="callout">
         <div class="callout-label">Today&rsquo;s Interview Angle</div>
         <div class="callout-text">
-          {{ synthesis.interview_angle or "Run the synthesis pipeline to surface this week's interview angle." }}
+          {{ synthesis.interview_angle or "Not available today." }}
         </div>
       </div>
     </section>
@@ -635,7 +635,7 @@
           {% endfor %}
         </ol>
       {% else %}
-        <p>When notable startup moves appear in the feed, they&rsquo;ll be called out here.</p>
+        <p>Not available today.</p>
       {% endif %}
     </section>
 

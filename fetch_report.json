@@ -1,0 +1,1089 @@
+[
+  {
+    "source_id": "a16z_podcast",
+    "source_name": "Andreessen Horowitz Podcast",
+    "theme": "ai_technology",
+    "type": "podcast",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://feeds.simplecast.com/JGE3yC0V",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Vitalik Buterin on Human Agency in the AI Era",
+        "url": "https://a16z.simplecast.com/episodes/vitalik-buterin-on-human-agency-in-the-ai-era-DY1OPgHD",
+        "published": "2026-05-15T13:34:28+00:00",
+        "rss_words": 296,
+        "fetch_tier": "rss",
+        "fetch_words": 296,
+        "confidence": "medium (below floor)",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p>Sophia Dew and Binji Pande speak with Vitalik Buterin about technology, human agency, and how the internet is changing the way people think, build, and relate to the world around them. Drawing from"
+      },
+      {
+        "title": "Ben Horowitz - \"Your ONLY job is Right Product, Right Time\"",
+        "url": "https://a16z.simplecast.com/episodes/ben-horowitz-your-only-job-is-right-product-right-time-PYh1Iyev",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "platformer",
+    "source_name": "Platformer",
+    "theme": "market_behavior",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://www.platformer.news/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Are the Twitter clones in trouble?",
+        "url": "https://www.platformer.news/threads-bluesky-x-usage-utopia-twitter-clones/",
+        "published": "2026-05-14T19:27:30+00:00",
+        "rss_words": 318,
+        "fetch_tier": "primary",
+        "fetch_words": 314,
+        "confidence": "medium (below floor)",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Today, in light of some new data and swirling discontent on basically all of these platforms, let\u2019s check in on the health of Bluesky, Threads, and (a sigh that lasts a full hour) X. In March, when Ja"
+      },
+      {
+        "title": "The best argument I\u2019ve heard for why AI won't take your job",
+        "url": "https://www.platformer.news/ai-job-loss-box-ceo-aaron-levie/",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "mit_tech_review",
+    "source_name": "MIT Technology Review",
+    "theme": "ai_technology",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://www.technologyreview.com/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Musk v. Altman week 3: Elon Musk and Sam Altman traded blows over each other\u2019s credibility. Now the jury will pick a side.",
+        "url": "https://www.technologyreview.com/2026/05/15/1137357/musk-v-altman-week-3/",
+        "published": "2026-05-15T18:09:35+00:00",
+        "rss_words": 1476,
+        "fetch_tier": "rss",
+        "fetch_words": 1476,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p>In the final week of the <em>Musk v. Altman</em> trial, lawyers traded blows over Elon Musk\u2019s and OpenAI CEO Sam Altman\u2019s credibility. Altman was grilled on his alleged <a href=\"https://www.newyork"
+      },
+      {
+        "title": "The Download: China\u2019s AI drama factory and the WHO\u2019s missing health targets",
+        "url": "https://www.technologyreview.com/2026/05/15/1137341/the-download-china-short-drama-ai-who-health-targets/",
+        "published": "2026-05-15T06:40:00+00:00",
+        "rss_words": 920,
+        "fetch_tier": "rss",
+        "fetch_words": 920,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p><em>This is today&#8217;s edition of </em><a href=\"https://forms.technologyreview.com/newsletters/briefing-the-download/?_ga=2.179569122.736533416.1649661040-405833893.1649413289\"><em>The Download<"
+      }
+    ]
+  },
+  {
+    "source_id": "import_ai",
+    "source_name": "Import AI (Jack Clark)",
+    "theme": "ai_technology",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://importai.substack.com/feed",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Import AI 456: RSI and economic growth; radical optionality for AI regulation; and a neural computer",
+        "url": "https://importai.substack.com/p/import-ai-456-rsi-and-economic-growth",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "Import AI 455: AI systems are about to start building themselves.",
+        "url": "https://importai.substack.com/p/import-ai-455-automating-ai-research",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "shreyas_doshi",
+    "source_name": "Shreyas Doshi",
+    "theme": "product_craft",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://shreyasdoshi.substack.com/feed",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Get to the Core of the Thing",
+        "url": "https://shreyasdoshi.substack.com/p/get-to-the-core-of-the-thing",
+        "published": "2026-05-16T11:09:40+00:00",
+        "rss_words": 601,
+        "fetch_tier": "rss",
+        "fetch_words": 601,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p>A founder I advise asked me last week: <em>&#8220;Should we go wide or should we go deep?&#8221;</em></p><p>She runs an AI startup. Two big incumbents had just announced they were entering her spac"
+      },
+      {
+        "title": "9 axioms of Interpersonal Communication",
+        "url": "https://shreyasdoshi.substack.com/p/9-axioms-of-interpersonal-communication",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "svpg",
+    "source_name": "SVPG (Marty Cagan)",
+    "theme": "product_craft",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://www.svpg.com/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Build To Learn FAQ",
+        "url": "https://www.svpg.com/build-to-learn-faq/",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "Build to Learn vs Build to Earn",
+        "url": "https://www.svpg.com/build-to-learn-vs-build-to-earn/",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "techcrunch",
+    "source_name": "TechCrunch",
+    "theme": "startup_disruption",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://techcrunch.com/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "If you\u2019re giving a commencement speech in 2026, maybe don\u2019t mention AI",
+        "url": "https://techcrunch.com/2026/05/17/if-youre-giving-a-commencement-speech-in-2026-maybe-dont-mention-ai/",
+        "published": "2026-05-17T11:02:04+00:00",
+        "rss_words": 14,
+        "fetch_tier": "jina",
+        "fetch_words": 1002,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Skip to content TechCrunch Desktop Logo Latest Startups Venture Apple Security AI Apps Events Podcasts Newsletters Site Search Toggle Mega Menu Toggle Topics  Latest  AI  Amazon  Apps  Biotech & Healt"
+      },
+      {
+        "title": "TechCrunch Mobility: The AI skills arms race is coming for automotive",
+        "url": "https://techcrunch.com/2026/05/17/techcrunch-mobility-the-ai-skills-arms-race-is-coming-for-automotive/",
+        "published": "2026-05-17T10:35:00+00:00",
+        "rss_words": 18,
+        "fetch_tier": "jina",
+        "fetch_words": 1432,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Skip to content TechCrunch Desktop Logo Latest Startups Venture Apple Security AI Apps Events Podcasts Newsletters Site Search Toggle Mega Menu Toggle Topics  Latest  AI  Amazon  Apps  Biotech & Healt"
+      }
+    ]
+  },
+  {
+    "source_id": "yc_blog",
+    "source_name": "Y Combinator Blog",
+    "theme": "startup_disruption",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://ycombinator.com/blog/rss",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Harshita Arora Joins YC as General Partner",
+        "url": "https://www.ycombinator.com/blog/welcome-harshita/",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "Adding Canada Back to Our List of Accepted Countries of Incorporation",
+        "url": "https://www.ycombinator.com/blog/adding-canada-back/",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "hn_frontpage",
+    "source_name": "Hacker News Frontpage",
+    "theme": "ai_technology",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://hnrss.org/frontpage",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "EU weighs restricting use of US cloud platforms to process sensitive gov data",
+        "url": "https://www.osnews.com/story/144943/eu-weighs-restricting-use-of-us-cloud-platforms-to-process-sensitive-government-data/",
+        "published": "2026-05-17T11:59:38+00:00",
+        "rss_words": 13,
+        "fetch_tier": "primary",
+        "fetch_words": 1418,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "Home > Legal > EU weighs restricting use of US cloud platforms to process sensitive government data The European Union is considering rules that would restrict its member governments\u2019 use of U.S. clou"
+      },
+      {
+        "title": "Meta deletes popular 1M follower account after Kuwaiti request",
+        "url": "https://twitter.com/ryangrim/status/2055992439031185782",
+        "published": "2026-05-17T11:40:48+00:00",
+        "rss_words": 13,
+        "fetch_tier": "jina",
+        "fetch_words": 256,
+        "confidence": "medium (below floor)",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "Don\u2019t miss what\u2019s happening People on X are the first to know. Log in Sign up Post See new posts Conversation Ryan Grim @ryangrim Looks like  @Meta  plans to delete an account with more than a million"
+      }
+    ]
+  },
+  {
+    "source_id": "google_blog",
+    "source_name": "Google Blog",
+    "theme": "company_strategy",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://blog.google/rss/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "We\u2019re launching the Google DeepMind Accelerator program in Asia Pacific to tackle environmental risks.",
+        "url": "https://blog.google/innovation-and-ai/models-and-research/google-deepmind/accelerator-ai-for-the-planet/",
+        "published": "2026-05-17T12:30:00+00:00",
+        "rss_words": 28,
+        "fetch_tier": "primary",
+        "fetch_words": 158,
+        "confidence": "skip (below summarizer minimum)",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "The Asia-Pacific region is a global engine for economic growth, but it's also highly vulnerable to climate change. While green technologies are gaining momentum, a recent report shows they aren\u2019t scal"
+      },
+      {
+        "title": "From policy to practice: supporting the future of AI in education",
+        "url": "https://blog.google/products-and-platforms/products/education/ai-policy-guidance-labs/",
+        "published": "2026-05-15T02:30:00+00:00",
+        "rss_words": 20,
+        "fetch_tier": "primary",
+        "fetch_words": 924,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "From policy to practice: supporting the future of AI in education May 15, 2026 \u00b7 Share x.com Facebook LinkedIn Mail Copy link Our global AI Policy & Guidance Labs discussed building a safe, equitable "
+      }
+    ]
+  },
+  {
+    "source_id": "meta_engineering",
+    "source_name": "Meta Engineering",
+    "theme": "company_strategy",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://engineering.fb.com/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Reel Friends: Building Social Discovery that Scales to Billions",
+        "url": "https://engineering.fb.com/2026/05/13/ml-applications/reel-friends-building-social-discovery-that-scales-to-billions/",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "Migrating Data Ingestion Systems at Meta Scale",
+        "url": "https://engineering.fb.com/2026/05/12/data-infrastructure/migrating-data-ingestion-systems-at-meta-scale/",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "microsoft_research",
+    "source_name": "Microsoft Research Blog",
+    "theme": "company_strategy",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://www.microsoft.com/en-us/research/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Further Notes on Our Recent Research on AI Delegation and Long-Horizon Reliability",
+        "url": "https://www.microsoft.com/en-us/research/blog/further-notes-on-our-recent-research-on-ai-delegation-and-long-horizon-reliability/",
+        "published": "2026-05-15T12:36:57+00:00",
+        "rss_words": 717,
+        "fetch_tier": "primary",
+        "fetch_words": 672,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Our recent paper, \u201c LLMs Corrupt Your Documents When You Delegate \u201d, has generated discussion about the reliability of AI systems in delegated workflows. We appreciate the interest in this work and wa"
+      },
+      {
+        "title": "mimalloc:\u00a0A\u00a0new,\u00a0high-performance,\u00a0scalable memory allocator for the modern era",
+        "url": "https://www.microsoft.com/en-us/research/blog/mimalloc-a-high-performance-scalable-memory-allocator-for-the-modern-era/",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "simon_willison_blog",
+    "source_name": "Simon Willison's Blog",
+    "theme": "ai_technology",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://simonwillison.net/atom/everything/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "GDS weighs in on the NHS's decision to retreat from Open Source",
+        "url": "https://simonwillison.net/2026/May/17/gds-weighs-in/#atom-everything",
+        "published": "2026-05-17T10:29:41+00:00",
+        "rss_words": 214,
+        "fetch_tier": "jina",
+        "fetch_words": 338,
+        "confidence": "medium (below floor)",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Simon Willison\u2019s Weblog Subscribe Sponsored by: Datadog \u2014 Ship reliable AI faster with LLM Observability. Read the best practices guide  GDS weighs in on the NHS's decision to retreat from Open Source"
+      },
+      {
+        "title": "Warelay -> OpenClaw",
+        "url": "https://simonwillison.net/2026/May/16/openclaw-names/#atom-everything",
+        "published": "2026-05-16T14:53:30+00:00",
+        "rss_words": 268,
+        "fetch_tier": "jina",
+        "fetch_words": 379,
+        "confidence": "medium (below floor)",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Simon Willison\u2019s Weblog Subscribe Sponsored by: Datadog \u2014 Ship reliable AI faster with LLM Observability. Read the best practices guide  In preparation for a lightning talk I'm giving at PyCon US this"
+      }
+    ]
+  },
+  {
+    "source_id": "openai_news",
+    "source_name": "OpenAI News",
+    "theme": "company_strategy",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://openai.com/news/rss.xml",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "OpenAI and Malta partner to bring ChatGPT Plus to all citizens",
+        "url": "https://openai.com/index/malta-chatgpt-plus-partnership",
+        "published": "2026-05-15T18:30:00+00:00",
+        "rss_words": 24,
+        "fetch_tier": "jina",
+        "fetch_words": 832,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Skip to main content      Research   Products  Business  Developers  Company  Foundation(opens in a new window)          Log inTry ChatGPT(opens in a new window)         Research  Products  Business  "
+      },
+      {
+        "title": "How business operations teams use Codex",
+        "url": "https://openai.com/academy/codex-for-work/how-business-operations-teams-use-codex",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "rest_of_world",
+    "source_name": "Rest of World",
+    "theme": "market_behavior",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://restofworld.org/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "India\u2019s VCs are beating Silicon Valley at home",
+        "url": "https://restofworld.org/2026/india-startups-venture-capital/?utm_source=rss&utm_medium=rss&utm_campaign=feeds",
+        "published": "2026-05-15T07:30:00+00:00",
+        "rss_words": 30,
+        "fetch_tier": "primary",
+        "fetch_words": 535,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "iStock/Rest of World By Itika Sharma Punit 15 May 2026 Global Dispatch India\u2019s VCs are beating Silicon Valley at home By Itika Sharma Punit > Global Dispatch This essay was first published in our Glob"
+      },
+      {
+        "title": "Can we really keep kids safe online?",
+        "url": "https://restofworld.org/2026/social-media-bans-minors-online-safety/?utm_source=rss&utm_medium=rss&utm_campaign=feeds",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "benedict_evans",
+    "source_name": "Benedict Evans",
+    "theme": "ai_technology",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://www.ben-evans.com/benedictevans/rss.xml",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "How will OpenAI compete?",
+        "url": "https://www.ben-evans.com/benedictevans/2026/2/19/how-will-openai-compete-nkg2x",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "AI, networks and Mechanical Turks",
+        "url": "https://www.ben-evans.com/benedictevans/2025/11/23/ai-networks-and-mechanical-turks",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "ai_snake_oil",
+    "source_name": "AI Snake Oil",
+    "theme": "ai_technology",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://aisnakeoil.substack.com/feed",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Open-world evaluations for measuring frontier AI capabilities",
+        "url": "https://www.normaltech.ai/p/open-world-evaluations-for-measuring",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "New Paper: Towards a science of AI agent reliability",
+        "url": "https://www.normaltech.ai/p/new-paper-towards-a-science-of-ai",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "verge",
+    "source_name": "The Verge",
+    "theme": "market_behavior",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://www.theverge.com/rss/index.xml",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Revamped Siri will reportedly offer auto-deleting chats",
+        "url": "https://www.theverge.com/tech/932207/siri-apple-intelligence-auto-deleting-chats",
+        "published": "2026-05-17T13:10:28+00:00",
+        "rss_words": 141,
+        "fetch_tier": "jina",
+        "fetch_words": 575,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "SKIP TO MAIN CONTENT The homepage SUBSCRIBE SIGN IN Tech Reviews Science Entertainment AI Policy Revamped Siri will reportedly offer auto-deleting chats 0 TECH AI NEWS Revamped Siri will reportedly of"
+      },
+      {
+        "title": "University of Arizona students boo Eric Schmidt\u2019s AI cheerleading during commencement",
+        "url": "https://www.theverge.com/ai-artificial-intelligence/932203/university-of-arizona-students-boo-eric-schmidt-ai-commencement",
+        "published": "2026-05-17T11:52:23+00:00",
+        "rss_words": 133,
+        "fetch_tier": "jina",
+        "fetch_words": 611,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "SKIP TO MAIN CONTENT The homepage SUBSCRIBE SIGN IN Tech Reviews Science Entertainment AI Policy University of Arizona students boo Eric Schmidt\u2019s AI cheerleading during commencement 10 AI NEWS TECH U"
+      }
+    ]
+  },
+  {
+    "source_id": "apple_newsroom",
+    "source_name": "Apple Newsroom",
+    "theme": "company_strategy",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://www.apple.com/newsroom/rss-feed.rss",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Wackadoo! Join Bluey for the ultimate playdate on Apple Arcade starting May 21",
+        "url": "https://www.apple.com/newsroom/2026/05/wackadoo-join-bluey-for-the-ultimate-playdate-on-apple-arcade-starting-may-21/",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "End-to-end encrypted RCS messaging begins rolling out today in beta",
+        "url": "https://www.apple.com/newsroom/2026/05/end-to-end-encrypted-rcs-messaging-begins-rolling-out-today-in-beta/",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "amazon_news",
+    "source_name": "Amazon News",
+    "theme": "company_strategy",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://www.aboutamazon.com/news/rss",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "An update on the search for the next James Bond",
+        "url": "https://www.aboutamazon.com/news/entertainment/next-james-bond-movie-latest-updates?utm_source=rss",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "Everything to know about Audible",
+        "url": "https://www.aboutamazon.com/news/entertainment/everything-to-know-about-audible?utm_source=rss",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "nvidia_blog",
+    "source_name": "NVIDIA Blog",
+    "theme": "company_strategy",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://blogs.nvidia.com/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Sea You in the Cloud: \u2018Subnautica 2\u2019 Early Access Dives Onto GeForce NOW",
+        "url": "https://blogs.nvidia.com/blog/geforce-now-thursday-subnautica-2/",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "NVIDIA, Ineffable Intelligence Team Up to Build the Future of Reinforcement Learning Infrastructure",
+        "url": "https://blogs.nvidia.com/blog/ineffable-intelligence-reinforcement-learning-infrastructure/",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "lennys_podcast",
+    "source_name": "Lenny's Podcast",
+    "error": "URL not resolved (env var not set)",
+    "items": []
+  },
+  {
+    "source_id": "stratechery",
+    "source_name": "Stratechery (Free)",
+    "theme": "market_behavior",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://stratechery.com/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "2026.20: Shifting Alliances in a Changing World",
+        "url": "https://stratechery.com/2026/shifting-alliances-in-a-changing-world/",
+        "published": "2026-05-15T11:30:00+00:00",
+        "rss_words": 865,
+        "fetch_tier": "rss",
+        "fetch_words": 865,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<figure class=\"wp-block-image size-large\"><img alt=\"\" class=\"wp-image-19050\" height=\"1133\" src=\"https://i0.wp.com/stratechery.com/wp-content/uploads/2026/05/GettyImages-2276124586.jpg?resize=1700%2C11"
+      },
+      {
+        "title": "An Interview with Ben Thompson at the MoffettNathanson Media, Internet & Communications Conference",
+        "url": "https://stratechery.com/2026/an-interview-with-ben-thompson-at-the-moffettnathanson-media-internet-communications-conference/",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "nngroup",
+    "source_name": "Nielsen Norman Group",
+    "theme": "design_ux",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://www.nngroup.com/feed/rss/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Small by Design: The Strength of Lean Design-System Teams",
+        "url": "https://www.nngroup.com/articles/lean-design-system-teams/?utm_source=rss&utm_medium=feed&utm_campaign=rss-syndication",
+        "published": "2026-05-15T11:30:00+00:00",
+        "rss_words": 225,
+        "fetch_tier": "primary",
+        "fetch_words": 1867,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "6 Small by Design: The Strength of Lean Design-System Teams Huei-Hsin Wang Huei-Hsin Wang May 15, 2026 2026-05-15 Share Email article Share on LinkedIn Share on Twitter Summary: Lean design-system tea"
+      },
+      {
+        "title": "What Designers Actually Struggle with on Product Teams",
+        "url": "https://www.nngroup.com/articles/designers-product-teams/?utm_source=rss&utm_medium=feed&utm_campaign=rss-syndication",
+        "published": "2026-05-15T11:30:00+00:00",
+        "rss_words": 206,
+        "fetch_tier": "primary",
+        "fetch_words": 980,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "3 What Designers Actually Struggle with on Product Teams Laura Klein Laura Klein May 15, 2026 2026-05-15 Share Email article Share on LinkedIn Share on Twitter Summary: Designers' top struggles aren't"
+      }
+    ]
+  },
+  {
+    "source_id": "ux_collective",
+    "source_name": "UX Collective",
+    "theme": "design_ux",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://uxdesign.cc/feed",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Should we be kind to machines (for our own sake, really)?",
+        "url": "https://uxdesign.cc/should-we-be-kind-to-machines-for-our-own-sake-really-26acf222af29?source=rss----138adf9c44c---4",
+        "published": "2026-05-16T13:41:51+00:00",
+        "rss_words": 2829,
+        "fetch_tier": "rss",
+        "fetch_words": 2829,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<h4><em>We know AI isn\u2019t conscious. We know it has no feelings, no preferences, no skin in the game. We say \u201cplease\u201d and \u201cthank you\u201d\u00a0anyway.</em></h4><figure><img alt=\"Two speech bubbles overlapping. "
+      },
+      {
+        "title": "How to write a DESIGN.md file Claude can actually use",
+        "url": "https://uxdesign.cc/how-to-write-a-design-md-file-claude-can-actually-use-2d89d183f823?source=rss----138adf9c44c---4",
+        "published": "2026-05-16T13:41:22+00:00",
+        "rss_words": 23,
+        "fetch_tier": "jina",
+        "fetch_words": 371,
+        "confidence": "medium (below floor)",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "Get app Write  Sign up  Sign in  UX Collective  We believe designers are thinkers as much as they are makers. https://linktr.ee/uxc  Follow publication  Member-only story  How to write a DESIGN.md fil"
+      }
+    ]
+  },
+  {
+    "source_id": "politico_tech",
+    "source_name": "Politico Tech",
+    "theme": "regulation_policy",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://rss.politico.com/technology.xml",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "House talks look at blocking some state AI laws, including in California and New York",
+        "url": "https://www.politico.com/news/2026/05/15/house-ai-talks-model-vetting-00924955",
+        "published": "2026-05-15T17:55:23+00:00",
+        "rss_words": 18,
+        "fetch_tier": "failed (jina_too_short (37 words))",
+        "fetch_words": 18,
+        "confidence": "skip (below summarizer minimum)",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Previously unreported details of negotiations come as the White House grapples with challenges from the emergence of Mythos."
+      },
+      {
+        "title": "Cruz pushes forward on kids' safety package",
+        "url": "https://www.politico.com/live-updates/2026/05/13/congress/cruz-to-mark-up-kids-safety-package-within-the-next-month-00919011",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "eff",
+    "source_name": "Electronic Frontier Foundation",
+    "theme": "regulation_policy",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://www.eff.org/rss/updates.xml",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Help EFF Solve an Issue That's Bigger than Creepy Ads",
+        "url": "https://www.eff.org/deeplinks/2026/05/online-tracking-isnt-just-unethical-its-dangerous",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "The Science is Not Settled: How Weak Evidence is Fueling a National Push to Ban Social Media for Youth",
+        "url": "https://www.eff.org/deeplinks/2026/05/science-not-settled-how-weak-evidence-fueling-national-push-ban-social-media-youth",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "quartz",
+    "source_name": "Quartz",
+    "theme": "consumer_behavior",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://qz.com/feed",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "America's power grid can't keep up with AI demand",
+        "url": "https://qz.com/us-power-grid-ai-data-center-demand-constraints-051326",
+        "published": "2026-05-17T07:31:16+00:00",
+        "rss_words": 23,
+        "fetch_tier": "jina",
+        "fetch_words": 1775,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Search Newsletters Editions HOME LATEST BUSINESS NEWS MONEY & MARKETS TECH & INNOVATION A.I. LIFESTYLE LEADERSHIP \u2709\ufe0f EMAILS \ud83c\udfa7 PODCASTS A.I. America's power grid can't keep up with AI demand Grid engin"
+      },
+      {
+        "title": "25 Italian pasta recipes every home cook should know",
+        "url": "https://qz.com/25-home-cook-italian-pasta-recipes",
+        "published": "2026-05-17T05:47:09+00:00",
+        "rss_words": 26,
+        "fetch_tier": "jina",
+        "fetch_words": 11489,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "25 Italian pasta recipes every home cook should know UNTITLED 25 Italian pasta recipes every home cook should know From weeknight Roman classics to slow-cooked Sunday rag\u00f9s, these 25 Italian pasta dis"
+      }
+    ]
+  },
+  {
+    "source_id": "axios_business",
+    "source_name": "Axios Business",
+    "theme": "consumer_behavior",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://www.axios.com/feeds/feed.rss",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Trump warns Iran \"clock is ticking\" until U.S. launches harder strikes",
+        "url": "https://www.axios.com/2026/05/17/trump-iran-warning-harder-strikes",
+        "published": "2026-05-17T13:10:56+00:00",
+        "rss_words": 362,
+        "fetch_tier": "rss",
+        "fetch_words": 362,
+        "confidence": "medium (below floor)",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p>President <a href=\"https://www.axios.com/politics-policy/donald-trump\" target=\"_blank\">Trump</a> told Axios in a phone call that \"the clock is ticking\" for Iran and warned that if the Iranian regim"
+      },
+      {
+        "title": "Exclusive: U.S. eyes attack-drone threat from Cuba",
+        "url": "https://www.axios.com/2026/05/17/us-military-drones-cuba",
+        "published": "2026-05-17T06:45:05+00:00",
+        "rss_words": 780,
+        "fetch_tier": "rss",
+        "fetch_words": 780,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p><a href=\"https://www.axios.com/2026/05/11/trump-cuba-pressure-military-action-talk\" target=\"_blank\">Cuba</a> has acquired more than 300 military drones and recently began discussing plans to use th"
+      }
+    ]
+  },
+  {
+    "source_id": "hard_fork",
+    "source_name": "Hard Fork",
+    "theme": "market_behavior",
+    "type": "podcast",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://feeds.simplecast.com/l2i9YnTd",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "A.I. Safety Is So Back + Mythos Mayhem with Nikesh Arora + Hot Mess Express",
+        "url": "https://www.nytimes.com/column/hard-fork",
+        "published": "2026-05-15T05:30:00+00:00",
+        "rss_words": 326,
+        "fetch_tier": "rss",
+        "fetch_words": 326,
+        "confidence": "medium (below floor)",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p>This week, between the president\u2019s negotiations in China and a potential executive order, we discuss why the Trump administration seems to be changing its tune on A.I. safety. Then, Nikesh Arora, c"
+      },
+      {
+        "title": "Can the U.S. Rein in Prediction Markets? + Joanna Stern on Her Year of A.I. Experiments + Our Producer Goes to Attention School",
+        "url": "https://www.nytimes.com/column/hard-fork",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "dwarkesh",
+    "source_name": "Dwarkesh Podcast",
+    "theme": "ai_technology",
+    "type": "podcast",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://dwarkeshpatel.substack.com/feed",
+    "items_checked": 0,
+    "items": []
+  },
+  {
+    "source_id": "pivot",
+    "source_name": "Pivot",
+    "theme": "consumer_behavior",
+    "type": "podcast",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://feeds.megaphone.fm/pivot",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Trump\u2019s China Summit, Inflation Shock, and Silicon Valley\u2019s Midterm Money",
+        "url": "",
+        "published": "2026-05-15T04:30:00+00:00",
+        "rss_words": 129,
+        "fetch_tier": "rss",
+        "fetch_words": 129,
+        "confidence": "skip (below summarizer minimum)",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p>Kara and Scott unpack what AI obsession is doing to relationships and young men. Then, they break down Trump\u2019s China summit, the crew of business executives he brought along, and ominous warnings f"
+      },
+      {
+        "title": "Midterm Map Wars, AirPods Revamp, and Trump Phone Grift",
+        "url": "",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "lennys_newsletter",
+    "source_name": "Lenny's Newsletter",
+    "error": "URL not resolved (env var not set)",
+    "items": []
+  },
+  {
+    "source_id": "how_i_ai",
+    "source_name": "How I AI (Claire Vo)",
+    "error": "URL not resolved (env var not set)",
+    "items": []
+  },
+  {
+    "source_id": "sifted",
+    "source_name": "Sifted",
+    "theme": "market_behavior",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://sifted.eu/feed",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Dutch dronemaker Destinus in \u20ac200m funding talks, reports say",
+        "url": "https://sifted.eu/articles/destinuse-defence-fundraise-report/",
+        "published": "2026-05-15T10:12:26+00:00",
+        "rss_words": 0,
+        "fetch_tier": "primary",
+        "fetch_words": 186,
+        "confidence": "skip (below summarizer minimum)",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "Defence tech startup Destinus is in talks to raise around \u20ac200m ahead of a planned IPO, according to reports. The Netherlands-headquartered company, which develops drones and cruise missiles, is repor"
+      },
+      {
+        "title": "Tech founders and investors on the Sunday Times Rich List 2026",
+        "url": "https://sifted.eu/articles/tech-founders-and-investors-on-the-sunday-times-rich-list-2026/",
+        "published": "2026-05-15T09:56:09+00:00",
+        "rss_words": 0,
+        "fetch_tier": "primary",
+        "fetch_words": 405,
+        "confidence": "high",
+        "is_thin_feed": true,
+        "is_fetch_blocked": false,
+        "preview": "European tech founders and investors climbed sharply up the Sunday Times Rich List 2026, buoyed by soaring valuations in fintech and AI. Revolut cofounder and CEO Nik Storonsky was the biggest mover a"
+      }
+    ]
+  },
+  {
+    "source_id": "medianama",
+    "source_name": "Medianama",
+    "theme": "regulation_policy",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://www.medianama.com/feed/",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Lowdown: What is the landmark US cryptocurrency regulation passed by the Senate Banking Committee",
+        "url": "https://www.medianama.com/2026/05/223-lowdown-landmark-us-cryptocurrency-regulation-passed-senate-banking-committee/",
+        "published": "2026-05-16T05:48:51+00:00",
+        "rss_words": 797,
+        "fetch_tier": "rss",
+        "fetch_words": 797,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<ul class=\"wp-block-list\"> <li><a href=\"https://www.medianama.com/wp-content/uploads/2026/05/BILLS-119hr3633eh.pdf\">Download a copy of the act here.&nbsp;</a></li> </ul>    <p>The US Senate Banking Co"
+      },
+      {
+        "title": "Delhi court orders OpIndia to remove articles on journalist Swati Chaturvedi",
+        "url": "https://www.medianama.com/2026/05/223-delhi-court-orders-opindia-remove-articles-journalist-swati-chaturvedi/",
+        "published": "2026-05-16T02:37:51+00:00",
+        "rss_words": 574,
+        "fetch_tier": "rss",
+        "fetch_words": 574,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p><strong>You can access the court order from </strong><a href=\"https://www.medianama.com/wp-content/uploads/2026/05/displayphp-674123.pdf\"><strong>here</strong></a>.</p>    <p>A Delhi court has <str"
+      }
+    ]
+  },
+  {
+    "source_id": "yourstory",
+    "source_name": "YourStory",
+    "theme": "startup_disruption",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://yourstory.com/feed",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "AONMeetings bets big on India with 450-partner push and browser-based meeting rooms",
+        "url": "https://yourstory.com/2026/05/aonmeetings-bets-big-india-450-partner-push-browser-based-meeting-rooms",
+        "published": "2026-05-15T06:25:32+00:00",
+        "rss_words": 825,
+        "fetch_tier": "rss",
+        "fetch_words": 825,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<div><img src=\"https://images.yourstory.com/cs/2/81f42290-b0f5-11ed-aa4d-75d0d1d6c429/1778747212113.jpeg\" /><img height=\"1\" src=\"https://yourstory.com/api/v2/analytics?i=336210&amp;t=feed&amp;u=https:"
+      },
+      {
+        "title": "Freshworks experts reveal the three signs your IT team is ready to modernize",
+        "url": "https://yourstory.com/2026/05/freshworks-experts-reveal-three-signs-it-team-modernize",
+        "published": "2026-05-15T09:11:18+00:00",
+        "rss_words": 750,
+        "fetch_tier": "rss",
+        "fetch_words": 750,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<div><img src=\"https://images.yourstory.com/cs/2/21ccd920843c11ec88170b5512a0f9d5/FeatureImage-1778838671732.PNG\" /><img height=\"1\" src=\"https://yourstory.com/api/v2/analytics?i=336220&amp;t=feed&amp;"
+      }
+    ]
+  },
+  {
+    "source_id": "vulcan_post",
+    "source_name": "Vulcan Post",
+    "theme": "market_behavior",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://vulcanpost.com/feed",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "The Woodleigh Mall is rapidly losing tenants, but rents still won\u2019t come down. Here\u2019s why.",
+        "url": "https://vulcanpost.com/911301/the-woodleigh-mall-losing-tenants-but-rent-still-wont-come-down/",
+        "published": "2026-05-15T04:13:16+00:00",
+        "rss_words": 1657,
+        "fetch_tier": "rss",
+        "fetch_words": 1657,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<h2 class=\"wp-block-heading\" id=\"h-landlords-would-rather-hold-out-for-higher-paying-tenants-than-lower-rent\"><strong>Landlords would rather hold out for higher-paying tenants than lower rent</strong>"
+      },
+      {
+        "title": "Inside HelloRide\u2019s rapid expansion: Here\u2019s how it put 20K bikes on S\u2019pore\u2019s streets in 3 yrs",
+        "url": "https://vulcanpost.com/911288/inside-helloride-rapid-expansion-in-singapore/",
+        "published": "2026-05-14T21:42:49+00:00",
+        "rss_words": 1375,
+        "fetch_tier": "rss",
+        "fetch_words": 1375,
+        "confidence": "high",
+        "is_thin_feed": false,
+        "is_fetch_blocked": false,
+        "preview": "<p><em>[This is a sponsored article with <a href=\"https://www.helloride-global.com/\" rel=\"noreferrer noopener\" target=\"_blank\">HelloRide</a>.]</em></p>    <p>Walk around your estate, MRT station, park"
+      }
+    ]
+  },
+  {
+    "source_id": "netflix_techblog",
+    "source_name": "Netflix Tech Blog",
+    "theme": "company_strategy",
+    "type": "rss",
+    "thin_feed": false,
+    "fetch_blocked": false,
+    "feed_url": "https://netflixtechblog.com/feed",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Scaling ArchUnit with Nebula ArchRules",
+        "url": "https://netflixtechblog.com/scaling-archunit-with-nebula-archrules-b4642c464c5a?source=rss----2615bd06b42e---4",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "Democratizing Machine Learning at Netflix: Building the Model Lifecycle Graph",
+        "url": "https://netflixtechblog.com/democratizing-machine-learning-at-netflix-building-the-model-lifecycle-graph-5cc6d5828bb1?source=rss----2615bd06b42e---4",
+        "skipped": "outside lookback window"
+      }
+    ]
+  },
+  {
+    "source_id": "anthropic_news",
+    "source_name": "Anthropic News",
+    "theme": "company_strategy",
+    "type": "rss",
+    "thin_feed": true,
+    "fetch_blocked": false,
+    "feed_url": "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml",
+    "items_checked": 2,
+    "items": [
+      {
+        "title": "Anthropic forms $200 million partnership with the Gates Foundation",
+        "url": "https://www.anthropic.com/news/gates-foundation-partnership",
+        "skipped": "outside lookback window"
+      },
+      {
+        "title": "PwC is deploying Claude to build technology, execute deals, and reinvent enterprise functions for clients",
+        "url": "https://www.anthropic.com/news/pwc-expanded-partnership",
+        "skipped": "outside lookback window"
+      }
+    ]
+  }
+]

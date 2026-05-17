@@ -32,13 +32,6 @@ OG_DESCRIPTION_MIN_WORDS = 20
 # If Jina returns fewer words than this, treat it as a failed fetch.
 JINA_MIN_WORD_THRESHOLD = 150
 
-BLOCKED_DOMAINS = {
-    "blogs.microsoft.com",
-    "openai.com",
-    "qz.com",
-    "www.politico.com",
-}
-
 # Domains where the primary fetcher reliably fails (JS-rendered or hard paywalls)
 # and we should skip straight to Jina rather than wasting a round-trip.
 JINA_PREFERRED_DOMAINS = {
@@ -149,13 +142,6 @@ def fetch_article_text(url: str, timeout: int = 10) -> str:
         return ""
 
     domain = _get_domain(url)
-
-    if domain in BLOCKED_DOMAINS:
-        logger.warning(
-            "Skipping full fetch for blocked domain %s — will use RSS summary only",
-            domain,
-        )
-        return ""
 
     # --- Tier 1: Primary httpx fetch (skip for known JS-heavy domains) ---
     og_description = ""

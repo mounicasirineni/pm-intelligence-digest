@@ -49,9 +49,11 @@ SYSTEM_PROMPT = (
     "and a concrete product design consequence, always prefer the latter. "
     "A specific mechanical implication that tells a PM what decision to make, what assumption to test, "
     "or what design pattern to apply is always stronger than a generalizable pattern observation. "
-    "Test every closing implication sentence: could a PM walk into a meeting tomorrow and use this "
-    "to change a decision? If the answer is 'it depends on context' or 'it is a useful frame,' "
-    "the implication is too abstract — rewrite it. "
+    "Test every closing implication sentence on two dimensions: (1) Is it traceable to a specific "
+    "bullet in a cited source? (2) Does it match the hedge level of that source? A closing sentence "
+    "that asserts certainty where the source only suggests possibility is an inference boundary "
+    "violation regardless of how actionable it sounds. Prefer a hedged specific consequence over a "
+    "confident general one. "
     "The broad observation is usually derivable from the headline. "
     "The specific mechanical consequence requires reading the full content. Keep the latter. "
     "A sharp PM should be able to walk into any interview and have a prepared opinion on the insights you surface."
@@ -442,19 +444,20 @@ Items:
 First, write your anchor selection reasoning inside <reasoning>...</reasoning> tags.
 For each required anchor theme:
 (1) List ALL insight bullets across every source eligible for that theme, ranked by non-obviousness.
-(2) Name the highest-ranked bullet and explain why it is the anchor.
-(3) List any bullets that contradict or qualify the anchor's claim and how you will address them.
+(2) Name the highest-ranked bullet and declare it the closing implication anchor. The closing sentence of the paragraph must be traceable to this bullet specifically — not to a synthesizer-constructed bridge across bullets, and not to a lower-ranked bullet. If you find yourself writing a closing sentence that does not trace to this bullet, return to the ranked list and select a different anchor.
+(3) List every bullet from the cited sources that contradicts, qualifies, or limits the anchor's claim. For each one, decide: incorporate it into the paragraph, or explicitly acknowledge it as a scope limitation. Omission is not an option — if a qualifying bullet would change the conclusion a reader draws, it must appear in the paragraph or the closing implication must be scoped to exclude it.
+(4) If you are combining items from more than one source into this paragraph, name the specific causal mechanism that justifies the combination. If you cannot name a mechanism beyond a shared category label, do not combine — anchor to the single strongest source instead.
 
 Then produce a JSON object with this exact structure:
 {{
   "whats_shifting": [
     {{
       "headline": "One declarative sentence, maximum 20 words, naming the underlying structural force or pattern. Not an event description. Renders as the visible collapsed card headline — scannable and self-contained.",
-      "paragraph": "Open by restating the headline claim with one additional clause of context. Develop across 3-4 sentences connecting signals from different sources to reveal something non-obvious. Close with one PM implication directly traceable to a cited source. Every sentence ends with inline [n] citations. HEDGE MATCH: match source hedge levels throughout — 'suggests' not 'demonstrates'. NO TIMELINE: omit any timeline not verbatim in a source. NO UNIVERSALITY: scope claims to actual examples. Draw from at least 2 distinct insight bullets — use the best available rather than omitting the paragraph. CLOSING SENTENCE: single consequence, source-traceable, no constructed PM actions.",
+      "paragraph": "Open by restating the headline claim with one additional clause of context. Develop across 3-4 sentences. If drawing from a single source, build depth by incorporating its strongest and most complicating bullets. If drawing from multiple sources, only combine them if you can name a specific causal mechanism that connects them — one that neither source states alone. A shared category label ('both are about AI costs') is not a mechanism. A shared causal chain ('both reveal that X causes Y through mechanism Z') is. When in doubt, anchor to one source's strongest bullet and build depth rather than breadth. Close with one PM implication directly traceable to a cited source. Every sentence ends with inline [n] citations. HEDGE MATCH: match source hedge levels throughout — 'suggests' not 'demonstrates'. NO TIMELINE: omit any timeline not verbatim in a source. NO UNIVERSALITY: scope claims to actual examples. Draw from at least 2 distinct insight bullets — use the best available rather than omitting the paragraph. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. If any exist, either incorporate them or scope the closing implication to reflect the limitation. A paragraph that ignores complicating evidence from its own cited sources will score lower than one that acknowledges the complication and commits to a narrower claim. INSIGHT SELECTION RULE: The closing implication must trace to the single highest-ranked bullet identified in your reasoning — the most non-obvious, specific, and source-grounded insight available. Do not close with a broad pattern observation when a more specific mechanical consequence is available in the source bullets. The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'means' or 'demonstrates'. Do not convert a source observation into a prescription. If no source bullet explicitly states a PM action, use 'this suggests' or 'this may signal' framing. Never write 'this means PMs must/should' unless a cited source explicitly states that directive. A well-hedged implication that commits to one specific consequence scores higher than a confident assertion that goes beyond the source.",
       "source_indices": [1, 2]
     }}
   ],
-  "interview_angle": "One specific tradeoff a PM should have a prepared opinion on this week, derived from a whats_shifting source. Empty string if no whats_shifting paragraph was produced. Frame as a debatable tradeoff at PM decision level — feature prioritization, architecture, safety design, retention, compliance, pricing, or go-to-market. Scope to the context the source describes."
+  "interview_angle": "One specific tradeoff a PM should have a prepared opinion on this week, derived from a whats_shifting source. Empty string if no whats_shifting paragraph was produced. Frame as a debatable tradeoff at PM decision level — feature prioritization, architecture, safety design, retention, compliance, pricing, or go-to-market. Scope to the context the source describes. DOMAIN RULE: Do not frame in legal, financial, or policy terms even if the source is a legal or regulatory story — translate into a product decision a PM owns. For example, a story about litigation risk should not ask 'should your company document financing rounds for legal defensibility' but rather 'when a platform you depend on undergoes a control shift through a major financing round, how do you reassess your product's dependency risk.' The angle must be answerable by a PM from product judgment, not legal or financial expertise. NEGATIVE EXAMPLE: 'Should your legal team document control shifts in financing rounds' — this is a legal question, not a PM question. POSITIVE EXAMPLE: 'When a major financing round changes who practically controls a platform you depend on, how do you reassess build vs. buy decisions' — this is a PM-owned tradeoff."
 }}
 
 IMPORTANT: Do not include anchor_reasoning inside the JSON. All reasoning goes in the <reasoning> block only.
@@ -560,13 +563,14 @@ Items for this theme:
 
 First, write your reasoning inside <reasoning>...</reasoning> tags:
 (1) List all insight bullets ranked by non-obviousness.
-(2) Name your anchor bullet and why.
-(3) Note any contradicting bullets and how you will address them.
+(2) Name the highest-ranked bullet and declare it the closing implication anchor. The closing sentence of the paragraph must be traceable to this bullet specifically — not to a synthesizer-constructed bridge across bullets, and not to a lower-ranked bullet. If you find yourself writing a closing sentence that does not trace to this bullet, return to the ranked list and select a different anchor.
+(3) List every bullet from the cited sources that contradicts, qualifies, or limits the anchor's claim. For each one, decide: incorporate it into the paragraph, or explicitly acknowledge it as a scope limitation. Omission is not an option — if a qualifying bullet would change the conclusion a reader draws, it must appear in the paragraph or the closing implication must be scoped to exclude it.
+(4) If you are combining items from more than one source into this paragraph, name the specific causal mechanism that justifies the combination. If you cannot name a mechanism beyond a shared category label, do not combine — anchor to the single strongest source instead.
 
 Then produce a JSON object:
 {{
   "headline": "One declarative sentence, maximum 20 words, naming the structural force or pattern. Scannable, self-contained, not an event description.",
-  "paragraph": "3-5 sentences. Open with the headline claim plus one clause of context. Develop with 2+ bullets from the items above. Close with one PM implication traceable to a cited source. Every sentence has inline [n] citations. HEDGE MATCH: match source hedge levels. NO TIMELINE unless verbatim in source. NO UNIVERSALITY beyond actual examples.",
+  "paragraph": "3-5 sentences. Open with the headline claim plus one clause of context. Develop with 2+ bullets from the items above. Close with one PM implication traceable to a cited source. Every sentence has inline [n] citations. HEDGE MATCH: match source hedge levels. NO TIMELINE unless verbatim in source. NO UNIVERSALITY beyond actual examples. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. If any exist, either incorporate them or scope the closing implication to reflect the limitation. A paragraph that ignores complicating evidence from its own cited sources will score lower than one that acknowledges the complication and commits to a narrower claim. INSIGHT SELECTION RULE: The closing implication must trace to the single highest-ranked bullet identified in your reasoning — the most non-obvious, specific, and source-grounded insight available. Do not close with a broad pattern observation when a more specific mechanical consequence is available in the source bullets. The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'means' or 'demonstrates'. Do not convert a source observation into a prescription. If no source bullet explicitly states a PM action, use 'this suggests' or 'this may signal' framing. Never write 'this means PMs must/should' unless a cited source explicitly states that directive. A well-hedged implication that commits to one specific consequence scores higher than a confident assertion that goes beyond the source.",
   "source_indices": []
 }}
 
@@ -649,15 +653,16 @@ Items:
 First, write your anchor selection reasoning inside <reasoning>...</reasoning> tags.
 For each company with available items, for each startup radar item, and for pm_craft_today:
 (1) List ALL insight bullets ranked by non-obviousness.
-(2) Name the highest-ranked bullet and explain why it is the anchor.
-(3) Note any contradicting bullets and how you will address them.
+(2) Name the highest-ranked bullet and declare it the closing implication anchor. The closing sentence of the paragraph must be traceable to this bullet specifically — not to a synthesizer-constructed bridge across bullets, and not to a lower-ranked bullet. If you find yourself writing a closing sentence that does not trace to this bullet, return to the ranked list and select a different anchor.
+(3) List every bullet from the cited sources that contradicts, qualifies, or limits the anchor's claim. For each one, decide: incorporate it into the paragraph, or explicitly acknowledge it as a scope limitation. Omission is not an option — if a qualifying bullet would change the conclusion a reader draws, it must appear in the paragraph or the closing implication must be scoped to exclude it.
+(4) If you are combining items from more than one source into this paragraph, name the specific causal mechanism that justifies the combination. If you cannot name a mechanism beyond a shared category label, do not combine — anchor to the single strongest source instead.
 
 Then produce a JSON object. Do not include anchor_reasoning fields inside the JSON.
 
 {{
   "company_watch": {{
     "Google": {{
-      "paragraph": "2-3 sentences of strategic signal. Sentence 1: what is strategically changing — not news, but a shift in positioning, priority, or competitive stance. Sentence 2: evidence with inline [n] citations. Sentence 3 (optional): one implication, most specific and directly grounded. OMIT RULE: empty string if no company_watch ONLY item matches this company. SOURCE RULE: only cite items tagged company_watch ONLY whose Company field matches. HEDGE MATCH throughout. CLOSING: single consequence, source-traceable, no constructed framings.",
+      "paragraph": "2-3 sentences of strategic signal. Sentence 1: what is strategically changing — not news, but a shift in positioning, priority, or competitive stance. Sentence 2: evidence with inline [n] citations. Sentence 3 (optional): one implication, most specific and directly grounded. OMIT RULE: empty string if no company_watch ONLY item matches this company. SOURCE RULE: only cite items tagged company_watch ONLY whose Company field matches. HEDGE MATCH throughout. COMPLICATION RULE: If the cited source contains a bullet that qualifies or limits the central claim, incorporate it or scope the implication accordingly. Do not build toward a clean conclusion by omitting evidence that complicates it. INSIGHT SELECTION RULE: The closing implication must trace to the single highest-ranked bullet identified in your reasoning — the most non-obvious, specific, and source-grounded insight available. Do not close with a broad pattern observation when a more specific mechanical consequence is available in the source bullets. The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'means' or 'demonstrates'. Do not convert a source observation into a prescription. If no source bullet explicitly states a PM action, use 'this suggests' or 'this may signal' framing. Never write 'this means PMs must/should' unless a cited source explicitly states that directive. A well-hedged implication that commits to one specific consequence scores higher than a confident assertion that goes beyond the source.",
       "source_indices": []
     }},
     "Meta": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}},
@@ -671,12 +676,12 @@ Then produce a JSON object. Do not include anchor_reasoning fields inside the JS
   }},
   "startup_radar": [
     {{
-      "bullet": "2-3 items on early-stage or emerging companies only. Structure: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. HEDGE MATCH. NO TIMELINE unless verbatim in source. METRICS: include funding amount or key metric. THEMATIC COMBINATION: only combine companies if you can name the specific causal mechanism both share — a shared category label is not a mechanism. CLOSING: single consequence, source-traceable, no constructed assertions.",
+      "bullet": "2-3 items on early-stage or emerging companies only. Structure: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. HEDGE MATCH. NO TIMELINE unless verbatim in source. METRICS: include funding amount or key metric. THEMATIC COMBINATION: only combine companies if you can name the specific causal mechanism both share — a shared category label is not a mechanism. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'demonstrates'. Do not assert strategic motivations or market outcomes the source does not state. Use 'this suggests' or 'this may signal' framing when the implication goes one step beyond the source. Never assert certainty where the source only implies possibility.",
       "source_indices": []
     }}
   ],
   "pm_craft_today": {{
-    "text": "Single most actionable PM craft insight. Draw ONLY from items tagged pm_craft_today ONLY (product_craft) OR pm_craft_today eligible (design_ux). Empty string if no such item exists. INSIGHT QUALITY: non-obvious pattern, tradeoff, or reframe that changes how a PM approaches a real decision. CLOSING: single consequence, source-traceable, no constructed PM actions.",
+    "text": "Single most actionable PM craft insight. Draw ONLY from items tagged pm_craft_today ONLY (product_craft) OR pm_craft_today eligible (design_ux). Empty string if no such item exists. INSIGHT QUALITY: non-obvious pattern, tradeoff, or reframe that changes how a PM approaches a real decision. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one actionable consequence traceable to a specific bullet in the cited source. Match the source's hedge level throughout. Do not convert a source observation into a prescriptive mandate — if the source says 'this changes how PMs prioritize', do not write 'PMs must prioritize X from day one'. Frame as 'this suggests' when the implication requires one step of reasoning beyond the source.",
     "source_indices": []
   }}
 }}
@@ -1149,6 +1154,13 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             }
 
         interview_angle = _strip_date_check_flags(str(call1_parsed.get("interview_angle") or ""))
+        INTERVIEW_ANGLE_POISON_STRINGS = ["synthesis pipeline", "surface this week", "run the"]
+        if any(p in interview_angle.lower() for p in INTERVIEW_ANGLE_POISON_STRINGS):
+            logger.warning(
+                "INTERVIEW ANGLE: Prompt bleed detected — suppressing output. Raw: %s",
+                interview_angle[:200],
+            )
+            interview_angle = ""
         normalized_company_watch = _normalize_company_watch(call2_parsed.get("company_watch") or {})
         normalized_startup_radar = _normalize_startup_radar(call2_parsed.get("startup_radar") or [])
         pm_craft_today = _normalize_pm_craft(call2_parsed.get("pm_craft_today") or {})

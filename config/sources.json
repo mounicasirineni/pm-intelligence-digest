@@ -14,7 +14,8 @@
       "name": "Platformer",
       "url": "https://www.platformer.news/feed/",
       "theme": "market_behavior",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "mit_tech_review",
@@ -100,8 +101,7 @@
       "theme": "company_strategy",
       "company_id": "Microsoft",
       "verified": false,
-      "thin_feed": true,
-      "fetch_blocked": true
+      "thin_feed": true
     },
     {
       "id": "simon_willison_blog",
@@ -109,7 +109,8 @@
       "name": "Simon Willison's Blog",
       "url": "https://simonwillison.net/atom/everything/",
       "theme": "ai_technology",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "openai_news",
@@ -119,8 +120,7 @@
       "theme": "company_strategy",
       "company_id": "OpenAI",
       "verified": false,
-      "thin_feed": true,
-      "fetch_blocked": true
+      "thin_feed": true
     },
     {
       "id": "rest_of_world",
@@ -153,7 +153,8 @@
       "name": "The Verge",
       "url": "https://www.theverge.com/rss/index.xml",
       "theme": "market_behavior",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "apple_newsroom",
@@ -205,7 +206,8 @@
       "name": "Nielsen Norman Group",
       "url": "https://www.nngroup.com/feed/rss/",
       "theme": "design_ux",
-      "verified": false
+      "verified": false,
+      "thin_feed": true
     },
     {
       "id": "ux_collective",
@@ -222,8 +224,7 @@
       "url": "https://rss.politico.com/technology.xml",
       "theme": "regulation_policy",
       "verified": false,
-      "thin_feed": true,
-      "fetch_blocked": true
+      "thin_feed": true
     },
     {
       "id": "eff",
@@ -240,8 +241,7 @@
       "url": "https://qz.com/feed",
       "theme": "consumer_behavior",
       "verified": false,
-      "thin_feed": true,
-      "fetch_blocked": true
+      "thin_feed": true
     },
     {
       "id": "axios_business",
