@@ -6,15 +6,17 @@ import sqlite3
 import logging
 import os
 import re
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
-from flask import Flask, redirect, render_template, url_for, abort, send_from_directory
+from flask import Flask, redirect, render_template, url_for, abort, request, send_from_directory
 import pytz
 
 from .config import load_settings
+from .digest_utils import get_used_indices
 from .services.cache import get_digest_for_today, init_db, save_digest
 from .services.rss import fetch_items_grouped_by_theme
 from .services.summarizer import summarize_item
@@ -45,6 +47,18 @@ init_db()
 
 _scheduler: BackgroundScheduler | None = None
 
+# FIX: thread-safe cache — APScheduler background job and Flask request threads
+# both write _CACHE; without a lock, concurrent /refresh requests could both
+# pass the None check and launch duplicate pipeline runs.
+_CACHE_LOCK = threading.Lock()
+
+_CACHE = {
+    "synthesis": None,
+    "items_by_theme": None,
+    "generated_at": None,
+    "fetch_metadata": None,
+}
+
 
 def _bold_md(value: str) -> str:
     """Convert **bold** markdown to <strong>bold</strong> for inline emphasis."""
@@ -61,43 +75,19 @@ def _build_utilized_keys(synthesis: dict) -> set:
     Return the set of (source_name, title) pairs for articles actually
     cited in synthesis output via source_indices.
 
-    source_index_lookup contains every article passed INTO synthesis.
-    This function resolves only the subset that Claude actually referenced
-    in whats_shifting, company_watch, startup_radar, or pm_craft_today.
+    FIX: previously duplicated the used_indices extraction logic from
+    evaluator.pipeline_funnel.  Now uses the shared get_used_indices()
+    utility from digest_utils so adding a new digest section only
+    requires updating one place.
     """
     source_index_lookup = (synthesis or {}).get("source_index_lookup") or {}
-
-    used_indices: set = set()
-
-    for insight in (synthesis.get("whats_shifting") or []):
-        if isinstance(insight, dict):
-            used_indices.update(str(i) for i in (insight.get("source_indices") or []))
-
-    for company in (synthesis.get("company_watch") or {}).values():
-        if isinstance(company, dict):
-            used_indices.update(str(i) for i in (company.get("source_indices") or []))
-
-    for item in (synthesis.get("startup_radar") or []):
-        if isinstance(item, dict):
-            used_indices.update(str(i) for i in (item.get("source_indices") or []))
-
-    pm_craft = synthesis.get("pm_craft_today")
-    if isinstance(pm_craft, dict):
-        used_indices.update(str(i) for i in (pm_craft.get("source_indices") or []))
+    used_indices = get_used_indices(synthesis or {})
 
     return {
         (v["source_name"], v["title"])
         for k, v in source_index_lookup.items()
         if k in used_indices and isinstance(v, dict)
     }
-
-
-_CACHE = {
-    "synthesis": None,
-    "items_by_theme": None,
-    "generated_at": None,
-    "fetch_metadata": None,
-}
 
 
 def _run_pipeline():
@@ -111,11 +101,18 @@ def _run_pipeline():
 
     for theme, items in grouped_raw.items():
         summarized_items = []
+        failed = 0
+        total = len(items)
+
         for item in items:
             try:
                 summary = summarize_item(item)
             except Exception as exc:
-                print(f"Summarizer failed for item '{item.get('title')}' in theme '{theme}': {exc}")
+                failed += 1
+                logger.warning(
+                    "Summarizer failed for item '%s' in theme '%s': %s",
+                    item.get("title"), theme, exc,
+                )
                 continue
 
             summarized_items.append(
@@ -135,6 +132,20 @@ def _run_pipeline():
                 }
             )
 
+        if total > 0:
+            logger.info(
+                "Summarization for theme '%s': %d/%d items succeeded, %d failed",
+                theme, total - failed, total, failed,
+            )
+            # FIX: abort pipeline on mass summarizer failure to prevent a silent
+            # empty digest (e.g. caused by API key expiry mid-run).
+            if failed > 0 and total > 0 and failed / total > 0.5:
+                raise RuntimeError(
+                    f"Summarization mass failure in theme '{theme}': "
+                    f"{failed}/{total} items failed. "
+                    "Aborting pipeline to prevent an empty digest from being saved."
+                )
+
         if summarized_items:
             items_by_theme[theme] = summarized_items
 
@@ -146,7 +157,7 @@ def _run_pipeline():
 
 def _start_scheduler_if_needed() -> None:
     global _scheduler
-    print("_start_scheduler_if_needed called", flush=True)
+    logger.debug("_start_scheduler_if_needed called")
 
     settings = load_settings()
     if settings.app_env.lower() == "testing":
@@ -172,11 +183,11 @@ def _start_scheduler_if_needed() -> None:
 
     _scheduler.start()
 
-    print(
-        f"Scheduler started: digest will refresh daily at "
-        f"{settings.digest_schedule_hour:02d}:{settings.digest_schedule_minute:02d} "
-        f"({settings.digest_timezone})",
-        flush=True,
+    logger.info(
+        "Scheduler started: digest will refresh daily at %02d:%02d (%s)",
+        settings.digest_schedule_hour,
+        settings.digest_schedule_minute,
+        settings.digest_timezone,
     )
 
     def _shutdown_scheduler() -> None:
@@ -189,39 +200,43 @@ def _start_scheduler_if_needed() -> None:
 
 
 def _get_or_run_pipeline(force_refresh: bool = False):
-    if not force_refresh:
-        if _CACHE["synthesis"] is not None:
-            return (
-                _CACHE["synthesis"],
-                _CACHE["items_by_theme"],
-                _CACHE["generated_at"],
-                _CACHE.get("fetch_metadata") or {},
-            )
+    with _CACHE_LOCK:
+        if not force_refresh:
+            if _CACHE["synthesis"] is not None:
+                return (
+                    _CACHE["synthesis"],
+                    _CACHE["items_by_theme"],
+                    _CACHE["generated_at"],
+                    _CACHE.get("fetch_metadata") or {},
+                )
 
-        record = get_digest_for_today()
-        if record is not None:
-            _CACHE["synthesis"] = record.synthesis
-            _CACHE["items_by_theme"] = record.items_by_theme
-            _CACHE["generated_at"] = record.generated_at
-            _CACHE["fetch_metadata"] = record.fetch_metadata
-            return record.synthesis, record.items_by_theme, record.generated_at, record.fetch_metadata
+            record = get_digest_for_today()
+            if record is not None:
+                _CACHE["synthesis"] = record.synthesis
+                _CACHE["items_by_theme"] = record.items_by_theme
+                _CACHE["generated_at"] = record.generated_at
+                _CACHE["fetch_metadata"] = record.fetch_metadata
+                return record.synthesis, record.items_by_theme, record.generated_at, record.fetch_metadata
 
-    synthesis, items_by_theme, generated_at, fetch_metadata = _run_pipeline()
-    _CACHE["synthesis"] = synthesis
-    _CACHE["items_by_theme"] = items_by_theme
-    _CACHE["generated_at"] = generated_at
-    _CACHE["fetch_metadata"] = fetch_metadata
+        synthesis, items_by_theme, generated_at, fetch_metadata = _run_pipeline()
+        _CACHE["synthesis"] = synthesis
+        _CACHE["items_by_theme"] = items_by_theme
+        _CACHE["generated_at"] = generated_at
+        _CACHE["fetch_metadata"] = fetch_metadata
 
     save_digest(synthesis, items_by_theme, generated_at, fetch_metadata=fetch_metadata)
 
     try:
         from .services import evaluator
         date_str = generated_at.date().isoformat() if generated_at else None
-        print(f"[evals] Starting eval for {date_str}", flush=True)
+        logger.info("[evals] Starting eval for %s", date_str)
         evaluator.run(date_str, synthesis, items_by_theme, fetch_metadata=fetch_metadata)
-        print(f"[evals] Completed eval for {date_str}", flush=True)
-    except Exception as e:
-        print(f"[evals] FAILED: {e}", flush=True)
+        logger.info("[evals] Completed eval for %s", date_str)
+    except Exception:
+        # FIX: use logger.exception() to capture full traceback — previously
+        # print(f"[evals] FAILED: {e}") logged only the exception message with
+        # no traceback, making it very hard to diagnose eval failures.
+        logger.exception("[evals] FAILED for %s — eval not written to DB", date_str)
 
     return synthesis, items_by_theme, generated_at, fetch_metadata
 
@@ -331,7 +346,11 @@ def _get_all_evals():
             d = datetime.strptime(date_str, "%Y-%m-%d")
             label = d.strftime("%B %d, %Y")
         except ValueError:
-            label = date_str
+            # FIX: skip rows with malformed date strings (e.g. debug eval rows
+            # written by the old /debug-eval route).  Previously these appeared
+            # in the eval history with the raw date string as the label.
+            logger.debug("Skipping eval row with non-standard date string: %s", date_str)
+            continue
 
         pf    = json.loads(pf_json)    if pf_json    else {}
         pm    = json.loads(pm_json)    if pm_json    else {}
@@ -421,7 +440,14 @@ def index():
 
 @app.route("/refresh")
 def refresh():
-    synthesis, items_by_theme, generated_at, fetch_metadata = _get_or_run_pipeline(force_refresh=True)
+    # FIX: require a secret token to prevent unauthenticated pipeline runs.
+    # Set REFRESH_TOKEN in Railway environment variables.
+    # Usage: GET /refresh?token=<your_secret>
+    settings = load_settings()
+    refresh_token = getattr(settings, "refresh_token", None) or os.environ.get("REFRESH_TOKEN", "")
+    if refresh_token and request.args.get("token") != refresh_token:
+        abort(403)
+    _get_or_run_pipeline(force_refresh=True)
     return redirect(url_for("index"))
 
 
@@ -470,13 +496,21 @@ def evals_page():
 
 @app.route("/debug-eval/<date_str>")
 def debug_eval(date_str: str):
+    """
+    Return the raw synthesis JSON for a given date for debugging purposes.
+
+    FIX: previously called evaluator.run(date_str + '-debug', ...) which wrote
+    a malformed-date row to the evals table and polluted the eval history page.
+    Now returns the synthesis as JSON without any DB write.
+    """
     result = _get_digest_for_date(date_str)
     if result is None:
-        return "No digest found", 404
+        return "No digest found for this date", 404
     synthesis, items_by_theme, generated_at, fetch_metadata = result
-    from .services import evaluator
-    evaluator.run(date_str + "-debug", synthesis, items_by_theme, fetch_metadata=fetch_metadata)
-    return "Done — check Railway logs"
+    return app.response_class(
+        json.dumps({"synthesis": synthesis, "generated_at": generated_at.isoformat()}, indent=2),
+        mimetype="application/json",
+    )
 
 
 @app.route("/<date_str>")

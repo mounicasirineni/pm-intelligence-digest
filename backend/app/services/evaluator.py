@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Tuple
 from anthropic import Anthropic
 
 from ..config import load_settings
+from ..digest_utils import get_used_indices
 from .summarizer import _extract_json
 
 
@@ -22,6 +23,13 @@ EVAL_MODEL = "claude-haiku-4-5-20251001"
 
 _CITATION_RE = re.compile(r"\[\d+\]")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+
+# Sections present in a fully-populated digest run.
+# Used to warn when overall_score is computed from a different set of sections,
+# which makes cross-day comparisons unreliable.
+_BASELINE_SECTIONS = frozenset(
+    {"whats_shifting", "company_watch", "startup_radar", "pm_craft", "interview_angle"}
+)
 
 
 @dataclass(frozen=True)
@@ -123,19 +131,8 @@ def pipeline_funnel(
 
     source_index_lookup = synthesis.get("source_index_lookup") or {}
 
-    used_indices: set[str] = set()
-    for insight in (synthesis.get("whats_shifting") or []):
-        if isinstance(insight, dict):
-            used_indices.update(str(i) for i in (insight.get("source_indices") or []))
-    for company in (synthesis.get("company_watch") or {}).values():
-        if isinstance(company, dict):
-            used_indices.update(str(i) for i in (company.get("source_indices") or []))
-    for item in (synthesis.get("startup_radar") or []):
-        if isinstance(item, dict):
-            used_indices.update(str(i) for i in (item.get("source_indices") or []))
-    pm_craft = synthesis.get("pm_craft_today")
-    if isinstance(pm_craft, dict):
-        used_indices.update(str(i) for i in (pm_craft.get("source_indices") or []))
+    # FIX: use shared get_used_indices() utility instead of duplicating the logic
+    used_indices = get_used_indices(synthesis)
 
     output_cited_titles: set[str] = {
         str(source_index_lookup[k]["title"])
@@ -143,6 +140,25 @@ def pipeline_funnel(
         if k in source_index_lookup
         and isinstance(source_index_lookup[k], dict)
         and source_index_lookup[k].get("title")
+    }
+
+    # FIX: prefer item_id matching when available — falls back to title matching
+    # for backward compatibility with digests generated before item_id was added
+    # to source_index_lookup.
+    output_cited_item_ids: set[str] = {
+        str(source_index_lookup[k]["item_id"])
+        for k in used_indices
+        if k in source_index_lookup
+        and isinstance(source_index_lookup[k], dict)
+        and source_index_lookup[k].get("item_id")
+    }
+
+    relevant_item_ids: set[str] = {
+        str(item.get("item_id") or "")
+        for item in all_items
+        if item.get("item_id")
+        and str(item.get("confidence") or "medium").lower() in {"high", "medium"}
+        and str(item.get("pm_relevance_score") or "medium").lower() in {"high", "medium"}
     }
 
     relevant_titles: set[str] = {
@@ -153,9 +169,12 @@ def pipeline_funnel(
         and item.get("title")
     }
 
-    utilized = len(output_cited_titles & relevant_titles)
+    # Use item_id matching when we have IDs; fall back to title matching
+    if output_cited_item_ids and relevant_item_ids:
+        utilized = len(output_cited_item_ids & relevant_item_ids)
+    else:
+        utilized = len(output_cited_titles & relevant_titles)
 
-    # Per-theme breakdown: fetched / confident / relevant counts
     theme_funnel: Dict[str, Dict[str, int]] = {}
     for theme, items in (items_by_theme or {}).items():
         theme_items = [i for i in (items or []) if isinstance(i, dict)]
@@ -241,19 +260,23 @@ async def llm_judge(
     startup_radar = synthesis.get("startup_radar") or []
     source_index_lookup = synthesis.get("source_index_lookup") or {}
 
-    def _build_source_summaries(indices: List[Any]) -> Dict[str, List[str]]:
-        indexed_items: Dict[Tuple[str, str], List[str]] = {}
-        for items in (items_by_theme or {}).values():
-            for item in (items or []):
-                if not isinstance(item, dict):
-                    continue
-                src = str(item.get("source_name") or "").strip()
-                ttl = str(item.get("title") or "").strip()
-                if not src or not ttl:
-                    continue
+    # FIX: build indexed_items once at the top of llm_judge — previously rebuilt
+    # on every _build_source_summaries call (O(items × paragraphs) redundant work)
+    indexed_items: Dict[Tuple[str, str], List[str]] = {}
+    for items in (items_by_theme or {}).values():
+        for item in (items or []):
+            if not isinstance(item, dict):
+                continue
+            src = str(item.get("source_name") or "").strip()
+            ttl = str(item.get("title") or "").strip()
+            if src and ttl:
                 insights = item.get("insights") or []
-                indexed_items[(src, ttl)] = [str(b) for b in (insights if isinstance(insights, list) else [str(insights)])]
+                indexed_items[(src, ttl)] = [
+                    str(b) for b in (insights if isinstance(insights, list) else [str(insights)])
+                ]
 
+    def _build_source_summaries(indices: List[Any]) -> Dict[str, List[str]]:
+        # Uses indexed_items from enclosing scope — no rebuild needed.
         summaries: Dict[str, List[str]] = {}
         for idx in indices:
             meta = source_index_lookup.get(str(idx)) or {}
@@ -346,13 +369,10 @@ async def llm_judge(
             "  - Any specific number not appearing verbatim in source evidence must be treated as unsourced.\n"
             "  - A claim contradicting an explicit source statement scores 1 regardless of writing quality.\n"
             "  - Omitting a bullet that explicitly challenges the synthesis conclusion scores 1 or 2 depending on severity.\n"
-            "  - MULTI-SOURCE CITATIONS: For paragraphs citing multiple sources, check each specific claim against ALL cited sources before concluding it is unsourced. "
-            "A claim may be sourced in one source even if it does not appear in another. "
-            "Do not conclude a claim is unsourced until you have checked every cited source's bullet list individually.\n"
+            "  - MULTI-SOURCE CITATIONS: For paragraphs citing multiple sources, check each specific claim against ALL cited sources before concluding it is unsourced.\n"
             "  - INDEX COLLISION RULE: The synthesis paragraph contains citation markers like [1], [4], [17], [23]. "
             "The evidence block above contains internal evaluation reference numbers also written as [1], [2], [3]. "
             "THESE ARE TWO COMPLETELY DIFFERENT NUMBERING SYSTEMS. They share the same bracket notation but have no relationship to each other. "
-            "The synthesis [n] refers to a source by its pool index. The evidence block [n] is just a bullet counter within each source's list. "
             "NEVER use either set of numbers in your justification text. "
             "When writing your coherence_reason, insight_depth_reason, and citation_support_reason: "
             "refer to sources ONLY by their publication name (e.g. 'MIT Technology Review', 'Simon Willison Blog', 'TechCrunch'). "
@@ -411,7 +431,8 @@ async def llm_judge(
     ) -> Dict[str, Any]:
         if not ws_paragraphs:
             return {"topical_breadth": 0, "topical_breadth_reason": "No paragraphs to evaluate."}
-        client = _build_llm_client()
+        # FIX: use client from enclosing llm_judge scope — previously called
+        # _build_llm_client() again, creating a second Anthropic instance
         combined = "\n\n".join(ws_paragraphs)
 
         available_themes_block = ""
@@ -471,7 +492,11 @@ async def llm_judge(
         reason = parsed.get("topical_breadth_reason", "")
         return {"topical_breadth": score, "topical_breadth_reason": reason}
 
-    # ── Score each section ────────────────────────────────────────────────────
+    # ── Score each section — FIX: use asyncio.gather() for concurrency ──────
+    # Previously all scoring calls used sequential await, defeating the async
+    # architecture and producing a ~40s eval run.  With gather(), all Claude
+    # calls run concurrently and the total time collapses to the longest single
+    # call (~4-6s).
 
     async def score_ws_one(insight: Any) -> Dict[str, Any] | None:
         paragraph = str(insight.get("paragraph") or "").strip() if isinstance(insight, dict) else str(insight).strip()
@@ -503,10 +528,8 @@ async def llm_judge(
         else:
             text = str(bullet_entry).strip()
             indices = _extract_indices_from_text(text)
-
         if not text:
             return None
-
         loop = asyncio.get_running_loop()
         try:
             return await loop.run_in_executor(None, lambda: _score_paragraph(text, indices, "startup_radar"))
@@ -525,26 +548,21 @@ async def llm_judge(
         except Exception:
             return {"topical_breadth": 0, "topical_breadth_reason": "Eval failed."}
 
-    ws_scores: List[Dict[str, Any]] = []
-    for insight in whats_shifting:
-        scored = await score_ws_one(insight)
-        if scored:
-            ws_scores.append(scored)
+    # Gather ALL scoring tasks concurrently
+    ws_tasks = [score_ws_one(i) for i in whats_shifting]
+    cw_tasks = [score_cw_one(co, val) for co, val in company_watch.items()]
+    sr_tasks = [score_sr_one(b) for b in startup_radar]
 
-    cw_scores: List[Dict[str, Any]] = []
-    if isinstance(company_watch, dict):
-        for company, value in company_watch.items():
-            scored = await score_cw_one(company, value)
-            if scored:
-                cw_scores.append(scored)
+    ws_results, cw_results, sr_results, topical_breadth_result = await asyncio.gather(
+        asyncio.gather(*ws_tasks),
+        asyncio.gather(*cw_tasks),
+        asyncio.gather(*sr_tasks),
+        score_topical_breadth_async(),
+    )
 
-    sr_scores: List[Dict[str, Any]] = []
-    for bullet_entry in startup_radar:
-        scored = await score_sr_one(bullet_entry)
-        if scored:
-            sr_scores.append(scored)
-
-    topical_breadth_result = await score_topical_breadth_async()
+    ws_scores: List[Dict[str, Any]] = [r for r in ws_results if r]
+    cw_scores: List[Dict[str, Any]] = [r for r in cw_results if r]
+    sr_scores: List[Dict[str, Any]] = [r for r in sr_results if r]
 
     def _averages(scores: List[Dict[str, Any]]) -> Tuple[float, float, float]:
         if not scores:
@@ -558,20 +576,15 @@ async def llm_judge(
     def _representative_reason(scores: List[Dict[str, Any]], dimension: str) -> str:
         if not scores:
             return ""
-
         key = dimension
         reason_key = f"{dimension}_reason"
-
         all_scores = [float(p.get(key) or 0) for p in scores]
         min_score = min(all_scores)
         max_score = max(all_scores)
-
         lowest = min(scores, key=lambda p: p.get(key) or 5)
         reason = str(lowest.get(reason_key) or "")
-
         if min_score == max_score:
             return f"All paragraphs scored {min_score:.1f}: {reason}"
-
         return f"Lowest-scoring paragraph ({min_score:.1f}): {reason}"
 
     ws_avg_c, ws_avg_i, ws_avg_g = _averages(ws_scores)
@@ -764,30 +777,21 @@ def run(
             if relevant_count > 0:
                 ws_available_themes[theme] = relevant_count
 
-    try:
-        llm_judge_result = asyncio.run(llm_judge(synthesis, items_by_theme, ws_available_themes))
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        try:
-            llm_judge_result = loop.run_until_complete(llm_judge(synthesis, items_by_theme, ws_available_themes))
-        finally:
-            loop.close()
+    # FIX: gather all three async evals in a single event loop rather than three
+    # separate asyncio.run() calls, saving ~4-8s and avoiding redundant loop creation.
+    async def _run_all_evals() -> Tuple[Dict, Dict, Dict]:
+        return await asyncio.gather(
+            llm_judge(synthesis, items_by_theme, ws_available_themes),
+            pm_craft_quality(synthesis),
+            interview_angle_quality(synthesis),
+        )
 
     try:
-        pm_craft_result = asyncio.run(pm_craft_quality(synthesis))
+        llm_judge_result, pm_craft_result, interview_angle_result = asyncio.run(_run_all_evals())
     except RuntimeError:
         loop = asyncio.new_event_loop()
         try:
-            pm_craft_result = loop.run_until_complete(pm_craft_quality(synthesis))
-        finally:
-            loop.close()
-
-    try:
-        interview_angle_result = asyncio.run(interview_angle_quality(synthesis))
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        try:
-            interview_angle_result = loop.run_until_complete(interview_angle_quality(synthesis))
+            llm_judge_result, pm_craft_result, interview_angle_result = loop.run_until_complete(_run_all_evals())
         finally:
             loop.close()
 
@@ -865,6 +869,19 @@ def run(
         sections_scored.append("pm_craft")
     if ia_relevance > 0:
         sections_scored.append("interview_angle")
+
+    # FIX: warn when sections_scored differs from the baseline set — the overall_score
+    # weight distribution changes when sections are absent, making cross-day comparisons
+    # unreliable without this signal.
+    scored_set = set(sections_scored)
+    if scored_set != _BASELINE_SECTIONS:
+        missing = _BASELINE_SECTIONS - scored_set
+        extra = scored_set - _BASELINE_SECTIONS
+        logger.warning(
+            "EVAL: sections_scored differs from baseline — overall_score not directly comparable. "
+            "Scored: %s | Missing vs baseline: %s | Extra: %s",
+            sections_scored, sorted(missing), sorted(extra),
+        )
 
     flags = {
         "flagged_paragraphs": llm_judge_result.get("flagged_paragraphs") or [],

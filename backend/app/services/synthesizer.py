@@ -87,10 +87,6 @@ def _extract_json(text: str) -> str:
 
 
 def _extract_reasoning_block(text: str) -> Tuple[str, str]:
-    """
-    Extract <reasoning>...</reasoning> block from Claude response.
-    Returns (reasoning_text, remaining_text_with_json).
-    """
     if not text:
         return "", text
     match = re.search(r"<reasoning>(.*?)</reasoning>", text, flags=re.DOTALL)
@@ -184,8 +180,6 @@ def _normalize_whats_shifting(raw: Any) -> List[Dict[str, Any]]:
         paragraph = _strip_date_check_flags(paragraph)
 
         # Hard-cap headline to 20 words regardless of what Claude produced.
-        # The prompt instructs 20 words max but Claude occasionally exceeds it
-        # for complex topics. This is the code-level enforcement.
         headline_words = headline.split()
         if len(headline_words) > 20:
             logger.info(
@@ -280,9 +274,17 @@ def _get_theme_for_ws(
     source_index_lookup: Dict[str, Dict[str, Any]],
 ) -> str:
     """
-    Identify the theme a WS paragraph belongs to by looking up its
-    primary source index. Falls back to keyword classification.
+    Identify the theme a WS paragraph belongs to.
+
+    FIX: Check _fill_theme first — fill results carry this key explicitly.
+    Previously, fill results with empty source_indices fell through to
+    source_index_lookup, got theme="" and were classified as "unknown",
+    causing false coverage-gap alarms even when the fill succeeded.
     """
+    # Fill results always carry _fill_theme — check before source_index_lookup.
+    if ws.get("_fill_theme"):
+        return ws["_fill_theme"]
+
     indices = ws.get("source_indices", [])
     if indices:
         info = source_index_lookup.get(str(indices[0]), {})
@@ -297,14 +299,8 @@ def _get_item_score(
     ws_items: List[Dict[str, Any]],
     ws_indexed: List[Dict[str, Any]],
 ) -> Tuple[int, int]:
-    """
-    Return (relevance_score, confidence_score) for a given source index.
-    Lower numbers = better (0=high, 1=medium/low).
-    Used for deduplication tie-breaking.
-    """
     if source_index is None:
         return (1, 1)
-    # Find item_id for this index
     item_id = None
     for entry in ws_indexed:
         if entry["index"] == source_index:
@@ -312,7 +308,6 @@ def _get_item_score(
             break
     if not item_id:
         return (1, 1)
-    # Find the item in ws_items
     for item in ws_items:
         if item.get("item_id") == item_id:
             rel = 0 if item.get("pm_relevance_score") == "high" else 1
@@ -326,9 +321,6 @@ def _get_covered_themes(
     ws_indexed: List[Dict[str, Any]],
     source_index_lookup: Dict[str, Dict[str, Any]],
 ) -> Set[str]:
-    """
-    Return the set of themes covered by non-empty WS paragraphs.
-    """
     covered = set()
     for ws in ws_paragraphs:
         if not ws.get("paragraph", "").strip():
@@ -345,11 +337,6 @@ def _deduplicate_by_theme(
     ws_indexed: List[Dict[str, Any]],
     source_index_lookup: Dict[str, Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """
-    Ensure at most one paragraph per theme.
-    When duplicates exist, keep the paragraph anchored to the
-    highest relevance/confidence source for that theme.
-    """
     seen_themes: Dict[str, Dict[str, Any]] = {}
 
     for ws in ws_paragraphs:
@@ -360,7 +347,6 @@ def _deduplicate_by_theme(
         if theme not in seen_themes:
             seen_themes[theme] = ws
         else:
-            # Compare anchor quality — lower score tuple = better
             existing_idx = seen_themes[theme]["source_indices"][0] if seen_themes[theme]["source_indices"] else None
             new_idx = ws["source_indices"][0] if ws["source_indices"] else None
             existing_score = _get_item_score(existing_idx, ws_items, ws_indexed)
@@ -384,7 +370,7 @@ def _deduplicate_by_theme(
 
 
 # ---------------------------------------------------------------------------
-# Call 1: What's Shifting + Interview Angle (all WS themes together)
+# Call 1: What's Shifting + Interview Angle
 # ---------------------------------------------------------------------------
 
 def _call_whats_shifting(
@@ -452,12 +438,12 @@ Then produce a JSON object with this exact structure:
 {{
   "whats_shifting": [
     {{
-      "headline": "One declarative sentence, maximum 20 words, naming the underlying structural force or pattern. Not an event description. Renders as the visible collapsed card headline — scannable and self-contained.",
+      "headline": "One declarative sentence, maximum 15 words, naming the underlying structural force or pattern. Not an event description. Renders as the visible collapsed card headline — scannable and self-contained.",
       "paragraph": "Open by restating the headline claim with one additional clause of context. Develop across 3-4 sentences. If drawing from a single source, build depth by incorporating its strongest and most complicating bullets. If drawing from multiple sources, only combine them if you can name a specific causal mechanism that connects them — one that neither source states alone. A shared category label ('both are about AI costs') is not a mechanism. A shared causal chain ('both reveal that X causes Y through mechanism Z') is. When in doubt, anchor to one source's strongest bullet and build depth rather than breadth. Close with one PM implication directly traceable to a cited source. Every sentence ends with inline [n] citations. HEDGE MATCH: match source hedge levels throughout — 'suggests' not 'demonstrates'. NO TIMELINE: omit any timeline not verbatim in a source. NO UNIVERSALITY: scope claims to actual examples. Draw from at least 2 distinct insight bullets — use the best available rather than omitting the paragraph. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. If any exist, either incorporate them or scope the closing implication to reflect the limitation. A paragraph that ignores complicating evidence from its own cited sources will score lower than one that acknowledges the complication and commits to a narrower claim. INSIGHT SELECTION RULE: The closing implication must trace to the single highest-ranked bullet identified in your reasoning — the most non-obvious, specific, and source-grounded insight available. Do not close with a broad pattern observation when a more specific mechanical consequence is available in the source bullets. The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'means' or 'demonstrates'. Do not convert a source observation into a prescription. If no source bullet explicitly states a PM action, use 'this suggests' or 'this may signal' framing. Never write 'this means PMs must/should' unless a cited source explicitly states that directive. A well-hedged implication that commits to one specific consequence scores higher than a confident assertion that goes beyond the source.",
       "source_indices": [1, 2]
     }}
   ],
-  "interview_angle": "One specific tradeoff a PM should have a prepared opinion on this week, derived from a whats_shifting source. Empty string if no whats_shifting paragraph was produced. Frame as a debatable tradeoff at PM decision level — feature prioritization, architecture, safety design, retention, compliance, pricing, or go-to-market. Scope to the context the source describes. DOMAIN RULE: Do not frame in legal, financial, or policy terms even if the source is a legal or regulatory story — translate into a product decision a PM owns. For example, a story about litigation risk should not ask 'should your company document financing rounds for legal defensibility' but rather 'when a platform you depend on undergoes a control shift through a major financing round, how do you reassess your product's dependency risk.' The angle must be answerable by a PM from product judgment, not legal or financial expertise. NEGATIVE EXAMPLE: 'Should your legal team document control shifts in financing rounds' — this is a legal question, not a PM question. POSITIVE EXAMPLE: 'When a major financing round changes who practically controls a platform you depend on, how do you reassess build vs. buy decisions' — this is a PM-owned tradeoff."
+  "interview_angle": "One specific tradeoff a PM should have a prepared opinion on this week, derived from a whats_shifting source. Empty string if no whats_shifting paragraph was produced. Frame as a debatable tradeoff at PM decision level — feature prioritization, architecture, safety design, retention, compliance, pricing, or go-to-market. Scope to the context the source describes. DOMAIN RULE: Do not frame in legal, financial, or policy terms even if the source is a legal or regulatory story — translate into a product decision a PM owns. The angle must be answerable by a PM from product judgment, not legal or financial expertise."
 }}
 
 IMPORTANT: Do not include anchor_reasoning inside the JSON. All reasoning goes in the <reasoning> block only.
@@ -475,8 +461,8 @@ CITATION RULE: Only cite item [n] if a specific insight bullet from that item di
 
     content_block = response.content[0]
     text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
-    print("Raw Claude Call 1 (WS) response text:")
-    print(text)
+    # FIX: use logger.debug for raw responses (very long — not useful at info level)
+    logger.debug("Raw Claude Call 1 (WS) response text: %s", text)
 
     reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
     if reasoning_text:
@@ -494,7 +480,7 @@ CITATION RULE: Only cite item [n] if a specific insight bullet from that item di
 
 
 # ---------------------------------------------------------------------------
-# Per-theme fill call: produces exactly one paragraph for one missing theme
+# Per-theme fill call
 # ---------------------------------------------------------------------------
 
 def _call_whats_shifting_single_theme(
@@ -505,21 +491,12 @@ def _call_whats_shifting_single_theme(
     today: str,
     ws_indexed: List[Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
-    """
-    Targeted call for a single WS theme that Call 1 failed to produce.
-    Sends only that theme's items. Returns a single normalized WS entry
-    or None if Claude still produces nothing usable.
-    """
     if not theme_items:
         logger.warning("FILL [theme=%s]: No items available — skipping", anchor["theme"])
         return None
 
-    # The fill call uses the same index numbers as ws_indexed so citations
-    # remain consistent with the main source_index_lookup.
-    # Build a context block using the existing indices from ws_indexed.
     lines: List[str] = []
     for item in theme_items:
-        # Find this item's index in ws_indexed by item_id
         idx = None
         for entry in ws_indexed:
             if entry.get("item_id") == item.get("item_id"):
@@ -563,19 +540,19 @@ Items for this theme:
 
 First, write your reasoning inside <reasoning>...</reasoning> tags:
 (1) List all insight bullets ranked by non-obviousness.
-(2) Name the highest-ranked bullet and declare it the closing implication anchor. The closing sentence of the paragraph must be traceable to this bullet specifically — not to a synthesizer-constructed bridge across bullets, and not to a lower-ranked bullet. If you find yourself writing a closing sentence that does not trace to this bullet, return to the ranked list and select a different anchor.
-(3) List every bullet from the cited sources that contradicts, qualifies, or limits the anchor's claim. For each one, decide: incorporate it into the paragraph, or explicitly acknowledge it as a scope limitation. Omission is not an option — if a qualifying bullet would change the conclusion a reader draws, it must appear in the paragraph or the closing implication must be scoped to exclude it.
-(4) If you are combining items from more than one source into this paragraph, name the specific causal mechanism that justifies the combination. If you cannot name a mechanism beyond a shared category label, do not combine — anchor to the single strongest source instead.
+(2) Name the highest-ranked bullet and declare it the closing implication anchor.
+(3) List every bullet that contradicts or qualifies the anchor's claim.
+(4) Name the causal mechanism if combining multiple sources.
 
 Then produce a JSON object:
 {{
-  "headline": "One declarative sentence, maximum 20 words, naming the structural force or pattern. Scannable, self-contained, not an event description.",
-  "paragraph": "3-5 sentences. Open with the headline claim plus one clause of context. Develop with 2+ bullets from the items above. Close with one PM implication traceable to a cited source. Every sentence has inline [n] citations. HEDGE MATCH: match source hedge levels. NO TIMELINE unless verbatim in source. NO UNIVERSALITY beyond actual examples. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. If any exist, either incorporate them or scope the closing implication to reflect the limitation. A paragraph that ignores complicating evidence from its own cited sources will score lower than one that acknowledges the complication and commits to a narrower claim. INSIGHT SELECTION RULE: The closing implication must trace to the single highest-ranked bullet identified in your reasoning — the most non-obvious, specific, and source-grounded insight available. Do not close with a broad pattern observation when a more specific mechanical consequence is available in the source bullets. The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'means' or 'demonstrates'. Do not convert a source observation into a prescription. If no source bullet explicitly states a PM action, use 'this suggests' or 'this may signal' framing. Never write 'this means PMs must/should' unless a cited source explicitly states that directive. A well-hedged implication that commits to one specific consequence scores higher than a confident assertion that goes beyond the source.",
+  "headline": "One declarative sentence, maximum 15 words, naming the structural force or pattern. Scannable, self-contained, not an event description.",
+  "paragraph": "3-5 sentences. Open with the headline claim plus one clause of context. Develop with 2+ bullets from the items above. Close with one PM implication traceable to a cited source. Every sentence has inline [n] citations. HEDGE MATCH: match source hedge levels. NO TIMELINE unless verbatim in source. NO UNIVERSALITY beyond actual examples. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, split and keep only the stronger one. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources.",
   "source_indices": []
 }}
 
 IMPORTANT: Do not include anchor_reasoning in the JSON. All reasoning goes in <reasoning> only.
-CITATION RULE: Use the item index numbers shown above (e.g. [3], [7]) exactly as written.
+CITATION RULE: Use the item index numbers shown above exactly as written.
 """.strip()
 
     response = client.messages.create(
@@ -588,8 +565,7 @@ CITATION RULE: Use the item index numbers shown above (e.g. [3], [7]) exactly as
 
     content_block = response.content[0]
     text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
-    print(f"Raw Claude Fill Call (theme={theme}) response text:")
-    print(text)
+    logger.debug("Raw Claude Fill Call (theme=%s) response text: %s", theme, text)
 
     reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
     cleaned = _extract_json(text_without_reasoning)
@@ -653,16 +629,16 @@ Items:
 First, write your anchor selection reasoning inside <reasoning>...</reasoning> tags.
 For each company with available items, for each startup radar item, and for pm_craft_today:
 (1) List ALL insight bullets ranked by non-obviousness.
-(2) Name the highest-ranked bullet and declare it the closing implication anchor. The closing sentence of the paragraph must be traceable to this bullet specifically — not to a synthesizer-constructed bridge across bullets, and not to a lower-ranked bullet. If you find yourself writing a closing sentence that does not trace to this bullet, return to the ranked list and select a different anchor.
-(3) List every bullet from the cited sources that contradicts, qualifies, or limits the anchor's claim. For each one, decide: incorporate it into the paragraph, or explicitly acknowledge it as a scope limitation. Omission is not an option — if a qualifying bullet would change the conclusion a reader draws, it must appear in the paragraph or the closing implication must be scoped to exclude it.
-(4) If you are combining items from more than one source into this paragraph, name the specific causal mechanism that justifies the combination. If you cannot name a mechanism beyond a shared category label, do not combine — anchor to the single strongest source instead.
+(2) Name the highest-ranked bullet and declare it the closing implication anchor.
+(3) List every bullet that contradicts or qualifies the anchor's claim.
+(4) Name the causal mechanism if combining multiple sources.
 
 Then produce a JSON object. Do not include anchor_reasoning fields inside the JSON.
 
 {{
   "company_watch": {{
     "Google": {{
-      "paragraph": "2-3 sentences of strategic signal. Sentence 1: what is strategically changing — not news, but a shift in positioning, priority, or competitive stance. Sentence 2: evidence with inline [n] citations. Sentence 3 (optional): one implication, most specific and directly grounded. OMIT RULE: empty string if no company_watch ONLY item matches this company. SOURCE RULE: only cite items tagged company_watch ONLY whose Company field matches. HEDGE MATCH throughout. COMPLICATION RULE: If the cited source contains a bullet that qualifies or limits the central claim, incorporate it or scope the implication accordingly. Do not build toward a clean conclusion by omitting evidence that complicates it. INSIGHT SELECTION RULE: The closing implication must trace to the single highest-ranked bullet identified in your reasoning — the most non-obvious, specific, and source-grounded insight available. Do not close with a broad pattern observation when a more specific mechanical consequence is available in the source bullets. The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'means' or 'demonstrates'. Do not convert a source observation into a prescription. If no source bullet explicitly states a PM action, use 'this suggests' or 'this may signal' framing. Never write 'this means PMs must/should' unless a cited source explicitly states that directive. A well-hedged implication that commits to one specific consequence scores higher than a confident assertion that goes beyond the source.",
+      "paragraph": "2-3 sentences of strategic signal. Sentence 1: what is strategically changing — not news, but a shift in positioning, priority, or competitive stance. Sentence 2: evidence with inline [n] citations. Sentence 3 (optional): one implication, most specific and directly grounded. OMIT RULE: empty string if no company_watch ONLY item matches this company. SOURCE RULE: only cite items tagged company_watch ONLY whose Company field matches. HEDGE MATCH throughout. COMPLICATION RULE: If the cited source contains a bullet that qualifies or limits the central claim, incorporate it or scope the implication accordingly. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, split and keep only the stronger one. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources.",
       "source_indices": []
     }},
     "Meta": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}},
@@ -676,12 +652,12 @@ Then produce a JSON object. Do not include anchor_reasoning fields inside the JS
   }},
   "startup_radar": [
     {{
-      "bullet": "2-3 items on early-stage or emerging companies only. Structure: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. HEDGE MATCH. NO TIMELINE unless verbatim in source. METRICS: include funding amount or key metric. THEMATIC COMBINATION: only combine companies if you can name the specific causal mechanism both share — a shared category label is not a mechanism. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'demonstrates'. Do not assert strategic motivations or market outcomes the source does not state. Use 'this suggests' or 'this may signal' framing when the implication goes one step beyond the source. Never assert certainty where the source only implies possibility.",
+      "bullet": "2-3 items on early-stage or emerging companies only. Structure: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. HEDGE MATCH. NO TIMELINE unless verbatim in source. METRICS: include funding amount or key metric. THEMATIC COMBINATION: only combine companies if you can name the specific causal mechanism both share. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, split and keep only the stronger one. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources.",
       "source_indices": []
     }}
   ],
   "pm_craft_today": {{
-    "text": "Single most actionable PM craft insight. Draw ONLY from items tagged pm_craft_today ONLY (product_craft) OR pm_craft_today eligible (design_ux). Empty string if no such item exists. INSIGHT QUALITY: non-obvious pattern, tradeoff, or reframe that changes how a PM approaches a real decision. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one actionable consequence traceable to a specific bullet in the cited source. Match the source's hedge level throughout. Do not convert a source observation into a prescriptive mandate — if the source says 'this changes how PMs prioritize', do not write 'PMs must prioritize X from day one'. Frame as 'this suggests' when the implication requires one step of reasoning beyond the source.",
+    "text": "Single most actionable PM craft insight. Draw ONLY from items tagged pm_craft_today ONLY (product_craft) OR pm_craft_today eligible (design_ux). Empty string if no such item exists. INSIGHT QUALITY: non-obvious pattern, tradeoff, or reframe that changes how a PM approaches a real decision. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, split and keep only the stronger one. CLOSING SENTENCE: State exactly one actionable consequence traceable to a specific bullet in the cited source.",
     "source_indices": []
   }}
 }}
@@ -701,8 +677,7 @@ CITATION RULE: Only cite item [n] if a specific insight bullet directly supports
 
     content_block = response.content[0]
     text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
-    print("Raw Claude Call 2 (Dedicated) response text:")
-    print(text)
+    logger.debug("Raw Claude Call 2 (Dedicated) response text: %s", text)
 
     reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
     if reasoning_text:
@@ -825,7 +800,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         t = item["theme"]
         theme_funnel_after_filter[t] = theme_funnel_after_filter.get(t, 0) + 1
     logger.info("THEME FUNNEL [stage=after_quality_filter]: %s", json.dumps(theme_funnel_after_filter))
-    print(f"THEME FUNNEL [stage=after_quality_filter]: {theme_funnel_after_filter}")
 
     empty_result = {
         "whats_shifting": [],
@@ -875,9 +849,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
     if source_concentration_warnings:
         logger.warning("SOURCE CONCENTRATION WARNINGS: %s", json.dumps(source_concentration_warnings, indent=2))
-        print("SOURCE CONCENTRATION WARNINGS:")
-        for w in source_concentration_warnings:
-            print(json.dumps(w, indent=2))
 
     # ---------------------------------------------------------------------------
     # Source diversity cap
@@ -921,7 +892,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         t = item["theme"]
         theme_funnel_after_cap[t] = theme_funnel_after_cap.get(t, 0) + 1
     logger.info("THEME FUNNEL [stage=after_diversity_cap]: %s", json.dumps(theme_funnel_after_cap))
-    print(f"THEME FUNNEL [stage=after_diversity_cap]: {theme_funnel_after_cap}")
 
     # ---------------------------------------------------------------------------
     # Partition by routing eligibility
@@ -969,16 +939,13 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         dedicated_theme_dist[t] = dedicated_theme_dist.get(t, 0) + 1
     logger.info("THEME FUNNEL [stage=ws_items_post_partition]: %s", json.dumps(ws_theme_dist))
     logger.info("THEME FUNNEL [stage=dedicated_items_post_partition]: %s", json.dumps(dedicated_theme_dist))
-    print(f"THEME FUNNEL [stage=ws_items_post_partition]: {ws_theme_dist}")
-    print(f"THEME FUNNEL [stage=dedicated_items_post_partition]: {dedicated_theme_dist}")
-
     logger.info(
         "Routing: %d whats_shifting items, %d dedicated section items",
         len(ws_items), len(dedicated_items)
     )
 
     # ---------------------------------------------------------------------------
-    # Build required anchors — one per WS theme with items available
+    # Build required anchors
     # ---------------------------------------------------------------------------
     WHATS_SHIFTING_THEMES_ORDERED = [
         "ai_technology",
@@ -1005,7 +972,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         "REQUIRED ANCHORS: %s",
         json.dumps([{"theme": a["theme"], "title": a["anchor_item"]["title"]} for a in required_anchors])
     )
-    print(f"REQUIRED ANCHORS: {[{'theme': a['theme'], 'title': a['anchor_item']['title']} for a in required_anchors]}")
 
     try:
         # ---------------------------------------------------------------------------
@@ -1017,11 +983,9 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             required_anchors=required_anchors,
         )
 
-        # Normalize Call 1 output into the live ws_paragraphs list
         ws_paragraphs = _normalize_whats_shifting(call1_parsed.get("whats_shifting") or [])
         ws_paragraphs = [ws for ws in ws_paragraphs if ws.get("paragraph", "").strip()]
 
-        # Build source_index_lookup from ws_indexed now so fill calls can use it
         source_index_lookup: Dict[str, Dict[str, Any]] = {}
         for entry in ws_indexed:
             source_index_lookup[str(entry["index"])] = {
@@ -1029,24 +993,18 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "source_name": entry["source_name"],
                 "theme": entry["theme"],
                 "company_id": entry.get("company_id"),
+                "item_id": entry.get("item_id"),  # propagate item_id for evaluator matching
             }
 
         # ---------------------------------------------------------------------------
-        # Step 2: detect which themes Call 1 covered
+        # Detect missing themes and fill
         # ---------------------------------------------------------------------------
         covered_themes = _get_covered_themes(ws_paragraphs, ws_indexed, source_index_lookup)
         missing_anchors = [a for a in required_anchors if a["theme"] not in covered_themes]
 
         logger.info("WS covered themes after Call 1: %s", sorted(covered_themes))
         logger.info("WS missing themes after Call 1: %s", [a["theme"] for a in missing_anchors])
-        print(f"WS covered themes after Call 1: {sorted(covered_themes)}")
-        print(f"WS missing themes after Call 1: {[a['theme'] for a in missing_anchors]}")
 
-        # ---------------------------------------------------------------------------
-        # Step 3: per-theme fill calls for each missing theme
-        # Results are merged into ws_paragraphs immediately after each call
-        # so they cannot be silently dropped downstream.
-        # ---------------------------------------------------------------------------
         fill_reasonings: List[Dict[str, Any]] = []
 
         for anchor in missing_anchors:
@@ -1057,21 +1015,17 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "WS FILL [theme=%s]: Calling targeted fill with %d items",
                 theme, len(theme_items)
             )
-            print(f"WS FILL [theme={theme}]: Targeted fill call with {len(theme_items)} items")
 
             fill_result = _call_whats_shifting_single_theme(
                 client, settings, theme_items, anchor, today, ws_indexed
             )
 
             if fill_result and fill_result.get("paragraph", "").strip():
-                # Merge immediately — this is the guarantee that fill results
-                # cannot be bypassed by subsequent processing steps.
                 ws_paragraphs.append(fill_result)
                 logger.info(
                     "WS FILL [theme=%s]: Merged into ws_paragraphs (%d total paragraphs now)",
                     theme, len(ws_paragraphs)
                 )
-                print(f"WS FILL [theme={theme}]: SUCCESS — merged. Total paragraphs: {len(ws_paragraphs)}")
                 if fill_result.get("_fill_reasoning"):
                     fill_reasonings.append({
                         "theme": theme,
@@ -1082,17 +1036,16 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     "WS FILL [theme=%s]: Fill call produced no usable paragraph",
                     theme
                 )
-                print(f"WS FILL [theme={theme}]: FAILED — no paragraph produced")
 
         # ---------------------------------------------------------------------------
-        # Step 4: deduplicate — one paragraph per theme, keep best anchor
+        # Deduplicate — one paragraph per theme
         # ---------------------------------------------------------------------------
         ws_paragraphs = _deduplicate_by_theme(
             ws_paragraphs, ws_items, ws_indexed, source_index_lookup
         )
 
         # ---------------------------------------------------------------------------
-        # Step 5: verify final coverage before building display payload
+        # Final coverage check
         # ---------------------------------------------------------------------------
         final_covered = _get_covered_themes(ws_paragraphs, ws_indexed, source_index_lookup)
         still_missing = [a["theme"] for a in required_anchors if a["theme"] not in final_covered]
@@ -1102,16 +1055,14 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "WS FINAL COVERAGE GAP: themes still missing after all fill calls: %s",
                 still_missing
             )
-            print(f"WS FINAL COVERAGE GAP: {still_missing} — content issue, not a pipeline drop")
         else:
             logger.info(
                 "WS FINAL COVERAGE: all %d required themes covered: %s",
                 len(required_anchors), sorted(final_covered)
             )
-            print(f"WS FINAL COVERAGE: all themes covered: {sorted(final_covered)}")
 
         # ---------------------------------------------------------------------------
-        # Dedup: remove design_ux items consumed by WS from dedicated_items
+        # Remove design_ux items consumed by WS from dedicated_items
         # ---------------------------------------------------------------------------
         ws_used_indices: Set[int] = set()
         for ws in ws_paragraphs:
@@ -1134,7 +1085,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     "DEDUP [ws_consumed]: Removed %d item(s) from dedicated_items already consumed by WS",
                     removed
                 )
-                print(f"DEDUP [ws_consumed]: Removed {removed} item(s) from dedicated_items")
 
         # ---------------------------------------------------------------------------
         # Call 2: dedicated sections
@@ -1144,23 +1094,31 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             client, settings, dedicated_items, today, start_idx=start_idx
         )
 
-        # Complete source_index_lookup with dedicated items
         for entry in dedicated_indexed:
             source_index_lookup[str(entry["index"])] = {
                 "title": entry["title"],
                 "source_name": entry["source_name"],
                 "theme": entry["theme"],
                 "company_id": entry.get("company_id"),
+                "item_id": entry.get("item_id"),
             }
 
         interview_angle = _strip_date_check_flags(str(call1_parsed.get("interview_angle") or ""))
-        INTERVIEW_ANGLE_POISON_STRINGS = ["synthesis pipeline", "surface this week", "run the"]
+
+        # FIX: documented poison strings with context about when each was added.
+        # These catch specific prompt-bleed patterns observed in production.
+        INTERVIEW_ANGLE_POISON_STRINGS = [
+            "synthesis pipeline",  # Claude echoed orchestration context
+            "surface this week",   # Claude echoed prompt phrasing verbatim
+            "run the",             # Claude echoed "run the digest" from prompt
+        ]
         if any(p in interview_angle.lower() for p in INTERVIEW_ANGLE_POISON_STRINGS):
             logger.warning(
                 "INTERVIEW ANGLE: Prompt bleed detected — suppressing output. Raw: %s",
                 interview_angle[:200],
             )
             interview_angle = ""
+
         normalized_company_watch = _normalize_company_watch(call2_parsed.get("company_watch") or {})
         normalized_startup_radar = _normalize_startup_radar(call2_parsed.get("startup_radar") or [])
         pm_craft_today = _normalize_pm_craft(call2_parsed.get("pm_craft_today") or {})
@@ -1194,9 +1152,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
         if multi_thread_warnings:
             logger.warning("SINGLE THESIS WARNINGS: %s", json.dumps(multi_thread_warnings, indent=2))
-            print("SINGLE THESIS WARNINGS:")
-            for w in multi_thread_warnings:
-                print(json.dumps(w, indent=2))
 
         # 2. Date validation
         current_year = date.today().year
@@ -1236,9 +1191,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
         if date_warnings:
             logger.warning("DATE WARNINGS: %s", json.dumps(date_warnings, indent=2))
-            print("DATE WARNINGS:")
-            for w in date_warnings:
-                print(json.dumps(w, indent=2))
 
         # 3. Cross-paragraph coherence
         source_to_companies: Dict[int, List[str]] = {}
@@ -1280,24 +1232,28 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
         if coherence_warnings:
             logger.warning("COHERENCE WARNINGS: %s", json.dumps(coherence_warnings, indent=2))
-            print("COHERENCE WARNINGS:")
-            for w in coherence_warnings:
-                print(json.dumps(w, indent=2))
 
-        # 4. Routing canary
+        # 4 + 5. Routing canary (merged — previously validators 4 and 5 checked the
+        # same company_watch condition independently, producing duplicate warnings).
+        # FIX: design_ux items are intentionally dual-routed (ws_items AND dedicated_items)
+        # — exempted from the WS-cites-dedicated canary to prevent false positives.
         routing_warnings = []
+        omit_rule_warnings = []
 
         for i, ws in enumerate(ws_paragraphs):
             for idx_val in ws.get("source_indices", []):
                 if idx_val in dedicated_eligible_indices:
                     source_info = source_index_lookup.get(str(idx_val), {})
-                    routing_warnings.append({
-                        "section": f"whats_shifting[{i}]",
-                        "source_index": idx_val,
-                        "source_title": source_info.get("title", "unknown"),
-                        "source_theme": source_info.get("theme", "unknown"),
-                        "warning": "CANARY: DEDICATED_SECTION source cited in whats_shifting"
-                    })
+                    source_theme = source_info.get("theme", "")
+                    # FIX: design_ux cross_market items are legitimately in both pools
+                    if source_theme != "design_ux":
+                        routing_warnings.append({
+                            "section": f"whats_shifting[{i}]",
+                            "source_index": idx_val,
+                            "source_title": source_info.get("title", "unknown"),
+                            "source_theme": source_theme,
+                            "warning": "CANARY: DEDICATED_SECTION source cited in whats_shifting"
+                        })
 
         for company, value in normalized_company_watch.items():
             for idx_val in value.get("source_indices", []):
@@ -1310,20 +1266,8 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                         "source_theme": source_info.get("theme", "unknown"),
                         "warning": "CANARY: WHATS_SHIFTING source cited in company_watch"
                     })
-
-        if routing_warnings:
-            logger.warning("ROUTING CANARY FIRED: %s", json.dumps(routing_warnings, indent=2))
-            print("ROUTING CANARY FIRED:")
-            for w in routing_warnings:
-                print(json.dumps(w, indent=2))
-
-        # 5. Omit rule canary
-        omit_rule_warnings = []
-
-        for company, value in normalized_company_watch.items():
-            for idx_val in value.get("source_indices", []):
-                if idx_val in ws_eligible_indices:
-                    source_info = source_index_lookup.get(str(idx_val), {})
+                    # Omit-rule canary for company_watch is now the same check —
+                    # record under omit_rule_warnings too for backward compatibility.
                     omit_rule_warnings.append({
                         "section": f"company_watch.{company}",
                         "source_index": idx_val,
@@ -1333,6 +1277,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                         "action": "INVESTIGATE"
                     })
 
+        # PM Craft omit-rule check (unique — not covered by routing canary)
         for idx_val in pm_craft_today.get("source_indices", []):
             if idx_val in ws_eligible_indices:
                 source_info = source_index_lookup.get(str(idx_val), {})
@@ -1345,11 +1290,10 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     "action": "INVESTIGATE"
                 })
 
+        if routing_warnings:
+            logger.warning("ROUTING CANARY FIRED: %s", json.dumps(routing_warnings, indent=2))
         if omit_rule_warnings:
             logger.warning("OMIT RULE CANARY: %s", json.dumps(omit_rule_warnings, indent=2))
-            print("OMIT RULE CANARY FIRED:")
-            for w in omit_rule_warnings:
-                print(json.dumps(w, indent=2))
 
         # 5b. Company Watch source integrity check
         cw_source_integrity_violations = []
@@ -1395,9 +1339,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
         if cw_source_integrity_violations:
             logger.warning("CW SOURCE INTEGRITY VIOLATIONS: %s", json.dumps(cw_source_integrity_violations, indent=2))
-            print("CW SOURCE INTEGRITY VIOLATIONS:")
-            for v in cw_source_integrity_violations:
-                print(json.dumps(v, indent=2))
 
         # 5c. PM Craft source integrity check
         product_craft_indices = {
@@ -1425,9 +1366,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     )
                 })
             logger.warning("PM CRAFT SOURCE VIOLATIONS: %s", json.dumps(pm_craft_source_violations, indent=2))
-            print("PM CRAFT SOURCE VIOLATIONS:")
-            for v in pm_craft_source_violations:
-                print(json.dumps(v, indent=2))
             pm_craft_today = {"text": "", "source_indices": []}
 
         # 6. Split implication detector
@@ -1472,9 +1410,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
         if split_implication_warnings:
             logger.warning("SPLIT IMPLICATION WARNINGS: %s", json.dumps(split_implication_warnings, indent=2))
-            print("SPLIT IMPLICATION WARNINGS:")
-            for w in split_implication_warnings:
-                print(json.dumps(w, indent=2))
 
         # 7. Theme audit
         THEME_KEYWORDS: Dict[str, List[str]] = {
@@ -1543,9 +1478,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
         if theme_audit_warnings:
             logger.error("THEME AUDIT WARNINGS: %s", json.dumps(theme_audit_warnings, indent=2))
-            print("THEME AUDIT WARNINGS:")
-            for w in theme_audit_warnings:
-                print(json.dumps(w, indent=2))
 
         # 8. Theme diversity warnings
         theme_diversity_warnings = []
@@ -1567,15 +1499,9 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
         if theme_diversity_warnings:
             logger.error("THEME DIVERSITY WARNINGS: %s", json.dumps(theme_diversity_warnings, indent=2))
-            print("THEME DIVERSITY WARNINGS:")
-            for w in theme_diversity_warnings:
-                print(json.dumps(w, indent=2))
 
         # ---------------------------------------------------------------------------
-        # Step 6: Build display payload from ws_paragraphs — the live merged list.
-        # This is the single source of truth. Call 1 parsed output is never
-        # referenced again after step 1 normalization. Fill results that were
-        # appended in step 3 are guaranteed to appear here.
+        # Build display payload
         # ---------------------------------------------------------------------------
         ws_display_payload = [
             {
@@ -1591,10 +1517,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             "WS DISPLAY PAYLOAD: %d paragraphs, themes: %s",
             len(ws_display_payload),
             [_get_theme_for_ws(ws, ws_indexed, source_index_lookup) for ws in ws_display_payload],
-        )
-        print(
-            f"WS DISPLAY PAYLOAD: {len(ws_display_payload)} paragraphs, "
-            f"themes: {[_get_theme_for_ws(ws, ws_indexed, source_index_lookup) for ws in ws_display_payload]}"
         )
 
         return {
@@ -1623,6 +1545,5 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         }
 
     except Exception as exc:
-        print("Exception during synthesis:", exc)
-        traceback.print_exc()
+        logger.exception("Exception during synthesis: %s", exc)
         raise

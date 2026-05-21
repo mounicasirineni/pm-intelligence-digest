@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 MAX_FEED_RETRIES = 2
 
+# Network errors worth retrying beyond IncompleteRead.
+_RETRYABLE_ERRORS = (IncompleteRead, OSError, ConnectionError, TimeoutError)
+
 
 def _parse_published(entry: Any) -> datetime | None:
     """Best-effort parsing of a feed entry's published date (UTC-aware)."""
@@ -31,12 +34,31 @@ def _parse_published(entry: Any) -> datetime | None:
         return None
 
 
+def _resolve_env_url(url: str) -> str | None:
+    """Resolve a URL that may be of the form 'env:VAR_NAME'."""
+    if not url.startswith("env:"):
+        return url
+    var_name = url.split(":", 1)[1]
+    resolved = os.getenv(var_name)
+    if not resolved:
+        logger.warning("Environment variable %s not set for source feed.", var_name)
+    return resolved
+
+
 def _fetch_rss_items(
     source: Dict[str, Any],
     max_items: int = 5,
     lookback_hours: int = 24,
 ) -> List[Dict[str, Any]]:
-    url = source["url"]
+    # --- FIX: resolve env: URLs for RSS sources (previously only done for podcasts) ---
+    url = _resolve_env_url(source["url"])
+    if not url:
+        return []
+
+    # Per-source overrides (optional fields in sources.json)
+    max_items = source.get("max_items", max_items)
+    lookback_hours = source.get("lookback_hours", lookback_hours)
+
     is_thin_feed = source.get("thin_feed", False)
     is_fetch_blocked = source.get("fetch_blocked", False)
 
@@ -45,20 +67,20 @@ def _fetch_rss_items(
         try:
             parsed = feedparser.parse(url)
             break
-        except IncompleteRead as exc:
+        except _RETRYABLE_ERRORS as exc:
+            # --- FIX: retry on OSError/TimeoutError in addition to IncompleteRead ---
             if attempt < MAX_FEED_RETRIES:
                 logger.warning(
-                    "RSS source %s: IncompleteRead on attempt %d, retrying — %s",
+                    "RSS source %s: %s on attempt %d, retrying — %s",
                     source.get("id"),
+                    type(exc).__name__,
                     attempt + 1,
                     exc,
                 )
-                time.sleep(2**attempt)  # 1s, 2s
+                time.sleep(2 ** attempt)
             else:
                 raise
 
-    # Loop exits via `break` after a successful parse, or raises on the last
-    # IncompleteRead — so `parsed` is always set here (helps strict type checkers).
     assert parsed is not None
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
@@ -66,10 +88,9 @@ def _fetch_rss_items(
     kept_entries = 0
     enriched_entries = 0
 
-    # Log fetch policy once at feed level (fetch_blocked is independent of thin_feed).
     if is_fetch_blocked:
         logger.warning(
-            "RSS source %s: full fetch disabled — using RSS summary only",
+            "RSS source %s: full fetch disabled (fetch_blocked=true) — using RSS summary only",
             source.get("id"),
         )
     elif is_thin_feed:
@@ -96,19 +117,25 @@ def _fetch_rss_items(
 
         published_at = _parse_published(entry)
 
-        if published_at is not None and published_at < cutoff:
+        # --- FIX: treat undated items as stale rather than always keeping them ---
+        if published_at is None:
+            logger.debug(
+                "RSS source %s: no date for '%s' — skipping (treat as stale)",
+                source.get("id"),
+                getattr(entry, "title", "")[:80],
+            )
+            continue
+
+        if published_at < cutoff:
             continue
 
         kept_entries += 1
 
-        # Full-article fetch for thin feeds or thin content
         entry_url = getattr(entry, "link", "")
         word_count = len(content_text.split())
         needs_fetch = (is_thin_feed or word_count < MIN_WORD_THRESHOLD) \
                       and not is_fetch_blocked
 
-        # Organic short RSS blurbs would normally trigger a full fetch; when
-        # fetch_blocked, we keep weak RSS text — log so it is not silent.
         if (
             is_fetch_blocked
             and not is_thin_feed
@@ -177,17 +204,6 @@ def _fetch_rss_items(
     return items
 
 
-def _resolve_env_url(url: str) -> str | None:
-    """Resolve a URL that may be of the form 'env:VAR_NAME'."""
-    if not url.startswith("env:"):
-        return url
-    var_name = url.split(":", 1)[1]
-    resolved = os.getenv(var_name)
-    if not resolved:
-        logger.warning("Environment variable %s not set for source feed.", var_name)
-    return resolved
-
-
 def _fetch_podcast_items(
     source: Dict[str, Any],
     max_items: int = 3,
@@ -197,6 +213,10 @@ def _fetch_podcast_items(
     url = _resolve_env_url(raw_url)
     if not url:
         return []
+
+    # Per-source overrides
+    max_items = source.get("max_items", max_items)
+    lookback_hours = source.get("lookback_hours", lookback_hours)
 
     parsed = feedparser.parse(url)
 
@@ -219,7 +239,16 @@ def _fetch_podcast_items(
 
         published_at = _parse_published(entry)
 
-        if published_at is not None and published_at < cutoff:
+        # Treat undated podcast entries as stale (consistent with RSS handling)
+        if published_at is None:
+            logger.debug(
+                "Podcast source %s: no date for '%s' — skipping",
+                source.get("id"),
+                getattr(entry, "title", "")[:80],
+            )
+            continue
+
+        if published_at < cutoff:
             continue
 
         kept_entries += 1
@@ -235,6 +264,9 @@ def _fetch_podcast_items(
                 "url": getattr(entry, "link", ""),
                 "published_at": published_at.isoformat() if published_at else None,
                 "summary": transcript_or_description,
+                # --- FIX: add rss_summary so downstream refusal-retry path works
+                #     identically for podcast items and RSS items ---
+                "rss_summary": transcript_or_description,
             }
         )
 
@@ -257,9 +289,9 @@ def fetch_items_grouped_by_theme() -> Tuple[Dict[str, List[Dict[str, Any]]], Dic
           - grouped items: {theme: [item, ...], ...}
           - fetch_metadata: {
               sources_configured: int,
-              sources_active: int,       # returned >=1 item in lookback window
-              sources_empty: int,        # returned 0 items in lookback window
-              empty_source_names: [...], # names of empty sources
+              sources_active: int,
+              sources_empty: int,
+              empty_source_names: [...],
             }
     """
     settings = load_settings()

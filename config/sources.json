@@ -72,7 +72,8 @@
       "name": "Hacker News Frontpage",
       "url": "https://hnrss.org/frontpage",
       "theme": "ai_technology",
-      "verified": false
+      "verified": false,
+      "max_items": 3
     },
     {
       "id": "google_blog",
@@ -215,7 +216,9 @@
       "name": "UX Collective",
       "url": "https://uxdesign.cc/feed",
       "theme": "design_ux",
-      "verified": false
+      "verified": false,
+      "fetch_blocked": true,
+      "_note": "robots.txt disallows all article fetching. fetch_blocked=true skips full-fetch, uses RSS summary only."
     },
     {
       "id": "politico_tech",
@@ -224,7 +227,9 @@
       "url": "https://rss.politico.com/technology.xml",
       "theme": "regulation_policy",
       "verified": false,
-      "thin_feed": true
+      "thin_feed": true,
+      "fetch_blocked": true,
+      "_note": "Consistent 403 on article fetch. fetch_blocked=true skips fetch attempt, uses RSS summary only."
     },
     {
       "id": "eff",
@@ -233,15 +238,6 @@
       "url": "https://www.eff.org/rss/updates.xml",
       "theme": "regulation_policy",
       "verified": false
-    },
-    {
-      "id": "quartz",
-      "type": "rss",
-      "name": "Quartz",
-      "url": "https://qz.com/feed",
-      "theme": "consumer_behavior",
-      "verified": false,
-      "thin_feed": true
     },
     {
       "id": "axios_business",
@@ -301,28 +297,14 @@
       "thin_feed": true
     },
     {
-      "id": "medianama",
-      "type": "rss",
-      "name": "Medianama",
-      "url": "https://www.medianama.com/feed/",
-      "theme": "regulation_policy",
-      "verified": false
-    },
-    {
       "id": "yourstory",
       "type": "rss",
       "name": "YourStory",
       "url": "https://yourstory.com/feed",
       "theme": "startup_disruption",
-      "verified": false
-    },
-    {
-      "id": "vulcan_post",
-      "type": "rss",
-      "name": "Vulcan Post",
-      "url": "https://vulcanpost.com/feed",
-      "theme": "market_behavior",
-      "verified": false
+      "verified": false,
+      "fetch_blocked": true,
+      "_note": "Consistent 403. fetch_blocked=true uses RSS summary only. Low relevance pass rate \u2014 consider removing."
     },
     {
       "id": "netflix_techblog",
@@ -342,7 +324,7 @@
       "company_id": "Anthropic",
       "verified": false,
       "thin_feed": true,
-      "_note": "Third-party GitHub mirror — no native Anthropic RSS exists as of 2026-04-15. Monitor https://www.anthropic.com/news for official feed."
+      "_note": "Third-party GitHub mirror \u2014 no native Anthropic RSS. Monitor https://www.anthropic.com/news for official feed."
     }
   ]
 }

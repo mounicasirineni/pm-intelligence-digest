@@ -8,6 +8,7 @@ from typing import Any, Dict
 from anthropic import Anthropic
 
 from ..config import load_settings
+from ..constants import OG_DESCRIPTION_PREFIX
 
 logger = logging.getLogger(__name__)
 
@@ -23,24 +24,14 @@ SYSTEM_PROMPT = (
     "Format each bullet as plain text only. Do not bold, italicize, or use any markdown formatting inside bullet text."
 )
 
-# Hard skip — don't hit the API at all below this word count.
+# Hard skip — don't hit the API below this word count.
 # Raised from 100 to 200: articles between 100–199 words were reaching Claude,
 # consuming tokens, and producing low-confidence outputs that got filtered anyway.
-# Jina and og:description fallbacks in fetcher.py now recover most of these sources,
-# so legitimate thin content is rarer. The ones that still come in below 200 after
-# three fetch tiers are truly unrecoverable (hard paywalls, login walls, stubs).
 MINIMUM_CONTENT_WORDS = 200
 
 # Articles below this word count get confidence capped at "medium" in code,
-# regardless of what Claude returns. Claude's prompt guidance on confidence levels
-# is not always respected for borderline cases — this is the hard enforcement.
+# regardless of what Claude returns.
 CONFIDENCE_FLOOR_WORDS = 400
-
-# Prefix written by fetcher.py when content came from og:description fallback.
-# Content sourced this way is always capped at confidence="low" regardless of
-# what Claude returns, since og:description is a 20–80 word meta tag, not the
-# article body.
-OG_DESCRIPTION_PREFIX = "OG_DESCRIPTION:"
 
 
 def _build_client() -> Anthropic:
@@ -54,24 +45,15 @@ def _build_client() -> Anthropic:
 
 
 def _extract_json(text: str) -> str:
-    """
-    Best-effort extraction of a JSON object from a Claude reply.
-
-    Handles common cases where the model wraps JSON in ```json ... ``` or ``` ... ``` fences.
-    """
+    """Best-effort extraction of a JSON object from a Claude reply."""
     if not text:
         return text
-
-    # First look for ```json ... ``` fenced blocks.
     json_fence = re.search(r"```json(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     if json_fence:
         return json_fence.group(1).strip()
-
-    # Then look for generic ``` ... ``` fenced blocks.
     generic_fence = re.search(r"```(.*?)```", text, flags=re.DOTALL)
     if generic_fence:
         return generic_fence.group(1).strip()
-
     return text.strip()
 
 
@@ -81,20 +63,20 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
 
     Args:
         item: dict with at least title, url, summary (or full content),
-              source_name, and theme. Optional ``rss_summary``: RSS text before
+              source_name, and theme.  Optional ``rss_summary``: RSS text before
               any full-article enrichment (used to retry once if Claude returns
               ``stop_reason=refusal`` on the full body).
 
     Returns:
         {
-          "insights": [ "...", ... ],        # 3–5 bullets
-          "pm_interview_relevance": "...",   # text explanation
-          "pm_relevance_score": "high" | "medium" | "low",  # categorical
+          "insights": [ "...", ... ],
+          "pm_interview_relevance": "...",
+          "pm_relevance_score": "high" | "medium" | "low",
           "confidence": "high" | "medium" | "low",
           "company_maturity": "startup" | "established" | "not_applicable",
           "scope": "cross_market" | "company_specific",
-          "content_word_count": int,         # words in content body sent to the model
-          "is_og_fallback": bool,            # True if content came from og:description
+          "content_word_count": int,
+          "is_og_fallback": bool,
         }
     """
     title = item.get("title") or ""
@@ -103,10 +85,13 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     theme = item.get("theme") or ""
     raw_content = item.get("summary") or item.get("content") or ""
 
-    # --- Detect and strip OG_DESCRIPTION prefix set by fetcher.py ---
+    # --- Detect and strip OG_DESCRIPTION prefix (imported from constants.py) ---
+    # FIX: previously this constant was defined locally as "OG_DESCRIPTION:" (no
+    # trailing space) while fetcher.py wrote "OG_DESCRIPTION: " (with space).
+    # Both now import from constants.py, guaranteeing exact match.
     is_og_fallback = raw_content.startswith(OG_DESCRIPTION_PREFIX)
     if is_og_fallback:
-        content = raw_content[len(OG_DESCRIPTION_PREFIX):].strip()
+        content = raw_content[len(OG_DESCRIPTION_PREFIX):]  # no .strip() needed — exact match
         logger.info(
             "Content for '%s' sourced from og:description fallback — "
             "confidence will be capped at low regardless of Claude output",
@@ -124,7 +109,7 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
         url,
     )
 
-    # --- Hard skip: don't hit the API below MINIMUM_CONTENT_WORDS ---
+    # --- Hard skip ---
     if content_word_count < MINIMUM_CONTENT_WORDS:
         logger.info(
             "Skipping '%s' — content too short (%d words, minimum %d)",
@@ -212,23 +197,19 @@ Guidance:
   MATURITY EDGE CASE RULE: If you recognize a company as a widely known name in tech, media, or finance — a company a PM interviewer would immediately recognize — classify it as established. When in doubt between startup and established, ask: would a senior PM at Google consider this company a peer or a startup? If peer, it is established.
   This field is used downstream to filter Startup Radar — established companies will not appear in Startup Radar regardless of feed tag.
 - SCOPE RULE: Assess whether this article describes a pattern affecting multiple companies or an entire product category ('cross_market'), or whether it is primarily about one named company's specific regulatory situation, legal case, government contract, or product decision ('company_specific').
-    cross_market    = the article's central claim applies to an industry, a product category, or a regulatory framework that affects multiple companies or builders. Example: an EFF article about how 3D printer regulations create repurposable censorship infrastructure is cross_market. An MIT Technology Review article about plastics supply chain vulnerabilities is cross_market.
-    company_specific = the article is primarily about what one named company did, faces, or decided. Example: a TechCrunch article about Google's new API is company_specific. An RTI filing about OpenAI's military contract is company_specific.
+    cross_market    = the article's central claim applies to an industry, a product category, or a regulatory framework that affects multiple companies or builders.
+    company_specific = the article is primarily about what one named company did, faces, or decided.
   DESIGN_UX SCOPE NOTE: Articles about design patterns, UX frameworks, or product
   craft that use named companies as examples (not as primary subjects) are
   cross_market. The test is whether the central claim applies to any builder in
-  that category, not whether a company name appears in the article. An article
-  arguing that AI products require trust infrastructure — illustrated with AWS as
-  an example — is cross_market because the claim applies to any AI product builder,
-  not only to AWS.
+  that category, not whether a company name appears in the article.
   This field is used downstream to route regulation_policy and design_ux articles —
   only cross_market articles are eligible for What's Shifting.
-  Company_specific articles route to Company Watch or are dropped.
 - "pm_interview_relevance" should be a one-line text explanation supporting your pm_relevance_score judgment.
 - "confidence" should reflect how well the content body above supports producing accurate, grounded insight bullets — it is a self-assessment of source quality, NOT a judgment of topic interest. Ask: how much of what I would write comes from the content body vs. from my own training knowledge?
     high   = content body is substantive (300+ words of original reporting, analysis, or primary source material) and provides enough specific detail to write 3-5 grounded bullets without drawing on outside knowledge
-    medium = content body is adequate but thin (100-300 words, or partially paywalled) — can produce 2-3 grounded bullets but some inference required
-    low    = content body is too thin to support grounded bullets (under 100 words, pure press release boilerplate, "In Brief" stub, or heavily paywalled with only a lede visible) — any bullets would be primarily inference from training knowledge, not from the source
+    medium = content body is adequate but thin (200-300 words, or partially paywalled) — can produce 2-3 grounded bullets but some inference required
+    low    = content body is too thin to support grounded bullets (under 200 words of original content after reaching this prompt — note: items below 200 words are hard-skipped before you see them, so if you are summarizing this content it is at least 200 words; 'low' at this stage means 200-299 words with significant paywall obstruction, boilerplate, or press-release stub content) — any bullets would be primarily inference from training knowledge, not from the source
   IMPORTANT: A thin source on an interesting topic still gets low confidence. Topic relevance is measured by pm_relevance_score, not confidence. These are independent judgments.
 - ROUNDUP HANDLING RULE: If this article is a newsletter or roundup containing multiple distinct stories, extract insights from each distinct story separately — do not limit analysis to the lead story. Each distinct story should contribute at least one insight bullet if PM-relevant. Bullets from different stories within the same roundup should each be self-contained and traceable to their specific story. If the roundup contains 4 stories, aim for 4-5 bullets total covering all stories, not 3-5 bullets covering only the first. Exception: if secondary stories are clearly minor (brief mentions, event listings, link digests with no analysis), skip them. Apply the same PM-relevance test to each story independently.
 """.strip()
@@ -236,10 +217,19 @@ Guidance:
     settings = load_settings()
     client = _build_client()
 
+    # --- FIX: temperature=0 for deterministic structured output.
+    #     Previously 0.2, which introduced day-to-day variance in classification
+    #     fields (pm_relevance_score, confidence, scope, company_maturity) making
+    #     eval baselines harder to compare. The insight bullets are already
+    #     tightly constrained by prompt rules — 0.2 vs 0 was noise, not signal.
+    # --- FIX: max_tokens scales with content length to prevent truncation on
+    #     dense roundup articles (ROUNDUP HANDLING RULE can push output > 1200 tokens).
+    max_tokens = 1800 if content_word_count > 1000 else 1200
+
     response = client.messages.create(
         model=settings.claude_model,
-        max_tokens=1200,
-        temperature=0.2,
+        max_tokens=max_tokens,
+        temperature=0,
         system=SYSTEM_PROMPT,
         messages=[
             {
@@ -249,13 +239,19 @@ Guidance:
         ],
     )
 
-    # --- Check stop_reason before touching response.content ---
-    # Claude can refuse to summarize content (e.g. military/defence articles)
-    # with stop_reason="refusal". This must be checked explicitly — a refusal
-    # response may still have content blocks containing an explanation, so
-    # checking `not response.content` alone is insufficient and leads to the
-    # refusal text being parsed as JSON, producing garbage output silently.
+    # --- Check for max_tokens truncation before touching response.content ---
     stop_reason = getattr(response, "stop_reason", None)
+
+    if stop_reason == "max_tokens":
+        logger.warning(
+            "Response truncated at max_tokens for '%s' — JSON likely malformed, "
+            "insights may be incomplete (content_word_count=%d, max_tokens=%d)",
+            title,
+            content_word_count,
+            max_tokens,
+        )
+
+    # --- Check stop_reason for refusal ---
     if stop_reason == "refusal":
         logger.warning(
             "Claude refused to summarize '%s' (stop_reason=refusal) — "
@@ -263,6 +259,9 @@ Guidance:
             title,
         )
         rss_fallback = item.get("rss_summary") or ""
+
+        # _refusal_retry is a copy-not-mutate sentinel.  It is set on a shallow
+        # copy of item (not on item itself) so callers never see it.
         if (
             rss_fallback
             and len(rss_fallback.split()) >= MINIMUM_CONTENT_WORDS
@@ -270,6 +269,8 @@ Guidance:
         ):
             fallback_item = {**item, "summary": rss_fallback, "_refusal_retry": True}
             return summarize_item(fallback_item)
+
+        # Log the specific reason retry didn't run — conditions are exhaustive.
         if not rss_fallback:
             logger.warning("No rss_summary available for '%s' — skipping.", title)
         elif len(rss_fallback.split()) < MINIMUM_CONTENT_WORDS:
@@ -279,10 +280,10 @@ Guidance:
                 len(rss_fallback.split()),
                 MINIMUM_CONTENT_WORDS,
             )
-        elif item.get("_refusal_retry"):
-            logger.warning("Refusal on RSS fallback for '%s' — skipping.", title)
         else:
-            logger.warning("No usable fallback for '%s' — skipping.", title)
+            # _refusal_retry must be True — the only remaining case.
+            logger.warning("Refusal on RSS fallback for '%s' — skipping.", title)
+
         return {
             "insights": [],
             "pm_interview_relevance": "Claude declined to summarize this content.",
@@ -327,15 +328,23 @@ Guidance:
     try:
         parsed = json.loads(cleaned_text)
     except Exception:
-        logger.warning("Claude response was not valid JSON, falling back to wrapper.")
-        parsed = {
-            "raw_text": text,
+        # --- FIX: JSON parse failure previously returned medium scores, misleading
+        #     the downstream filter into treating a malformed response as valid content.
+        #     Now returns low scores and logs the raw text for debugging. ---
+        logger.warning(
+            "Claude response was not valid JSON for '%s' — raw text (first 500 chars): %s",
+            title,
+            (text or "")[:500],
+        )
+        return {
             "insights": [],
-            "pm_interview_relevance": "",
-            "pm_relevance_score": "medium",
-            "confidence": "medium",
+            "pm_interview_relevance": "JSON parse failed — Claude output malformed.",
+            "pm_relevance_score": "low",
+            "confidence": "low",
             "company_maturity": "not_applicable",
             "scope": "cross_market",
+            "content_word_count": content_word_count,
+            "is_og_fallback": is_og_fallback,
         }
 
     # Ensure required keys exist with safe defaults.
@@ -361,11 +370,6 @@ Guidance:
         scope = "cross_market"
 
     # --- Code-level confidence enforcement ---
-    # These caps override whatever Claude returned. Prompt guidance alone is
-    # insufficient for borderline cases.
-    #
-    # Cap 1: og:description fallback — always low confidence.
-    # A 20–80 word meta tag cannot support grounded bullets regardless of topic.
     if is_og_fallback:
         if confidence != "low":
             logger.info(
@@ -375,10 +379,6 @@ Guidance:
                 title,
             )
         confidence = "low"
-
-    # Cap 2: thin content — cap at medium.
-    # Articles below CONFIDENCE_FLOOR_WORDS can produce at most medium-confidence
-    # bullets. Claude's prompt defines this threshold but doesn't enforce it in code.
     elif content_word_count < CONFIDENCE_FLOOR_WORDS and confidence == "high":
         logger.info(
             "Overriding confidence from 'high' to 'medium' for '%s' — "
