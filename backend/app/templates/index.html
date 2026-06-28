@@ -462,8 +462,7 @@
       {% endif %}
       <div class="header-nav">
         <a href="/history">Archive</a>
-        <span style="color: var(--border-subtle); margin: 0 0.5rem;">|</span>
-        <a href="/evals">Evals</a>
+        <a href="/digest-health">Digest Health</a>
       </div>
     </header>
 
@@ -475,7 +474,7 @@
       {{ "%.0f"|format(eval_summary.overall_score or 0) }}/100
     </span>
     <span style="color: var(--muted); font-size: 0.82rem; margin-left: 0.75rem;">·</span>
-    <a href="/evals" style="font-size: 0.82rem; margin-left: 0.5rem; border-bottom: none; color: var(--accent);">See Evals for breakdown →</a>
+    <a href="/digest-health/quality" style="font-size: 0.82rem; margin-left: 0.5rem; border-bottom: none; color: var(--accent);">See quality breakdown →</a>
   </div>
 </section>
 {% endif %}

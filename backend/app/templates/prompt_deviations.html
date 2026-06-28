@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow, noarchive"/>
+  <title>PM Digest — Prompt Deviations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#FAFAF8;--text:#1A1A18;--accent:#1B3A6B;--muted:#7A7A72;
+      --border:#DFDED7;--green:#2D6A4F;--amber:#B45309;--red:#991B1B;}
+    *{box-sizing:border-box;}
+    body{margin:0;padding:24px 16px 40px;background:var(--bg);color:var(--text);
+      font-family:"Source Serif 4",-apple-system,serif;-webkit-font-smoothing:antialiased;}
+    .page{max-width:900px;margin:0 auto;}
+    h1,h2{font-family:"Playfair Display",serif;font-weight:600;letter-spacing:0.02em;margin:0;}
+    .header{margin-bottom:2rem;border-bottom:1px solid var(--border);padding-bottom:1.25rem;}
+    .header-title{font-size:clamp(1.8rem,3vw,2.4rem);text-transform:uppercase;letter-spacing:0.18em;}
+    .header-subtitle{margin-top:0.4rem;font-size:0.9rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.16em;}
+    .header-nav{margin-top:0.5rem;font-size:0.85rem;display:flex;gap:1.25rem;}
+    .header-nav a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(27,58,107,0.25);}
+    .header-nav a:hover{border-bottom-color:rgba(27,58,107,0.6);}
+    .header-nav span{color:var(--muted);font-style:italic;}
+    .section{padding:1.5rem 0 1.75rem;border-bottom:1px solid var(--border);}
+    .section:last-of-type{border-bottom:none;}
+    .section-heading{font-size:1.15rem;margin-bottom:0.3rem;}
+    .section-sub{font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;}
+
+    /* Warning history table */
+    .tbl{width:100%;border-collapse:collapse;font-size:0.82rem;}
+    .tbl thead tr{border-bottom:1px solid var(--border);}
+    .tbl th{text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;
+      color:var(--muted);padding:0 0.5rem 0.5rem 0;white-space:nowrap;font-weight:600;}
+    .tbl th:first-child{padding-left:0;}
+    .tbl td{padding:0.4rem 0.5rem 0.4rem 0;border-top:1px solid rgba(223,222,215,0.5);
+      vertical-align:top;white-space:nowrap;}
+    .tbl td:first-child{padding-left:0;}
+    .tbl tbody tr:first-child td{border-top:none;}
+
+    /* Prompt change row */
+    .tbl tr.prompt-change td{
+      background:rgba(27,58,107,0.04);
+      border-top:2px solid var(--accent);
+    }
+    .tbl tr.prompt-change + tr td{border-top:none;}
+    .prompt-change-banner{
+      font-size:0.72rem;font-weight:600;color:var(--accent);
+      display:flex;align-items:center;gap:6px;
+    }
+    .prompt-change-banner::before{
+      content:"";display:inline-block;width:8px;height:8px;
+      border-radius:50%;background:var(--accent);flex-shrink:0;
+    }
+
+    /* Warning pills in cells */
+    .warn-cell{white-space:normal;}
+    .warn-pill{display:inline-block;font-size:0.68rem;padding:1px 6px;border-radius:3px;
+      margin:1px 2px 1px 0;white-space:nowrap;}
+    .warn-pill.active{background:rgba(180,83,9,0.12);border:1px solid rgba(180,83,9,0.3);color:var(--amber);}
+    .warn-pill.streak{background:rgba(153,27,27,0.1);border:1px solid rgba(153,27,27,0.3);color:var(--red);}
+    .warn-pill.ok{background:rgba(45,106,79,0.08);border:1px solid rgba(45,106,79,0.25);color:var(--green);}
+
+    /* Version history */
+    .version-group{margin-bottom:1.5rem;}
+    .version-group-label{font-size:0.72rem;font-weight:600;text-transform:uppercase;
+      letter-spacing:0.1em;color:var(--accent);margin-bottom:0.5rem;}
+    .version-row{display:flex;gap:1rem;align-items:baseline;font-size:0.82rem;
+      padding:0.3rem 0;border-bottom:1px solid rgba(223,222,215,0.4);}
+    .version-row:last-child{border-bottom:none;}
+    .v-date{min-width:80px;color:var(--muted);}
+    .v-hash{font-family:"SF Mono","Fira Code",monospace;font-size:0.75rem;color:var(--accent);}
+    .v-active{font-size:0.65rem;background:#dcfce7;color:#166534;padding:1px 5px;border-radius:3px;font-weight:700;}
+    .v-reason{color:var(--text);flex:1;}
+    .v-by{font-size:0.72rem;color:var(--muted);}
+    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
+
+    /* Legend */
+    .legend{font-size:0.78rem;color:var(--muted);line-height:1.8;margin-bottom:1.25rem;}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header class="header">
+    <h1 class="header-title">PM Digest</h1>
+    <div class="header-subtitle">Prompt Deviations</div>
+    <nav class="header-nav">
+      <a href="/">Digest</a>
+      <a href="/history">Archive</a>
+      <a href="/digest-health?token={{ token }}">Digest Health</a>
+      <span>Deviations</span>
+    </nav>
+  </header>
+
+  <!-- Warning history -->
+  <section class="section">
+    <h2 class="section-heading">Warning history — last 30 days</h2>
+    <div class="section-sub">
+      Each row is one digest run. Blue markers show when a prompt version changed.
+      Pill color: amber = warning fired, red = fired at or above threshold (patch signal).
+    </div>
+    <div class="legend">
+      Tracked: split implication (3d) · theme diversity (3d) · theme audit (2d) ·
+      routing (2d) · CW source integrity (1d) · PM craft source (1d)
+    </div>
+
+    {% set tracked = [
+      "split_implication_warnings",
+      "theme_diversity_warnings",
+      "theme_audit_warnings",
+      "routing_warnings",
+      "cw_source_integrity_violations",
+      "pm_craft_source_violations"
+    ] %}
+
+    {% set thresholds = {
+      "split_implication_warnings": 3,
+      "theme_diversity_warnings": 3,
+      "theme_audit_warnings": 2,
+      "routing_warnings": 2,
+      "cw_source_integrity_violations": 1,
+      "pm_craft_source_violations": 1
+    } %}
+
+    {% if warnings %}
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Split impl.</th>
+          <th>Theme div.</th>
+          <th>Theme audit</th>
+          <th>Routing</th>
+          <th>CW integrity</th>
+          <th>PM craft src</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in warnings %}
+
+        {# Prompt change banner row #}
+        {% if row.date in change_dates %}
+        <tr class="prompt-change">
+          <td colspan="7">
+            <div class="prompt-change-banner">
+              Prompt updated on {{ row.date }} —
+              {% set changed_calls = [] %}
+              {% for call_name, versions in versions.items() %}
+                {% for v in versions %}
+                  {% if v.active_from == row.date %}
+                    {% if changed_calls.append(call_name | replace("_"," ")) %}{% endif %}
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+              {{ changed_calls | join(', ') or 'see version history below' }}
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+
+        <tr>
+          <td style="color:var(--accent);font-weight:500;">{{ row.label }}</td>
+          {% for wtype in tracked %}
+          {% set wdata = row.warnings.get(wtype) %}
+          <td class="warn-cell">
+            {% if wdata %}
+              {% set threshold = thresholds.get(wtype, 99) %}
+              <span class="warn-pill {% if wdata.consecutive_days >= threshold %}streak{% else %}active{% endif %}">
+                {{ wdata.consecutive_days }}d
+              </span>
+            {% else %}
+              <span class="warn-pill ok">✓</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No warning history yet — warning_counts table is empty.</p>
+    {% endif %}
+  </section>
+
+  <!-- Prompt version history -->
+  <section class="section">
+    <h2 class="section-heading">Prompt version history</h2>
+    <div class="section-sub">
+      Auto-detected from content hash at each startup. Change reason recorded when provided.
+    </div>
+
+    {% set ordered_calls = [
+      "summarizer.call_a.system", "summarizer.call_b.system", "summarizer.call_c.system",
+      "synthesizer.call_1a", "synthesizer.call_1b",
+      "synthesizer.call_2_pm_craft", "synthesizer.call_3_cw", "synthesizer.call_4a", "synthesizer.call_4b_sr"
+    ] %}
+
+    {% set ns = namespace(has_any=false) %}
+    {% for call_name in ordered_calls %}
+      {% if versions.get(call_name) %}
+        {% set ns.has_any = true %}
+      {% endif %}
+    {% endfor %}
+
+    {% if ns.has_any %}
+      {% for call_name in ordered_calls %}
+      {% set vlist = versions.get(call_name) %}
+      {% if vlist %}
+      <div class="version-group">
+        <div class="version-group-label">{{ call_name | replace("."," · ") }}</div>
+        {% for v in vlist %}
+        <div class="version-row">
+          <span class="v-date">{{ v.active_from }}</span>
+          <span class="v-hash">{{ v.prompt_hash }}</span>
+          {% if v.is_active %}<span class="v-active">ACTIVE</span>{% endif %}
+          <span class="v-reason">{{ v.reason or "—" }}</span>
+          <span class="v-by">{{ v.proposed_by }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    {% else %}
+      <p class="empty">
+        No prompt versions registered yet.
+        Call <code>register_prompt(call_name, prompt_text)</code> in <code>create_app()</code> to begin tracking.
+      </p>
+    {% endif %}
+  </section>
+
+</div>
+</body>
+</html>

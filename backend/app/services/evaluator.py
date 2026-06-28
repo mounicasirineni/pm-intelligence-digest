@@ -6,7 +6,7 @@ import logging
 import re
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -20,6 +20,17 @@ from .summarizer import _extract_json
 logger = logging.getLogger(__name__)
 
 EVAL_MODEL = "claude-haiku-4-5-20251001"
+
+PATCH_SIGNAL_THRESHOLDS = {
+    # Prompt compliance failures — model ignoring a specific rule
+    "split_implication_warnings": 3,
+    "theme_diversity_warnings": 3,
+    "theme_audit_warnings": 2,
+    "routing_warnings": 2,
+    # Architecture failures — should never happen, any instance is signal
+    "cw_source_integrity_violations": 1,
+    "pm_craft_source_violations": 1,
+}
 
 _CITATION_RE = re.compile(r"\[\d+\]")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
@@ -81,6 +92,201 @@ def _ensure_evals_table(conn: sqlite3.Connection) -> None:
         except sqlite3.OperationalError:
             pass
     conn.commit()
+
+
+def _ensure_warning_counts_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS warning_counts (
+            date             TEXT NOT NULL,
+            warning_type     TEXT NOT NULL,
+            count            INTEGER DEFAULT 0,
+            consecutive_days INTEGER DEFAULT 0,
+            last_fired       TEXT,
+            PRIMARY KEY (date, warning_type)
+        )
+        """
+    )
+    conn.commit()
+
+
+def _update_warning_counts(
+    conn: sqlite3.Connection,
+    date_str: str,
+    synthesis: Dict[str, Any],
+) -> None:
+    """
+    Extract editorial_warnings from synthesis and write to warning_counts table.
+    Increments consecutive_days when the same warning type fired yesterday.
+    """
+    warnings = (synthesis or {}).get("editorial_warnings") or {}
+
+    warning_type_counts: Dict[str, int] = {}
+    for key, value in warnings.items():
+        if key.endswith("_debug"):
+            continue
+        if isinstance(value, list):
+            if value:
+                warning_type_counts[key] = len(value)
+        elif isinstance(value, str) and value:
+            warning_type_counts[key] = 1
+
+    try:
+        yesterday = (
+            datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+
+        for warning_type, count in warning_type_counts.items():
+            cur = conn.execute(
+                """
+                SELECT consecutive_days FROM warning_counts
+                WHERE date = ? AND warning_type = ?
+                """,
+                (yesterday, warning_type),
+            )
+            row = cur.fetchone()
+            prev_consecutive = row[0] if row else 0
+            consecutive_days = prev_consecutive + 1
+
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO warning_counts
+                    (date, warning_type, count, consecutive_days, last_fired)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (date_str, warning_type, count, consecutive_days, date_str),
+            )
+
+            threshold = PATCH_SIGNAL_THRESHOLDS.get(warning_type)
+            if threshold is not None and consecutive_days >= threshold:
+                logger.warning(
+                    "SELF-IMPROVE SIGNAL: '%s' has fired for %d consecutive days "
+                    "(count today: %d, threshold: %d) — candidate for prompt patch",
+                    warning_type, consecutive_days, count, threshold,
+                )
+
+        conn.commit()
+        logger.info(
+            "warning_counts updated for %s: %d warning types recorded",
+            date_str, len(warning_type_counts),
+        )
+
+    except Exception:
+        logger.exception("Failed to update warning_counts for %s", date_str)
+
+
+def get_consecutive_warning_types() -> List[Dict[str, Any]]:
+    """
+    Return warning types that have fired for >= their individual threshold.
+    Uses PATCH_SIGNAL_THRESHOLDS — excluded types never appear here.
+    """
+    if not PATCH_SIGNAL_THRESHOLDS:
+        return []
+
+    conn = _get_connection()
+    try:
+        _ensure_warning_counts_table(conn)
+        results: List[Dict[str, Any]] = []
+        for warning_type, threshold in PATCH_SIGNAL_THRESHOLDS.items():
+            if threshold is None:
+                continue
+            cur = conn.execute(
+                """
+                SELECT date, warning_type, count, consecutive_days, last_fired
+                FROM warning_counts
+                WHERE warning_type = ? AND consecutive_days >= ?
+                ORDER BY date DESC LIMIT 1
+                """,
+                (warning_type, threshold),
+            )
+            row = cur.fetchone()
+            if row:
+                results.append({
+                    "date": row[0],
+                    "warning_type": row[1],
+                    "count": row[2],
+                    "consecutive_days": row[3],
+                    "last_fired": row[4],
+                    "threshold": threshold,
+                })
+        return sorted(results, key=lambda x: -x["consecutive_days"])
+    finally:
+        conn.close()
+
+
+def get_score_trend(lookback_days: int = 7) -> Dict[str, Any]:
+    """
+    Return overall_score trend and per-section averages for the last N days.
+    Used by eval-gated prompt evolution to detect sustained score drops.
+    """
+    conn = _get_connection()
+    try:
+        cur = conn.execute(
+            """
+            SELECT date, overall_score, llm_judge_json
+            FROM evals
+            ORDER BY date DESC
+            LIMIT ?
+            """,
+            (lookback_days,),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    scores = []
+    for row_date, overall_score, llm_json in rows:
+        llm = json.loads(llm_json) if llm_json else {}
+        scores.append({
+            "date": row_date,
+            "overall_score": float(overall_score or 0),
+            "ws_breadth": float(llm.get("ws_topical_breadth") or 0),
+            "ws_coherence": float(llm.get("ws_avg_coherence") or 0),
+            "ws_insight": float(llm.get("ws_avg_insight_depth") or 0),
+            "cw_coherence": float(llm.get("cw_avg_coherence") or 0),
+            "sr_coherence": float(llm.get("sr_avg_coherence") or 0),
+        })
+
+    if not scores:
+        return {}
+
+    below_threshold_streak = 0
+    breadth_below_streak = 0
+    for s in scores:
+        if s["overall_score"] < 65:
+            below_threshold_streak += 1
+        else:
+            break
+
+    for s in scores:
+        if s["ws_breadth"] < 2.5:
+            breadth_below_streak += 1
+        else:
+            break
+
+    avg_overall = sum(s["overall_score"] for s in scores) / len(scores)
+    avg_breadth = sum(s["ws_breadth"] for s in scores) / len(scores)
+
+    if below_threshold_streak >= 3:
+        logger.warning(
+            "SELF-IMPROVE SIGNAL: overall_score below 65 for %d consecutive days "
+            "(avg=%.1f) — candidate for prompt evolution",
+            below_threshold_streak, avg_overall,
+        )
+    if breadth_below_streak >= 3:
+        logger.warning(
+            "SELF-IMPROVE SIGNAL: ws_breadth below 2.5 for %d consecutive days "
+            "— candidate for breadth prompt patch",
+            breadth_below_streak,
+        )
+
+    return {
+        "scores": scores,
+        "avg_overall": avg_overall,
+        "avg_ws_breadth": avg_breadth,
+        "below_threshold_streak": below_threshold_streak,
+        "breadth_below_threshold_streak": breadth_below_streak,
+    }
 
 
 def _build_llm_client() -> Anthropic:
@@ -426,14 +632,64 @@ async def llm_judge(
         }
 
     def _score_topical_breadth(
-        ws_paragraphs: List[str],
+        ws_paragraph_dicts: List[Dict[str, Any]],
         available_themes: Dict[str, int] | None = None,
     ) -> Dict[str, Any]:
-        if not ws_paragraphs:
+        if not ws_paragraph_dicts:
             return {"topical_breadth": 0, "topical_breadth_reason": "No paragraphs to evaluate."}
-        # FIX: use client from enclosing llm_judge scope — previously called
-        # _build_llm_client() again, creating a second Anthropic instance
-        combined = "\n\n".join(ws_paragraphs)
+
+        # Build combined text for the evaluator, prepending declared theme when
+        # available so Haiku doesn't have to re-infer from keyword matching.
+        paragraph_blocks = []
+        declared_theme_map = {}
+        for i, entry in enumerate(ws_paragraph_dicts):
+            para = str(entry.get("paragraph") or "").strip()
+            if not para:
+                continue
+            declared = str(entry.get("theme") or "").strip()
+            if declared:
+                declared_theme_map[i] = declared
+                paragraph_blocks.append(f"[Paragraph {i+1} | declared theme: {declared}]\n{para}")
+            else:
+                paragraph_blocks.append(f"[Paragraph {i+1}]\n{para}")
+
+        if not paragraph_blocks:
+            return {"topical_breadth": 0, "topical_breadth_reason": "No paragraphs to evaluate."}
+
+        combined = "\n\n".join(paragraph_blocks)
+
+        # If ALL paragraphs have declared themes, we can score without an LLM call.
+        if len(declared_theme_map) == len(paragraph_blocks):
+            declared_themes = list(declared_theme_map.values())
+            valid_themes = {
+                "ai_technology", "market_behavior", "consumer_behavior",
+                "regulation_policy", "design_ux"
+            }
+            declared_themes_clean = [t for t in declared_themes if t in valid_themes]
+            distinct_valid = len(set(declared_themes_clean))
+            # Map distinct theme count to breadth score (matches evaluator rubric)
+            score_map = {5: 5, 4: 4, 3: 3, 2: 2, 1: 1}
+            score = score_map.get(distinct_valid, max(1, distinct_valid))
+            theme_list = ", ".join(sorted(set(declared_themes_clean)))
+            available_not_covered = [
+                t for t in (available_themes or {})
+                if t not in set(declared_themes_clean) and (available_themes or {}).get(t, 0) >= 2
+            ]
+            reason = (
+                f"{distinct_valid} distinct themes covered ({theme_list})"
+                + (f"; {len(available_not_covered)} theme(s) had material but no paragraph: {', '.join(available_not_covered)}" if available_not_covered else "")
+            )
+            logger.info(
+                "BREADTH: scored from declared themes (no LLM call needed) — %d distinct, score=%d",
+                distinct_valid, score,
+            )
+            return {"topical_breadth": score, "topical_breadth_reason": reason}
+
+        # Fallback: LLM-based classification for paragraphs without declared themes.
+        logger.info(
+            "BREADTH: falling back to LLM classification (%d undeclared paragraphs)",
+            len(paragraph_blocks) - len(declared_theme_map),
+        )
 
         available_themes_block = ""
         if available_themes:
@@ -503,7 +759,12 @@ async def llm_judge(
         indices = insight.get("source_indices") or [] if isinstance(insight, dict) else []
         loop = asyncio.get_running_loop()
         try:
-            return await loop.run_in_executor(None, lambda: _score_paragraph(paragraph, indices, "whats_shifting synthesis"))
+            result = await loop.run_in_executor(
+                None, lambda: _score_paragraph(paragraph, indices, "whats_shifting synthesis")
+            )
+            if result:
+                result["call"] = "call_1b"
+            return result
         except Exception:
             return None
 
@@ -517,6 +778,7 @@ async def llm_judge(
             scored = await loop.run_in_executor(None, lambda: _score_paragraph(paragraph, indices, f"company_watch ({company})"))
             if scored:
                 scored["company"] = company
+                scored["call"] = "call_3"
             return scored
         except Exception:
             return None
@@ -532,19 +794,29 @@ async def llm_judge(
             return None
         loop = asyncio.get_running_loop()
         try:
-            return await loop.run_in_executor(None, lambda: _score_paragraph(text, indices, "startup_radar"))
+            result = await loop.run_in_executor(
+                None, lambda: _score_paragraph(text, indices, "startup_radar")
+            )
+            if result:
+                result["call"] = "call_4b"
+            return result
         except Exception:
             return None
 
     async def score_topical_breadth_async() -> Dict[str, Any]:
-        ws_paragraphs = [
-            str(i.get("paragraph") or "").strip() if isinstance(i, dict) else str(i).strip()
+        # Pass full dicts so _score_topical_breadth can use declared themes
+        # from the synthesizer rather than re-inferring from keyword matching.
+        ws_paragraph_dicts = [
+            i if isinstance(i, dict) else {"paragraph": str(i)}
             for i in whats_shifting
+            if (i.get("paragraph") if isinstance(i, dict) else str(i)).strip()
         ]
-        ws_paragraphs = [p for p in ws_paragraphs if p]
         loop = asyncio.get_running_loop()
         try:
-            return await loop.run_in_executor(None, lambda: _score_topical_breadth(ws_paragraphs, ws_available_themes))
+            return await loop.run_in_executor(
+                None,
+                lambda: _score_topical_breadth(ws_paragraph_dicts, ws_available_themes)
+            )
         except Exception:
             return {"topical_breadth": 0, "topical_breadth_reason": "Eval failed."}
 
@@ -928,6 +1200,17 @@ def run(
         conn.commit()
     finally:
         conn.close()
+
+    conn2 = _get_connection()
+    try:
+        _ensure_warning_counts_table(conn2)
+        _update_warning_counts(conn2, date_str, synthesis)
+    finally:
+        conn2.close()
+
+    trend = get_score_trend(lookback_days=7)
+    if trend:
+        _ = trend  # signals already logged inside get_score_trend
 
     return {
         "date": date_str,

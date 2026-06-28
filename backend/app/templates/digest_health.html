@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow, noarchive"/>
+  <title>PM Digest — Digest Health</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#FAFAF8; --text:#1A1A18; --accent:#1B3A6B; --muted:#7A7A72;
+      --border:#DFDED7; --green:#2D6A4F; --amber:#B45309; --red:#991B1B;
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;padding:24px 16px 40px;background:var(--bg);color:var(--text);
+      font-family:"Source Serif 4",-apple-system,serif;-webkit-font-smoothing:antialiased;}
+    .page{max-width:860px;margin:0 auto;}
+    h1,h2{font-family:"Playfair Display",serif;font-weight:600;letter-spacing:0.02em;margin:0;}
+    .header{margin-bottom:2rem;border-bottom:1px solid var(--border);padding-bottom:1.25rem;}
+    .header-title{font-size:clamp(1.8rem,3vw,2.4rem);text-transform:uppercase;letter-spacing:0.18em;}
+    .header-subtitle{margin-top:0.4rem;font-size:0.9rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.16em;}
+    .header-nav{margin-top:0.5rem;font-size:0.85rem;display:flex;gap:1.25rem;}
+    .header-nav a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(27,58,107,0.25);}
+    .header-nav a:hover{border-bottom-color:rgba(27,58,107,0.6);}
+    .header-nav span{color:var(--muted);font-style:italic;}
+
+    /* Status cards */
+    .status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:2rem;}
+    .status-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:1rem 1.25rem;
+      text-decoration:none;color:inherit;display:block;transition:border-color 0.15s;}
+    .status-card:hover{border-color:var(--accent);}
+    .status-card .sc-label{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:6px;}
+    .status-card .sc-value{font-size:1.6rem;font-weight:700;font-family:"Playfair Display",serif;}
+    .status-card .sc-sub{font-size:0.78rem;color:var(--muted);margin-top:3px;}
+    .status-card .sc-link{font-size:0.78rem;color:var(--accent);margin-top:8px;border-bottom:1px solid rgba(27,58,107,0.25);}
+    .good{color:var(--green);} .amber{color:var(--amber);} .bad{color:var(--red);}
+
+    /* Section */
+    .section{padding:1.5rem 0 1.75rem;border-bottom:1px solid var(--border);}
+    .section:last-of-type{border-bottom:none;}
+    .section-heading{font-size:1.15rem;margin-bottom:0.3rem;}
+    .section-sub{font-size:0.9rem;color:var(--muted);margin-bottom:1.25rem;}
+
+    /* Patch cards */
+    .patch-card{background:#fff;border:1px solid var(--border);border-radius:8px;
+      padding:1.1rem 1.25rem;margin-bottom:0.875rem;}
+    .patch-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:0.6rem;}
+    .badge{display:inline-block;font-size:0.68rem;font-weight:600;padding:2px 7px;border-radius:4px;}
+    .badge-call{background:#e8f0fe;color:#1a56db;}
+    .badge-trigger{background:#fef3c7;color:#92400e;}
+    .badge-proposed{background:#f0fdf4;color:#166534;}
+    .patch-date{font-size:0.75rem;color:var(--muted);}
+    .patch-detail{font-size:0.82rem;color:#555;font-style:italic;margin-bottom:0.75rem;}
+    .patch-content{background:#f7f6f3;border:1px solid var(--border);border-radius:6px;
+      padding:0.75rem;font-size:0.78rem;line-height:1.7;white-space:pre-wrap;
+      max-height:200px;overflow-y:auto;margin-bottom:0.875rem;}
+    .patch-actions{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+    .patch-notes{flex:1;min-width:180px;}
+    .patch-notes label{display:block;font-size:0.75rem;color:var(--muted);margin-bottom:3px;}
+    .patch-notes textarea{width:100%;font-size:0.8rem;padding:5px 7px;border:1px solid var(--border);
+      border-radius:5px;resize:vertical;min-height:44px;font-family:inherit;}
+    .btn{display:inline-flex;align-items:center;padding:6px 14px;font-size:0.8rem;font-weight:600;
+      border-radius:6px;cursor:pointer;border:1px solid transparent;}
+    .btn-accept{background:#166534;color:#fff;border-color:#166534;}
+    .btn-reject{background:#fff;color:var(--red);border-color:var(--red);}
+    .btn:hover{opacity:0.85;}
+
+    /* Signal pills */
+    .signal-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;}
+    .signal-pill{font-size:0.75rem;padding:3px 10px;border-radius:12px;
+      background:rgba(180,83,9,0.1);border:1px solid rgba(180,83,9,0.3);color:var(--amber);}
+    .signal-pill.danger{background:rgba(153,27,27,0.08);border-color:rgba(153,27,27,0.3);color:var(--red);}
+    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header class="header">
+    <h1 class="header-title">PM Digest</h1>
+    <div class="header-subtitle">Digest Health</div>
+    <nav class="header-nav">
+      <a href="/">Digest</a>
+      <a href="/history">Archive</a>
+      <span>Digest Health</span>
+    </nav>
+  </header>
+
+  <!-- Status cards linking to sub-pages -->
+  <div class="status-grid">
+
+    <a class="status-card" href="/digest-health/pipeline?token={{ token }}">
+      <div class="sc-label">Source pipeline</div>
+      {% if today_pipeline %}
+        <div class="sc-value {% if today_pipeline.sources_active_pct >= 80 %}good{% elif today_pipeline.sources_active_pct >= 60 %}amber{% else %}bad{% endif %}">
+          {{ "%.0f"|format(today_pipeline.sources_active_pct) }}%
+        </div>
+        <div class="sc-sub">sources active today</div>
+        <div class="sc-sub">{{ today_pipeline.fetched }} fetched → {{ today_pipeline.relevant }} relevant → {{ today_pipeline.utilized }} utilized</div>
+      {% else %}
+        <div class="sc-value" style="color:var(--muted)">—</div>
+        <div class="sc-sub">no data today</div>
+      {% endif %}
+      <div class="sc-link">View pipeline health →</div>
+    </a>
+
+    <a class="status-card" href="/digest-health/deviations?token={{ token }}">
+      <div class="sc-label">Prompt deviations</div>
+      <div class="sc-value {% if signals|length == 0 %}good{% elif signals|length <= 2 %}amber{% else %}bad{% endif %}">
+        {{ signals|length }}
+      </div>
+      <div class="sc-sub">active signal{% if signals|length != 1 %}s{% endif %} (≥ threshold)</div>
+      {% if signals %}
+        <div class="sc-sub" style="margin-top:6px;">
+          {% for s in signals[:2] %}{{ s.warning_type | replace("_warnings","") | replace("_violations","") | replace("_"," ") }} ({{ s.consecutive_days }}d){% if not loop.last %}, {% endif %}{% endfor %}
+          {% if signals|length > 2 %}…{% endif %}
+        </div>
+      {% endif %}
+      <div class="sc-link">View deviation history →</div>
+    </a>
+
+    <a class="status-card" href="/digest-health/quality?token={{ token }}">
+      <div class="sc-label">Output quality</div>
+      {% if trend and trend.scores %}
+        <div class="sc-value {% if trend.avg_overall >= 70 %}good{% elif trend.avg_overall >= 60 %}amber{% else %}bad{% endif %}">
+          {{ "%.1f"|format(trend.avg_overall) }}
+        </div>
+        <div class="sc-sub">7-day avg overall score</div>
+        <div class="sc-sub">breadth avg {{ "%.2f"|format(trend.avg_ws_breadth) }}</div>
+      {% else %}
+        <div class="sc-value" style="color:var(--muted)">—</div>
+        <div class="sc-sub">no eval history</div>
+      {% endif %}
+      <div class="sc-link">View quality scores →</div>
+    </a>
+
+  </div>
+
+  <!-- Patch suggestions -->
+  <section class="section">
+    <h2 class="section-heading">Patch suggestions</h2>
+    <div class="section-sub">
+      Proposed prompt changes triggered by consecutive warning signals.
+      Review and accept or reject — accepted patches are tracked in prompt version history.
+    </div>
+
+    {% if signals %}
+    <div class="signal-pills" style="margin-bottom:1.25rem;">
+      {% for s in signals %}
+      <span class="signal-pill {% if s.consecutive_days >= 5 %}danger{% endif %}">
+        {{ s.warning_type | replace("_warnings","") | replace("_violations","") | replace("_"," ") }}
+        · {{ s.consecutive_days }}d · threshold {{ s.threshold }}d
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if pending %}
+      {% for patch in pending %}
+      <div class="patch-card">
+        <div class="patch-meta">
+          <span class="badge badge-call">{{ patch.call_name | replace("_"," ") }}</span>
+          <span class="badge badge-trigger">{{ patch.trigger_type | replace("_"," ") }}</span>
+          <span class="badge badge-proposed">awaiting review</span>
+          <span class="patch-date">{{ patch.created_at }}</span>
+        </div>
+        <div class="patch-detail">{{ patch.trigger_detail }}</div>
+        <div class="patch-content">{{ patch.proposed_patch }}</div>
+        <div class="patch-actions">
+          <div class="patch-notes">
+            <label>Reviewer notes (optional)</label>
+            <textarea id="notes-{{ patch.id }}" placeholder="Reason for accepting or rejecting..."></textarea>
+          </div>
+          <form method="POST" action="/digest-health/patches/accept"
+            onsubmit="document.getElementById('na-{{ patch.id }}').value=document.getElementById('notes-{{ patch.id }}').value">
+            <input type="hidden" name="token" value="{{ token }}">
+            <input type="hidden" name="patch_id" value="{{ patch.id }}">
+            <input type="hidden" name="notes" id="na-{{ patch.id }}">
+            <button type="submit" class="btn btn-accept">✓ Accept</button>
+          </form>
+          <form method="POST" action="/digest-health/patches/reject"
+            onsubmit="document.getElementById('nr-{{ patch.id }}').value=document.getElementById('notes-{{ patch.id }}').value">
+            <input type="hidden" name="token" value="{{ token }}">
+            <input type="hidden" name="patch_id" value="{{ patch.id }}">
+            <input type="hidden" name="notes" id="nr-{{ patch.id }}">
+            <button type="submit" class="btn btn-reject">✗ Reject</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="empty">No patches awaiting review.</p>
+    {% endif %}
+  </section>
+
+</div>
+</body>
+</html>

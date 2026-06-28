@@ -18,6 +18,12 @@ import pytz
 from .config import load_settings
 from .digest_utils import get_used_indices
 from .services.cache import get_digest_for_today, init_db, save_digest
+from .services.evaluator import get_consecutive_warning_types, get_score_trend
+from .services.prompt_registry import (
+    accept_patch,
+    get_pending_patches,
+    reject_patch,
+)
 from .services.rss import fetch_items_grouped_by_theme
 from .services.summarizer import summarize_item
 from .services.synthesizer import synthesize_trends
@@ -410,6 +416,197 @@ def _get_all_evals():
     return result
 
 
+def _get_pipeline_health(days: int = 14) -> List[Dict[str, Any]]:
+    """Fetch pipeline funnel data for the last N days."""
+    settings = load_settings()
+    conn = sqlite3.connect(str(settings.database_path))
+    try:
+        cur = conn.execute(
+            """
+            SELECT e.date, e.pipeline_funnel_json
+            FROM evals e
+            ORDER BY e.date DESC
+            LIMIT ?
+            """,
+            (days,),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    result: List[Dict[str, Any]] = []
+    for date_str, pf_json in rows:
+        try:
+            d = datetime.strptime(date_str, "%Y-%m-%d")
+            pf = json.loads(pf_json) if pf_json else {}
+        except Exception:
+            continue
+        result.append({
+            "date": date_str,
+            "label": d.strftime("%b %d"),
+            "sources_configured": int(pf.get("sources_configured") or 0),
+            "sources_active": int(pf.get("sources_active") or 0),
+            "fetched": int(pf.get("fetched") or 0),
+            "confident": int(pf.get("confident") or 0),
+            "relevant": int(pf.get("relevant") or 0),
+            "utilized": int(pf.get("utilized") or 0),
+            "sources_active_pct": float(pf.get("sources_active_pct") or 0),
+            "confident_pct": float(pf.get("confident_pct") or 0),
+            "relevant_pct": float(pf.get("relevant_pct") or 0),
+            "utilized_pct": float(pf.get("utilized_pct") or 0),
+            "empty_source_names": pf.get("empty_source_names") or [],
+            "theme_funnel": pf.get("theme_funnel") or {},
+        })
+    return result
+
+
+def _get_warning_history(days: int = 30) -> List[Dict[str, Any]]:
+    """Fetch warning_counts rows for the last N days."""
+    settings = load_settings()
+    conn = sqlite3.connect(str(settings.database_path))
+    try:
+        cur = conn.execute(
+            """
+            SELECT DISTINCT date FROM warning_counts
+            ORDER BY date DESC LIMIT ?
+            """,
+            (days,),
+        )
+        dates = [r[0] for r in cur.fetchall()]
+
+        result: List[Dict[str, Any]] = []
+        for date_str in dates:
+            cur2 = conn.execute(
+                """
+                SELECT warning_type, count, consecutive_days
+                FROM warning_counts WHERE date = ?
+                """,
+                (date_str,),
+            )
+            warnings = {
+                r[0]: {"count": r[1], "consecutive_days": r[2]}
+                for r in cur2.fetchall()
+            }
+            try:
+                d = datetime.strptime(date_str, "%Y-%m-%d")
+                label = d.strftime("%b %d")
+            except Exception:
+                label = date_str
+            result.append({"date": date_str, "label": label, "warnings": warnings})
+    finally:
+        conn.close()
+    return result
+
+
+def _get_prompt_versions_all() -> Dict[str, List[Dict[str, Any]]]:
+    """Fetch all prompt versions grouped by call_name."""
+    settings = load_settings()
+    conn = sqlite3.connect(str(settings.database_path))
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompt_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                active_from TEXT NOT NULL, active_to TEXT,
+                call_name TEXT NOT NULL, prompt_hash TEXT NOT NULL,
+                change_reason TEXT, proposed_by TEXT DEFAULT 'manual'
+            )
+            """
+        )
+        cur = conn.execute(
+            """
+            SELECT call_name, active_from, active_to, prompt_hash,
+                   change_reason, proposed_by
+            FROM prompt_versions
+            ORDER BY active_from DESC
+            """
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    by_call: Dict[str, List[Dict[str, Any]]] = {}
+    for call_name, active_from, active_to, ph, reason, by in rows:
+        by_call.setdefault(call_name, []).append({
+            "active_from": active_from,
+            "active_to": active_to,
+            "prompt_hash": ph,
+            "reason": reason or "",
+            "proposed_by": by or "manual",
+            "is_active": active_to is None,
+        })
+    return by_call
+
+
+def _get_quality_scores(days: int = 30) -> List[Dict[str, Any]]:
+    """Fetch all quality score dimensions for the last N days."""
+    settings = load_settings()
+    conn = sqlite3.connect(str(settings.database_path))
+    try:
+        cur = conn.execute(
+            """
+            SELECT date, llm_judge_json, pm_craft_json,
+                   interview_angle_json, overall_score, flags_json
+            FROM evals ORDER BY date DESC LIMIT ?
+            """,
+            (days,),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    result: List[Dict[str, Any]] = []
+    for date_str, llm_j, pc_j, ia_j, overall, flags_j in rows:
+        try:
+            d = datetime.strptime(date_str, "%Y-%m-%d")
+            label = d.strftime("%b %d")
+        except Exception:
+            continue
+        llm = json.loads(llm_j) if llm_j else {}
+        pc = json.loads(pc_j) if pc_j else {}
+        ia = json.loads(ia_j) if ia_j else {}
+        flags = json.loads(flags_j) if flags_j else {}
+        result.append({
+            "date": date_str,
+            "label": label,
+            "overall_score": float(overall or 0),
+            "ws_coherence": float(llm.get("ws_avg_coherence") or 0),
+            "ws_insight": float(llm.get("ws_avg_insight_depth") or 0),
+            "ws_grounding": float(llm.get("ws_avg_citation_support") or 0),
+            "ws_breadth": float(llm.get("ws_topical_breadth") or 0),
+            "cw_coherence": float(llm.get("cw_avg_coherence") or 0),
+            "cw_insight": float(llm.get("cw_avg_insight_depth") or 0),
+            "cw_grounding": float(llm.get("cw_avg_citation_support") or 0),
+            "sr_coherence": float(llm.get("sr_avg_coherence") or 0),
+            "sr_insight": float(llm.get("sr_avg_insight_depth") or 0),
+            "sr_grounding": float(llm.get("sr_avg_citation_support") or 0),
+            "pc_insight": float(pc.get("insight_depth") or 0),
+            "ia_relevance": float(ia.get("relevance") or 0),
+            "sections_scored": flags.get("sections_scored") or [],
+            "weak_pct": float(flags.get("weak_pct") or 0),
+            "ws_breadth_reason": str(llm.get("ws_topical_breadth_reason") or ""),
+            "ws_coherence_reason": str(llm.get("ws_coherence_reason") or ""),
+            "ws_insight_reason": str(llm.get("ws_insight_reason") or ""),
+            "ws_grounding_reason": str(llm.get("ws_grounding_reason") or ""),
+            "cw_coherence_reason": str(llm.get("cw_coherence_reason") or ""),
+            "sr_coherence_reason": str(llm.get("sr_coherence_reason") or ""),
+            "pc_insight_reason": str(pc.get("insight_depth_reason") or ""),
+            "ia_relevance_reason": str(ia.get("relevance_reason") or ""),
+        })
+    return result
+
+
+def _admin_auth() -> bool:
+    """Return True if request is authenticated."""
+    settings = load_settings()
+    token = getattr(settings, "refresh_token", None) or os.environ.get("REFRESH_TOKEN", "")
+    return not token or request.args.get("token") == token
+
+
+def _admin_token() -> str:
+    return request.args.get("token", "")
+
+
 @app.route("/")
 def index():
     synthesis, items_by_theme, generated_at, fetch_metadata = _get_or_run_pipeline(force_refresh=False)
@@ -451,6 +648,111 @@ def refresh():
     return redirect(url_for("index"))
 
 
+@app.route("/digest-health/patches/accept", methods=["POST"])
+def digest_health_patches_accept():
+    settings = load_settings()
+    refresh_token = getattr(settings, "refresh_token", None) or os.environ.get("REFRESH_TOKEN", "")
+    if refresh_token and request.form.get("token") != refresh_token:
+        abort(403)
+
+    patch_id = request.form.get("patch_id")
+    notes = request.form.get("notes", "")
+    if patch_id:
+        accept_patch(int(patch_id), reviewer_notes=notes)
+
+    token_param = f"?token={request.form.get('token')}" if request.form.get("token") else ""
+    return redirect(url_for("digest_health") + token_param)
+
+
+@app.route("/digest-health/patches/reject", methods=["POST"])
+def digest_health_patches_reject():
+    settings = load_settings()
+    refresh_token = getattr(settings, "refresh_token", None) or os.environ.get("REFRESH_TOKEN", "")
+    if refresh_token and request.form.get("token") != refresh_token:
+        abort(403)
+
+    patch_id = request.form.get("patch_id")
+    notes = request.form.get("notes", "")
+    if patch_id:
+        reject_patch(int(patch_id), reviewer_notes=notes)
+
+    token_param = f"?token={request.form.get('token')}" if request.form.get("token") else ""
+    return redirect(url_for("digest_health") + token_param)
+
+
+@app.route("/digest-health")
+def digest_health():
+    if not _admin_auth():
+        abort(403)
+
+    signals = get_consecutive_warning_types()
+    pending = get_pending_patches()
+    trend = get_score_trend(lookback_days=7)
+    pipeline = _get_pipeline_health(days=1)
+    today_pipeline = pipeline[0] if pipeline else {}
+
+    return render_template(
+        "digest_health.html",
+        signals=signals,
+        pending=pending,
+        trend=trend,
+        today_pipeline=today_pipeline,
+        token=_admin_token(),
+    )
+
+
+@app.route("/digest-health/pipeline")
+def digest_health_pipeline():
+    if not _admin_auth():
+        abort(403)
+    rows = _get_pipeline_health(days=14)
+    return render_template("source_pipeline.html", rows=rows, token=_admin_token())
+
+
+@app.route("/digest-health/deviations")
+def digest_health_deviations():
+    if not _admin_auth():
+        abort(403)
+    warnings = _get_warning_history(days=30)
+    versions = _get_prompt_versions_all()
+    change_dates = {
+        v["active_from"]
+        for versions_list in versions.values()
+        for v in versions_list
+    }
+    warning_types = sorted({
+        wt for entry in warnings for wt in entry.get("warnings", {})
+    })
+    return render_template(
+        "prompt_deviations.html",
+        warnings=warnings,
+        versions=versions,
+        change_dates=change_dates,
+        warning_types=warning_types,
+        token=_admin_token(),
+    )
+
+
+@app.route("/digest-health/quality")
+def digest_health_quality():
+    if not _admin_auth():
+        abort(403)
+    scores = _get_quality_scores(days=30)
+    versions = _get_prompt_versions_all()
+    change_dates = {
+        v["active_from"]
+        for versions_list in versions.values()
+        for v in versions_list
+    }
+    return render_template(
+        "output_quality.html",
+        scores=scores,
+        versions=versions,
+        change_dates=change_dates,
+        token=_admin_token(),
+    )
+
+
 @app.route("/history")
 def history():
     settings = load_settings()
@@ -488,11 +790,7 @@ def history():
     )
 
 
-@app.route("/evals")
-def evals_page():
-    eval_rows = _get_all_evals()
-    return render_template("evals.html", eval_rows=eval_rows)
-
+# RETIRED: /evals — superseded by /digest-health/quality
 
 @app.route("/debug-eval/<date_str>")
 def debug_eval(date_str: str):
@@ -551,7 +849,47 @@ def digest_by_date(date_str: str):
 def create_app() -> Flask:
     """Factory for external runners if needed."""
     _start_scheduler_if_needed()
+    _register_all_prompts()
     return app
 
 
+def _register_all_prompts() -> None:
+    """
+    Register all prompt system strings at startup.
+    Auto-detects changes via content hash — no manual version bumping needed.
+    Only the static system prompt strings are registered (not user prompt
+    templates, which embed dynamic values like today's date and context blocks).
+    """
+    try:
+        from .services.prompt_registry import register_prompt
+        from .services.summarizer import (
+            _CALL_A_SYSTEM,
+            _CALL_B_SYSTEM,
+            _CALL_C_SYSTEM,
+        )
+        from .services.synthesizer import (
+            SYSTEM_PROMPT,
+            _CALL_1A_SYSTEM,
+            _CALL_2_SYSTEM,
+            _CALL_3_SYSTEM,
+            _CALL_4A_SYSTEM,
+            _CALL_4B_SYSTEM,
+        )
+
+        register_prompt("summarizer.call_a.system", _CALL_A_SYSTEM)
+        register_prompt("summarizer.call_b.system", _CALL_B_SYSTEM)
+        register_prompt("summarizer.call_c.system", _CALL_C_SYSTEM)
+        register_prompt("synthesizer.shared.system", SYSTEM_PROMPT)
+        register_prompt("synthesizer.call_1a.system", _CALL_1A_SYSTEM)
+        register_prompt("synthesizer.call_2_pm_craft", _CALL_2_SYSTEM)
+        register_prompt("synthesizer.call_3_cw", _CALL_3_SYSTEM)
+        register_prompt("synthesizer.call_4a.system", _CALL_4A_SYSTEM)
+        register_prompt("synthesizer.call_4b_sr", _CALL_4B_SYSTEM)
+
+        logger.info("Prompt versions registered at startup.")
+    except Exception:
+        logger.exception("Failed to register prompt versions — continuing without version tracking.")
+
+
 _start_scheduler_if_needed()
+_register_all_prompts()

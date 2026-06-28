@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow, noarchive"/>
+  <title>PM Digest — Output Quality</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#FAFAF8;--text:#1A1A18;--accent:#1B3A6B;--muted:#7A7A72;
+      --border:#DFDED7;--green:#2D6A4F;--amber:#B45309;--red:#991B1B;}
+    *{box-sizing:border-box;}
+    body{margin:0;padding:24px 16px 40px;background:var(--bg);color:var(--text);
+      font-family:"Source Serif 4",-apple-system,serif;-webkit-font-smoothing:antialiased;}
+    .page{max-width:960px;margin:0 auto;}
+    h1,h2{font-family:"Playfair Display",serif;font-weight:600;letter-spacing:0.02em;margin:0;}
+    .header{margin-bottom:2rem;border-bottom:1px solid var(--border);padding-bottom:1.25rem;}
+    .header-title{font-size:clamp(1.8rem,3vw,2.4rem);text-transform:uppercase;letter-spacing:0.18em;}
+    .header-subtitle{margin-top:0.4rem;font-size:0.9rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.16em;}
+    .header-nav{margin-top:0.5rem;font-size:0.85rem;display:flex;gap:1.25rem;}
+    .header-nav a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(27,58,107,0.25);}
+    .header-nav a:hover{border-bottom-color:rgba(27,58,107,0.6);}
+    .header-nav span{color:var(--muted);font-style:italic;}
+    .section{padding:1.5rem 0 1.75rem;border-bottom:1px solid var(--border);}
+    .section:last-of-type{border-bottom:none;}
+    .section-heading{font-size:1.15rem;margin-bottom:0.3rem;}
+    .section-sub{font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;}
+
+    /* Score table */
+    .tbl{width:100%;border-collapse:collapse;font-size:0.82rem;}
+    .tbl thead tr{border-bottom:1px solid var(--border);}
+    .tbl th{text-align:left;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;
+      color:var(--muted);padding:0 0.5rem 0.5rem 0;white-space:nowrap;font-weight:600;}
+    .tbl th:first-child{padding-left:0;}
+    .tbl td{padding:0.4rem 0.5rem 0.4rem 0;border-top:1px solid rgba(223,222,215,0.5);
+      vertical-align:middle;white-space:nowrap;}
+    .tbl td:first-child{padding-left:0;}
+    .tbl tbody tr:first-child td{border-top:none;}
+
+    /* Prompt change rows */
+    .tbl tr.prompt-change td{
+      background:rgba(27,58,107,0.04);
+      border-top:2px solid var(--accent);
+      padding-top:0.6rem;padding-bottom:0.6rem;
+    }
+    .prompt-change-banner{
+      font-size:0.72rem;font-weight:600;color:var(--accent);
+      display:flex;align-items:center;gap:6px;
+    }
+    .prompt-change-banner::before{
+      content:"";display:inline-block;width:8px;height:8px;
+      border-radius:50%;background:var(--accent);flex-shrink:0;
+    }
+
+    .good{color:var(--green);font-weight:600;}
+    .amber{color:var(--amber);}
+    .bad{color:var(--red);}
+
+    .overall-badge{
+      display:inline-block;font-weight:700;font-size:0.95rem;
+      min-width:2.5rem;padding:0.1rem 0.4rem;border-radius:4px;
+      background:rgba(27,58,107,0.05);border:1px solid rgba(27,58,107,0.12);
+    }
+
+    .col-divider{border-left:1px solid var(--border);padding-left:0.5rem!important;}
+    .col-group-header{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.12em;
+      color:var(--accent);padding-top:0.2rem;padding-bottom:0.35rem;
+      border-bottom:1px solid var(--border);text-align:center;}
+    .tbl thead tr:nth-child(2) th{padding-top:0.35rem;}
+
+    .toggle-btn{font-size:0.7rem;color:var(--muted);background:none;border:none;
+      cursor:pointer;padding:0;text-decoration:underline;}
+    .toggle-btn:hover{color:var(--text);}
+
+    .reasons-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.4rem 1.25rem;
+      font-size:0.77rem;color:#555;line-height:1.5;padding:0.25rem 0;}
+    .reasons-grid strong{color:var(--text);}
+    .call-badge{display:inline-block;font-size:0.62rem;font-family:"SF Mono","Fira Code",monospace;
+      padding:1px 4px;border-radius:3px;background:rgba(27,58,107,0.08);color:var(--accent);margin-left:3px;}
+
+    .dash{color:var(--muted);}
+    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
+
+    /* Section missing badge */
+    .missing{font-size:0.65rem;color:var(--muted);font-style:italic;}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header class="header">
+    <h1 class="header-title">PM Digest</h1>
+    <div class="header-subtitle">Output Quality</div>
+    <nav class="header-nav">
+      <a href="/">Digest</a>
+      <a href="/history">Archive</a>
+      <a href="/digest-health?token={{ token }}">Digest Health</a>
+      <span>Quality</span>
+    </nav>
+  </header>
+
+  <section class="section">
+    <h2 class="section-heading">Score history — last 30 days</h2>
+    <div class="section-sub">
+      All quality dimensions by section. Blue markers show when a prompt was updated —
+      compare scores before and after to evaluate whether a change helped.
+    </div>
+
+    {% if scores %}
+    {% macro sc(v) %}{% if v %}{{ "%.2f"|format(v) }}{% else %}<span class="dash">—</span>{% endif %}{% endmacro %}
+    {% macro sc_cls(v) %}{% if v >= 4 %}good{% elif v >= 3 %}amber{% else %}bad{% endif %}{% endmacro %}
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th rowspan="2">Date</th>
+          <th rowspan="2">Overall</th>
+          <th colspan="4" class="col-divider col-group-header">What&rsquo;s Shifting <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_1b</span></th>
+          <th colspan="3" class="col-divider col-group-header">Company Watch <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_3</span></th>
+          <th colspan="3" class="col-divider col-group-header">Startup Radar <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_4b</span></th>
+          <th class="col-divider col-group-header">PM Craft <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_2</span></th>
+          <th class="col-divider col-group-header">IA <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_1b</span></th>
+          <th rowspan="2"></th>
+        </tr>
+        <tr>
+          <th class="col-divider">Coh</th><th>Ins</th><th>Grnd</th><th>Brdth</th>
+          <th class="col-divider">Coh</th><th>Ins</th><th>Grnd</th>
+          <th class="col-divider">Coh</th><th>Ins</th><th>Grnd</th>
+          <th class="col-divider">Ins</th>
+          <th class="col-divider">Rel</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in scores %}
+
+        {# Prompt change banner #}
+        {% if row.date in change_dates %}
+        <tr class="prompt-change">
+          <td colspan="15">
+            <div class="prompt-change-banner">
+              Prompt updated — {{ row.date }}
+              {% set changed = [] %}
+              {% for call_name, vlist in versions.items() %}
+                {% for v in vlist %}{% if v.active_from == row.date %}
+                  {% if changed.append(call_name.split('.')[-1] | replace('_',' ')) %}{% endif %}
+                {% endif %}{% endfor %}
+              {% endfor %}
+              {% if changed %} · {{ changed | join(', ') }}{% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+
+        <tr>
+          <td style="color:var(--accent);font-weight:500;">
+            <a href="/{{ row.date }}" style="color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(27,58,107,0.25);">{{ row.label }}</a>
+          </td>
+          <td>
+            <span class="overall-badge {% if row.overall_score >= 75 %}good{% elif row.overall_score >= 65 %}amber{% else %}bad{% endif %}">
+              {{ "%.1f"|format(row.overall_score) }}
+            </span>
+            {% if row.sections_scored|length < 5 %}
+            <span class="missing">{{ row.sections_scored|length }}/5</span>
+            {% endif %}
+          </td>
+          <!-- WS -->
+          <td class="col-divider {{ sc_cls(row.ws_coherence) }}">{{ sc(row.ws_coherence) }}</td>
+          <td class="{{ sc_cls(row.ws_insight) }}">{{ sc(row.ws_insight) }}</td>
+          <td class="{{ sc_cls(row.ws_grounding) }}">{{ sc(row.ws_grounding) }}</td>
+          <td class="{{ sc_cls(row.ws_breadth) }}">{{ sc(row.ws_breadth) }}</td>
+          <!-- CW -->
+          <td class="col-divider {{ sc_cls(row.cw_coherence) if row.cw_coherence else 'dash' }}">{{ sc(row.cw_coherence) }}</td>
+          <td class="{{ sc_cls(row.cw_insight) if row.cw_insight else '' }}">{{ sc(row.cw_insight) }}</td>
+          <td class="{{ sc_cls(row.cw_grounding) if row.cw_grounding else '' }}">{{ sc(row.cw_grounding) }}</td>
+          <!-- SR -->
+          <td class="col-divider {{ sc_cls(row.sr_coherence) if row.sr_coherence else '' }}">{{ sc(row.sr_coherence) }}</td>
+          <td class="{{ sc_cls(row.sr_insight) if row.sr_insight else '' }}">{{ sc(row.sr_insight) }}</td>
+          <td class="{{ sc_cls(row.sr_grounding) if row.sr_grounding else '' }}">{{ sc(row.sr_grounding) }}</td>
+          <!-- PM Craft -->
+          <td class="col-divider {{ sc_cls(row.pc_insight) if row.pc_insight else '' }}">{{ sc(row.pc_insight) }}</td>
+          <!-- IA -->
+          <td class="col-divider {{ sc_cls(row.ia_relevance) if row.ia_relevance else '' }}">{{ sc(row.ia_relevance) }}</td>
+          <td>
+            <button class="toggle-btn" onclick="toggle('r-{{ row.date }}')">reasons</button>
+          </td>
+        </tr>
+
+        <!-- Reasons row -->
+        <tr id="r-{{ row.date }}" style="display:none;">
+          <td colspan="15" style="padding:0.6rem 0.75rem 0.9rem;background:#f9f7f4;">
+            <div class="reasons-grid">
+              {% if row.ws_coherence_reason %}<div><strong>WS Coherence</strong><span class="call-badge">call_1b</span><br>{{ row.ws_coherence_reason }}</div>{% endif %}
+              {% if row.ws_insight_reason %}<div><strong>WS Insight</strong><span class="call-badge">call_1b</span><br>{{ row.ws_insight_reason }}</div>{% endif %}
+              {% if row.ws_grounding_reason %}<div><strong>WS Grounding</strong><span class="call-badge">call_1b</span><br>{{ row.ws_grounding_reason }}</div>{% endif %}
+              {% if row.ws_breadth_reason %}<div><strong>WS Breadth</strong><span class="call-badge">declared</span><br>{{ row.ws_breadth_reason }}</div>{% endif %}
+              {% if row.cw_coherence_reason %}<div><strong>CW Coherence</strong><span class="call-badge">call_3</span><br>{{ row.cw_coherence_reason }}</div>{% endif %}
+              {% if row.sr_coherence_reason %}<div><strong>SR Coherence</strong><span class="call-badge">call_4b</span><br>{{ row.sr_coherence_reason }}</div>{% endif %}
+              {% if row.pc_insight_reason %}<div><strong>PM Craft Insight</strong><span class="call-badge">call_2</span><br>{{ row.pc_insight_reason }}</div>{% endif %}
+              {% if row.ia_relevance_reason %}<div><strong>Interview Angle</strong><span class="call-badge">call_1b</span><br>{{ row.ia_relevance_reason }}</div>{% endif %}
+            </div>
+          </td>
+        </tr>
+
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No quality scores yet.</p>
+    {% endif %}
+  </section>
+
+</div>
+<script>
+function toggle(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+</script>
+</body>
+</html>

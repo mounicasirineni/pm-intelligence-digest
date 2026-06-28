@@ -31,6 +31,7 @@ DEDICATED_SECTION_THEMES = {
     "product_craft",
 }
 
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
 # ---------------------------------------------------------------------------
 # System prompt — shared across all calls
@@ -58,6 +59,33 @@ SYSTEM_PROMPT = (
     "The specific mechanical consequence requires reading the full content. Keep the latter. "
     "A sharp PM should be able to walk into any interview and have a prepared opinion on the insights you surface."
 )
+
+# ---------------------------------------------------------------------------
+# System prompt constants — registered at startup for version tracking.
+# Call 1b and Call 1 fill share SYSTEM_PROMPT (above).
+# ---------------------------------------------------------------------------
+
+_CALL_1A_SYSTEM = (
+    "You are a content classifier for a PM intelligence digest. "
+    "Classify items as cross-market or company-specific based on their central claim. "
+    "Be conservative — when in doubt, classify as company-specific."
+)
+
+_CALL_2_SYSTEM = (
+    "You are writing a PM Craft insight for a Senior PM digest. "
+    "Your job is to surface the single most actionable, non-obvious practitioner insight "
+    "from product_craft and design_ux sources. Prefer specific reframes over general advice."
+)
+
+_CALL_3_SYSTEM = SYSTEM_PROMPT  # Company Watch uses the shared synthesizer system prompt
+
+_CALL_4A_SYSTEM = (
+    "You are a company maturity classifier for a PM intelligence digest. "
+    "Classify companies as startup or established based on their market position. "
+    "Be conservative — when in doubt about a well-known name, classify as established."
+)
+
+_CALL_4B_SYSTEM = SYSTEM_PROMPT  # Startup Radar uses the shared synthesizer system prompt
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +221,7 @@ def _normalize_whats_shifting(raw: Any) -> List[Dict[str, Any]]:
             "headline": headline,
             "paragraph": paragraph,
             "source_indices": cleaned,
+            "declared_theme": _strip_date_check_flags(str(entry.get("theme") or "")) if isinstance(entry, dict) else "",
         })
     return normalized
 
@@ -281,7 +310,11 @@ def _get_theme_for_ws(
     source_index_lookup, got theme="" and were classified as "unknown",
     causing false coverage-gap alarms even when the fill succeeded.
     """
-    # Fill results always carry _fill_theme — check before source_index_lookup.
+    # 1. Model self-declared theme — highest fidelity signal.
+    if ws.get("declared_theme"):
+        return ws["declared_theme"]
+
+    # 2. Fill results carry _fill_theme explicitly.
     if ws.get("_fill_theme"):
         return ws["_fill_theme"]
 
@@ -440,7 +473,8 @@ Then produce a JSON object with this exact structure:
     {{
       "headline": "One declarative sentence, maximum 15 words, naming the underlying structural force or pattern. Not an event description. Renders as the visible collapsed card headline — scannable and self-contained.",
       "paragraph": "Open by restating the headline claim with one additional clause of context. Develop across 3-4 sentences. If drawing from a single source, build depth by incorporating its strongest and most complicating bullets. If drawing from multiple sources, only combine them if you can name a specific causal mechanism that connects them — one that neither source states alone. A shared category label ('both are about AI costs') is not a mechanism. A shared causal chain ('both reveal that X causes Y through mechanism Z') is. When in doubt, anchor to one source's strongest bullet and build depth rather than breadth. Close with one PM implication directly traceable to a cited source. Every sentence ends with inline [n] citations. HEDGE MATCH: match source hedge levels throughout — 'suggests' not 'demonstrates'. NO TIMELINE: omit any timeline not verbatim in a source. NO UNIVERSALITY: scope claims to actual examples. Draw from at least 2 distinct insight bullets — use the best available rather than omitting the paragraph. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. If any exist, either incorporate them or scope the closing implication to reflect the limitation. A paragraph that ignores complicating evidence from its own cited sources will score lower than one that acknowledges the complication and commits to a narrower claim. INSIGHT SELECTION RULE: The closing implication must trace to the single highest-ranked bullet identified in your reasoning — the most non-obvious, specific, and source-grounded insight available. Do not close with a broad pattern observation when a more specific mechanical consequence is available in the source bullets. The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'means' or 'demonstrates'. Do not convert a source observation into a prescription. If no source bullet explicitly states a PM action, use 'this suggests' or 'this may signal' framing. Never write 'this means PMs must/should' unless a cited source explicitly states that directive. A well-hedged implication that commits to one specific consequence scores higher than a confident assertion that goes beyond the source.",
-      "source_indices": [1, 2]
+      "source_indices": [1, 2],
+      "theme": "The single theme this paragraph addresses. Must be exactly one of: ai_technology | market_behavior | consumer_behavior | regulation_policy | design_ux. Pick the theme whose core claim this paragraph develops — not a secondary mention."
     }}
   ],
   "interview_angle": "One specific tradeoff a PM should have a prepared opinion on this week, derived from a whats_shifting source. Empty string if no whats_shifting paragraph was produced. Frame as a debatable tradeoff at PM decision level — feature prioritization, architecture, safety design, retention, compliance, pricing, or go-to-market. Scope to the context the source describes. DOMAIN RULE: Do not frame in legal, financial, or policy terms even if the source is a legal or regulatory story — translate into a product decision a PM owns. The angle must be answerable by a PM from product judgment, not legal or financial expertise."
@@ -490,6 +524,7 @@ def _call_whats_shifting_single_theme(
     anchor: Dict[str, Any],
     today: str,
     ws_indexed: List[Dict[str, Any]],
+    covered_themes: Set[str] | None = None,
 ) -> Optional[Dict[str, Any]]:
     if not theme_items:
         logger.warning("FILL [theme=%s]: No items available — skipping", anchor["theme"])
@@ -526,6 +561,18 @@ def _call_whats_shifting_single_theme(
     theme = anchor["theme"]
     anchor_title = anchor["anchor_item"]["title"]
 
+    covered_themes_str = ", ".join(sorted(covered_themes)) if covered_themes else "none yet"
+    fill_theme_context = f"""
+THEME GAP CONTEXT:
+The following themes are already covered by paragraphs produced in the main synthesis pass:
+{covered_themes_str}
+
+Your task is to fill the gap for theme: {theme}
+The paragraph you produce must develop a claim whose central force is {theme} — not a theme
+already covered above. If the available source bullets touch multiple themes, anchor to the
+one that is genuinely about {theme} and treat others as supporting context only.
+"""
+
     user_prompt = f"""
 You are producing exactly one What's Shifting paragraph for a Senior PM digest.
 Today's date is {today}.
@@ -534,7 +581,7 @@ Theme: {theme}
 Anchor item: "{anchor_title}"
 
 MANDATE: Produce exactly one paragraph for this theme. This is a targeted fill call — the main synthesis pass did not produce a paragraph for this theme. Output is required. A paragraph with 2 bullets and an imperfect closing is better than no paragraph.
-
+{fill_theme_context}
 Items for this theme:
 {context_block}
 
@@ -548,7 +595,8 @@ Then produce a JSON object:
 {{
   "headline": "One declarative sentence, maximum 15 words, naming the structural force or pattern. Scannable, self-contained, not an event description.",
   "paragraph": "3-5 sentences. Open with the headline claim plus one clause of context. Develop with 2+ bullets from the items above. Close with one PM implication traceable to a cited source. Every sentence has inline [n] citations. HEDGE MATCH: match source hedge levels. NO TIMELINE unless verbatim in source. NO UNIVERSALITY beyond actual examples. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, split and keep only the stronger one. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources.",
-  "source_indices": []
+  "source_indices": [],
+  "theme": "{theme}"
 }}
 
 IMPORTANT: Do not include anchor_reasoning in the JSON. All reasoning goes in <reasoning> only.
@@ -605,97 +653,377 @@ CITATION RULE: Use the item index numbers shown above exactly as written.
 
 
 # ---------------------------------------------------------------------------
-# Call 2: Company Watch + Startup Radar + PM Craft
+# Call 2a: Company Watch only (compressed prompt)
 # ---------------------------------------------------------------------------
 
-def _call_dedicated_sections(
+def _call_company_watch(
     client: Anthropic,
     settings: Any,
-    dedicated_items: List[Dict[str, Any]],
+    cw_items: List[Dict[str, Any]],
     today: str,
     start_idx: int,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    context_block, dedicated_indexed, _ = _build_context_block(dedicated_items, start_idx=start_idx)
+    if not cw_items:
+        logger.info("Call 3 (CW): No company_strategy items — returning empty.")
+        return {"company_watch": {}, "_call3_reasoning": ""}, []
+
+    context_block, cw_indexed, _ = _build_context_block(cw_items, start_idx=start_idx)
 
     user_prompt = f"""
-You are reasoning across multiple high/medium confidence items that a Senior PM is tracking.
-Today's date is {today}.
+You are writing Company Watch entries for a Senior PM digest.
+Today: {today}
 
-You are given items eligible for Company Watch, Startup Radar, and PM Craft.
+COMPANY WATCH RULES (apply to every company entry below):
+  STRUCTURE: 2-3 sentences.
+    Sentence 1: what is strategically changing — a shift in positioning, priority,
+                or competitive stance. Not news. A structural move.
+    Sentence 2: evidence with inline [n] citations.
+    Sentence 3 (optional): one implication, most specific and directly grounded.
+  OMIT RULE: Write empty string if no item in the pool matches that company.
+             Do not hallucinate coverage for companies with no items.
+  SOURCE RULE: Only cite items whose Company field matches the entry company.
+  HEDGE MATCH: Match source hedge levels — 'suggests' not 'demonstrates'.
+  COMPLICATION RULE: If a cited source contains a bullet qualifying the central
+                     claim, incorporate it or scope the implication accordingly.
+  SPLIT CHECK: Before writing the closing sentence — does it contain 'and',
+               'while also', 'as well as', or 'in addition'? If yes, split and
+               keep only the stronger consequence.
+  CLOSING SENTENCE: Exactly one consequence traceable to a specific cited bullet.
+                    Never assert certainty beyond what the source states.
 
-Items:
+Items (company_strategy sources only):
 {context_block}
 
-First, write your anchor selection reasoning inside <reasoning>...</reasoning> tags.
-For each company with available items, for each startup radar item, and for pm_craft_today:
-(1) List ALL insight bullets ranked by non-obviousness.
-(2) Name the highest-ranked bullet and declare it the closing implication anchor.
-(3) List every bullet that contradicts or qualifies the anchor's claim.
-(4) Name the causal mechanism if combining multiple sources.
+First, write anchor reasoning inside <reasoning>...</reasoning> tags.
+For each company that has items:
+  (1) List all bullets ranked by non-obviousness.
+  (2) Declare the closing implication anchor.
+  (3) Note any qualifying bullets — incorporate or scope.
 
-Then produce a JSON object. Do not include anchor_reasoning fields inside the JSON.
-
+Then produce JSON:
 {{
   "company_watch": {{
-    "Google": {{
-      "paragraph": "2-3 sentences of strategic signal. Sentence 1: what is strategically changing — not news, but a shift in positioning, priority, or competitive stance. Sentence 2: evidence with inline [n] citations. Sentence 3 (optional): one implication, most specific and directly grounded. OMIT RULE: empty string if no company_watch ONLY item matches this company. SOURCE RULE: only cite items tagged company_watch ONLY whose Company field matches. HEDGE MATCH throughout. COMPLICATION RULE: If the cited source contains a bullet that qualifies or limits the central claim, incorporate it or scope the implication accordingly. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, split and keep only the stronger one. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources.",
-      "source_indices": []
-    }},
-    "Meta": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}},
-    "Apple": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}},
-    "Amazon": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}},
-    "Netflix": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}},
-    "Microsoft": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}},
-    "NVIDIA": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}},
-    "OpenAI": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}},
-    "Anthropic": {{"paragraph": "Same rules as Google. Empty string if no matching item.", "source_indices": []}}
-  }},
-  "startup_radar": [
-    {{
-      "bullet": "2-3 items on early-stage or emerging companies only. Structure: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. HEDGE MATCH. NO TIMELINE unless verbatim in source. METRICS: include funding amount or key metric. THEMATIC COMBINATION: only combine companies if you can name the specific causal mechanism both share. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, split and keep only the stronger one. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources.",
-      "source_indices": []
-    }}
-  ],
-  "pm_craft_today": {{
-    "text": "Single most actionable PM craft insight. Draw ONLY from items tagged pm_craft_today ONLY (product_craft) OR pm_craft_today eligible (design_ux). Empty string if no such item exists. INSIGHT QUALITY: non-obvious pattern, tradeoff, or reframe that changes how a PM approaches a real decision. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, split and keep only the stronger one. CLOSING SENTENCE: State exactly one actionable consequence traceable to a specific bullet in the cited source.",
-    "source_indices": []
+    "Google":    {{"paragraph": "...", "source_indices": []}},
+    "Meta":      {{"paragraph": "...", "source_indices": []}},
+    "Apple":     {{"paragraph": "...", "source_indices": []}},
+    "Amazon":    {{"paragraph": "...", "source_indices": []}},
+    "Netflix":   {{"paragraph": "...", "source_indices": []}},
+    "Microsoft": {{"paragraph": "...", "source_indices": []}},
+    "NVIDIA":    {{"paragraph": "...", "source_indices": []}},
+    "OpenAI":    {{"paragraph": "...", "source_indices": []}},
+    "Anthropic": {{"paragraph": "...", "source_indices": []}}
   }}
 }}
 
-IMPORTANT: Do not include anchor_reasoning anywhere in the JSON. All reasoning goes in <reasoning> only.
-SECTION ROUTING RULE: Items tagged company_watch ONLY → that company's entry only. startup_radar ONLY → startup_radar only. pm_craft_today ONLY → pm_craft_today only. pm_craft_today eligible (design_ux) → pm_craft_today only. Hard constraints, not suggestions.
-CITATION RULE: Only cite item [n] if a specific insight bullet directly supports the exact claim.
+IMPORTANT: Reasoning in <reasoning> only. JSON contains paragraphs only.
+CITATION RULE: Only cite [n] if a specific bullet directly supports the exact claim.
 """.strip()
 
     response = client.messages.create(
         model=settings.claude_model,
-        max_tokens=5000,
+        max_tokens=3000,
         temperature=0.3,
-        system=SYSTEM_PROMPT,
+        system=_CALL_3_SYSTEM,
         messages=[{"role": "user", "content": user_prompt}],
     )
 
-    content_block = response.content[0]
-    text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
-    logger.debug("Raw Claude Call 2 (Dedicated) response text: %s", text)
+    block = response.content[0]
+    text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+    logger.debug("Raw Call 3 (CW) response: %s", text)
 
     reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
     if reasoning_text:
-        logger.info("Call 2 anchor reasoning extracted (%d chars)", len(reasoning_text))
+        logger.info("Call 3 (CW) reasoning extracted (%d chars)", len(reasoning_text))
 
     cleaned = _extract_json(text_without_reasoning)
     try:
         parsed = json.loads(cleaned)
     except Exception:
-        logger.warning("Call 2 response was not valid JSON. Raw (first 500): %s", (text or "")[:500])
+        logger.warning("Call 3 (CW) not valid JSON. Raw (first 500): %s", (text or "")[:500])
+        parsed = {"company_watch": {}}
+
+    parsed["_call3_reasoning"] = reasoning_text
+    return parsed, cw_indexed
+
+
+# ---------------------------------------------------------------------------
+# Call 2b: Startup Radar + PM Craft
+# ---------------------------------------------------------------------------
+
+def _call_sr_pm_craft(
+    client: Anthropic,
+    settings: Any,
+    sr_pm_items: List[Dict[str, Any]],
+    today: str,
+    start_idx: int,
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    Dedicated call for Startup Radar and PM Craft only.
+
+    Separating these from Company Watch gives SR and PM Craft their own
+    full attention budget. Previously these sections received whatever
+    token headroom remained after 9 company evaluations — directly causing
+    SR's 43% run rate and coherence volatility.
+    """
+    if not sr_pm_items:
+        logger.info("Call 2b (SR+PC): No items — returning empty.")
+        return {
+            "startup_radar": [],
+            "pm_craft_today": {"text": "", "source_indices": []},
+            "_call2b_reasoning": "",
+        }, []
+
+    context_block, sr_pm_indexed, _ = _build_context_block(sr_pm_items, start_idx=start_idx)
+
+    user_prompt = f"""
+You are reasoning across startup_disruption and product_craft items for a Senior PM digest.
+Today's date is {today}.
+
+Items are tagged either:
+  - startup_radar ONLY  (theme: startup_disruption)
+  - pm_craft_today ONLY (theme: product_craft)
+  - pm_craft_today eligible (design_ux)
+
+Items:
+{context_block}
+
+First, write your anchor selection reasoning inside <reasoning>...</reasoning> tags.
+For startup_radar and pm_craft_today:
+(1) List ALL insight bullets ranked by non-obviousness.
+(2) Name the highest-ranked bullet and declare it the closing implication anchor.
+(3) List every bullet that contradicts or qualifies the anchor's claim.
+(4) Name the causal mechanism if combining multiple sources.
+
+Then produce a JSON object:
+
+{{
+  "startup_radar": [
+    {{
+      "bullet": "2-3 items on early-stage or emerging companies only. Structure: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. HEDGE MATCH. NO TIMELINE unless verbatim in source. METRICS: include funding amount or key metric if available. THEMATIC COMBINATION: only combine companies if you can name the specific causal mechanism both share. SPLIT CHECK: closing sentence must state exactly one consequence traceable to a cited bullet.",
+      "source_indices": []
+    }}
+  ],
+  "pm_craft_today": {{
+    "text": "Single most actionable PM craft insight. Draw ONLY from items tagged pm_craft_today ONLY (product_craft) OR pm_craft_today eligible (design_ux). Empty string if no such item exists. INSIGHT QUALITY: non-obvious pattern, tradeoff, or reframe that changes how a PM approaches a real decision. SPLIT CHECK: closing sentence must state exactly one actionable consequence traceable to a cited bullet.",
+    "source_indices": []
+  }}
+}}
+
+IMPORTANT: Do not include reasoning inside the JSON. All reasoning goes in <reasoning> only.
+SECTION ROUTING RULE: startup_radar ONLY items → startup_radar only. pm_craft_today ONLY items → pm_craft_today only. pm_craft_today eligible (design_ux) → pm_craft_today only. Hard constraints, not suggestions.
+CITATION RULE: Only cite item [n] if a specific insight bullet directly supports the exact claim.
+STARTUP FILTER: Only include companies with company_maturity=startup in startup_radar. Established companies must not appear here.
+EMPTY STRING RULE: If no eligible items exist for a section, return empty string or empty array — do not hallucinate content.
+""".strip()
+
+    response = client.messages.create(
+        model=settings.claude_model,
+        max_tokens=2000,
+        temperature=0.3,
+        system=_CALL_4B_SYSTEM,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    content_block = response.content[0]
+    text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
+    logger.debug("Raw Claude Call 2b (SR+PC) response: %s", text)
+
+    reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
+    if reasoning_text:
+        logger.info("Call 2b (SR+PC) reasoning extracted (%d chars)", len(reasoning_text))
+
+    cleaned = _extract_json(text_without_reasoning)
+    try:
+        parsed = json.loads(cleaned)
+    except Exception:
+        logger.warning("Call 2b (SR+PC) response not valid JSON. Raw (first 500): %s", (text or "")[:500])
         parsed = {
-            "company_watch": {},
             "startup_radar": [],
             "pm_craft_today": {"text": "", "source_indices": []},
         }
 
-    parsed["_call2_reasoning"] = reasoning_text
-    return parsed, dedicated_indexed
+    parsed["_call2b_reasoning"] = reasoning_text
+    return parsed, sr_pm_indexed
+
+
+# ---------------------------------------------------------------------------
+# Call 1a — Cross-market classifier (Haiku)
+# ---------------------------------------------------------------------------
+
+def _call_cross_market_classifier(
+    client: Anthropic,
+    settings: Any,
+    ws_items: List[Dict[str, Any]],
+    today: str,
+) -> Dict[str, bool]:
+    """
+    Classify each WS-theme item as cross-market or not.
+    Returns {item_id: is_cross_market} dict.
+    Runs on Haiku — pure classification, no synthesis.
+    """
+    if not ws_items:
+        return {}
+
+    items_block_lines = []
+    for item in ws_items:
+        bullets = item.get("insights") or []
+        bullets_text = "\n".join(f"    - {b}" for b in bullets) if bullets else "    (none)"
+        items_block_lines.append(
+            f"[{item['item_id']}]\n"
+            f"  Source: {item['source_name']}\n"
+            f"  Theme: {item['theme']}\n"
+            f"  Title: {item['title']}\n"
+            f"  Bullets:\n{bullets_text}"
+        )
+    items_block = "\n\n".join(items_block_lines)
+
+    user_prompt = f"""
+Today: {today}
+
+For each item below, classify whether it describes a CROSS-MARKET structural shift
+or COMPANY-SPECIFIC news.
+
+CROSS-MARKET = the central claim applies to an industry, product category, or regulatory
+framework affecting multiple companies or builders. The insight would be relevant to a PM
+at any company in that space, not just the company mentioned.
+
+COMPANY-SPECIFIC = primarily about what one named company did, faces, or decided.
+A regulatory action against one company is company-specific even if it has industry
+implications — the central claim is still about that company's situation.
+
+Items:
+{items_block}
+
+Return strict JSON — a dict mapping each item_id to true (cross-market) or false (company-specific):
+{{
+  "classifications": {{
+    "<item_id>": true,
+    "<item_id>": false
+  }}
+}}
+
+Use the exact item_id strings shown in brackets above.
+""".strip()
+
+    try:
+        response = client.messages.create(
+            model=HAIKU_MODEL,
+            max_tokens=512,
+            temperature=0,
+            system=_CALL_1A_SYSTEM,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        block = response.content[0]
+        text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+        parsed = json.loads(_extract_json(text or ""))
+        classifications = parsed.get("classifications") or {}
+        result = {
+            item["item_id"]: bool(classifications.get(item["item_id"], False))
+            for item in ws_items
+        }
+        cross_market_count = sum(1 for v in result.values() if v)
+        logger.info(
+            "Call 1a (cross-market): %d/%d items classified as cross-market",
+            cross_market_count, len(ws_items),
+        )
+        return result
+    except Exception:
+        logger.warning("Call 1a classification failed — defaulting all items to cross-market")
+        return {item["item_id"]: True for item in ws_items}
+
+
+# ---------------------------------------------------------------------------
+# Call 4a — Startup classifier (Haiku)
+# ---------------------------------------------------------------------------
+
+def _call_startup_classifier(
+    client: Anthropic,
+    settings: Any,
+    sr_items: List[Dict[str, Any]],
+    today: str,
+) -> Dict[str, bool]:
+    """
+    Classify each startup_disruption item as genuinely early-stage or established.
+    Returns {item_id: is_startup} dict.
+    Runs on Haiku — pure classification, no synthesis.
+    """
+    if not sr_items:
+        return {}
+
+    items_block_lines = []
+    for item in sr_items:
+        bullets = item.get("insights") or []
+        bullets_text = "\n".join(f"    - {b}" for b in bullets) if bullets else "    (none)"
+        items_block_lines.append(
+            f"[{item['item_id']}]\n"
+            f"  Company: {item.get('company_id') or 'unknown'}\n"
+            f"  Source: {item['source_name']}\n"
+            f"  Title: {item['title']}\n"
+            f"  Bullets:\n{bullets_text}"
+        )
+    items_block = "\n\n".join(items_block_lines)
+
+    user_prompt = f"""
+Today: {today}
+
+For each item below, classify whether the PRIMARY SUBJECT COMPANY is a startup
+(early-stage, emerging) or established.
+
+STARTUP = early-stage or emerging company, privately held, valued below $1B,
+without dominant market position. Unknown companies are likely startups.
+
+ESTABLISHED = publicly traded company, subsidiary of one, OR privately held with
+$1B+ valuation AND significant market presence.
+
+Named established companies (always established regardless of funding stage):
+Anthropic, OpenAI, Stripe, SpaceX, Databricks, Canva, Intuit, Google, Meta,
+Amazon, Salesforce, Microsoft, Apple, Netflix, NVIDIA, Uber, Airbnb, DoorDash,
+Instacart, Reddit, Discord, Figma, Notion, Airtable, Hugging Face, Cohere,
+Mistral, Scale AI, Weights & Biases.
+
+When in doubt: if a PM at Google would consider this company a peer rather than
+a startup, classify as established.
+
+Items:
+{items_block}
+
+Return strict JSON:
+{{
+  "classifications": {{
+    "<item_id>": true,
+    "<item_id>": false
+  }}
+}}
+
+true = startup, false = established.
+Use the exact item_id strings shown in brackets above.
+""".strip()
+
+    try:
+        response = client.messages.create(
+            model=HAIKU_MODEL,
+            max_tokens=256,
+            temperature=0,
+            system=_CALL_4A_SYSTEM,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        block = response.content[0]
+        text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+        parsed = json.loads(_extract_json(text or ""))
+        classifications = parsed.get("classifications") or {}
+        result = {
+            item["item_id"]: bool(classifications.get(item["item_id"], False))
+            for item in sr_items
+        }
+        startup_count = sum(1 for v in result.values() if v)
+        logger.info(
+            "Call 4a (startup): %d/%d items classified as startup",
+            startup_count, len(sr_items),
+        )
+        return result
+    except Exception:
+        logger.warning("Call 4a classification failed — defaulting all items to startup")
+        return {item["item_id"]: True for item in sr_items}
 
 
 # ---------------------------------------------------------------------------
@@ -768,26 +1096,15 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 )
                 continue
 
-            company_maturity = str(item.get("company_maturity") or "not_applicable").lower()
-
-            if theme == "startup_disruption" and company_maturity != "startup":
-                logger.info(
-                    "FILTER [step=3 reason=non_startup_in_startup_radar] dropped: %s — %s",
-                    item.get("source_name"), item.get("title")
-                )
-                continue
-
             filtered_items.append({
                 "item_id": str(uuid.uuid4()),
                 "theme": theme,
                 "title": item.get("title", ""),
                 "source_name": item.get("source_name", ""),
                 "company_id": item.get("company_id"),
-                "scope": str(item.get("scope") or "cross_market").lower(),
                 "insights": item.get("insights") or [],
                 "confidence": conf_raw,
                 "pm_relevance_score": relevance_raw,
-                "company_maturity": company_maturity,
             })
 
     if dropped_low_confidence:
@@ -896,38 +1213,50 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
     # ---------------------------------------------------------------------------
     # Partition by routing eligibility
     # ---------------------------------------------------------------------------
-    ws_items = []
-    dedicated_items = []
+    ws_items: List[Dict[str, Any]] = []
+    sr_pm_items: List[Dict[str, Any]] = []
+    cw_items: List[Dict[str, Any]] = []
+    sr_items: List[Dict[str, Any]] = []
+
+    items_for_1a = [
+        item for item in filtered_items
+        if item["theme"] in WHATS_SHIFTING_THEMES
+    ]
+    cross_market_map = _call_cross_market_classifier(
+        client, settings, items_for_1a, today
+    )
 
     for item in filtered_items:
         theme = item["theme"]
-        scope = item.get("scope", "cross_market")
-
-        if theme in DEDICATED_SECTION_THEMES:
-            dedicated_items.append(item)
-        elif theme in WHATS_SHIFTING_THEMES:
-            if theme == "regulation_policy" and scope == "company_specific":
-                logger.info(
-                    "FILTER [step=4 reason=regulation_policy_company_specific_excluded_from_ws] "
-                    "routed to dedicated: %s — %s",
-                    item.get("source_name"), item.get("title")
-                )
-                dedicated_items.append(item)
-            elif theme == "design_ux":
-                if scope == "cross_market":
-                    ws_items.append(item)
-                    logger.info(
-                        "ROUTING [design_ux cross_market → ws_items + dedicated_items]: %s — %s",
-                        item.get("source_name"), item.get("title")
-                    )
-                else:
-                    logger.info(
-                        "ROUTING [design_ux company_specific → dedicated_items only]: %s — %s",
-                        item.get("source_name"), item.get("title")
-                    )
-                dedicated_items.append(item)
-            else:
+        if theme == "design_ux":
+            # Cross-market design_ux → WS only; company-specific → PM Craft only.
+            # Never both — avoids double-dipping the same insight.
+            if cross_market_map.get(item["item_id"], False):
                 ws_items.append(item)
+            else:
+                sr_pm_items.append(item)
+        elif theme == "company_strategy":
+            cw_items.append(item)
+        elif theme == "startup_disruption":
+            sr_items.append(item)
+        elif theme == "product_craft":
+            sr_pm_items.append(item)
+        elif theme in WHATS_SHIFTING_THEMES:
+            if cross_market_map.get(item["item_id"], True):
+                ws_items.append(item)
+
+    design_ux_ws = sum(1 for i in ws_items if i["theme"] == "design_ux")
+    design_ux_pm = sum(1 for i in sr_pm_items if i["theme"] == "design_ux")
+    logger.info(
+        "Call 1a design_ux routing: %d cross-market → WS, %d company-specific → PM Craft",
+        design_ux_ws, design_ux_pm,
+    )
+    logger.info(
+        "Call 1a: %d items in WS pool after cross-market filter",
+        len(ws_items),
+    )
+
+    dedicated_items = cw_items + sr_items + sr_pm_items
 
     ws_theme_dist: Dict[str, int] = {}
     for item in ws_items:
@@ -1017,7 +1346,8 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             )
 
             fill_result = _call_whats_shifting_single_theme(
-                client, settings, theme_items, anchor, today, ws_indexed
+                client, settings, theme_items, anchor, today, ws_indexed,
+                covered_themes=covered_themes,
             )
 
             if fill_result and fill_result.get("paragraph", "").strip():
@@ -1062,7 +1392,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             )
 
         # ---------------------------------------------------------------------------
-        # Remove design_ux items consumed by WS from dedicated_items
+        # Remove WS-consumed items from PM Craft pool (prevents double-dipping)
         # ---------------------------------------------------------------------------
         ws_used_indices: Set[int] = set()
         for ws in ws_paragraphs:
@@ -1074,25 +1404,67 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 ws_used_item_ids.add(entry["item_id"])
 
         if ws_used_item_ids:
-            before_count = len(dedicated_items)
-            dedicated_items = [
-                item for item in dedicated_items
+            before_count = len(sr_pm_items)
+            sr_pm_items = [
+                item for item in sr_pm_items
                 if item.get("item_id") not in ws_used_item_ids
             ]
-            removed = before_count - len(dedicated_items)
+            removed = before_count - len(sr_pm_items)
             if removed:
                 logger.info(
-                    "DEDUP [ws_consumed]: Removed %d item(s) from dedicated_items already consumed by WS",
+                    "DEDUP [ws_consumed]: Removed %d item(s) from PM Craft pool already cited in WS",
                     removed
                 )
 
+        # Call 4a — startup classification
+        startup_map: Dict[str, bool] = {}
+        if sr_items:
+            startup_map = _call_startup_classifier(client, settings, sr_items, today)
+            before_count = len(sr_items)
+            sr_items = [
+                item for item in sr_items
+                if startup_map.get(item["item_id"], True)
+            ]
+            dropped = before_count - len(sr_items)
+            logger.info(
+                "Call 4a: %d established companies removed from startup_disruption pool",
+                dropped,
+            )
+
         # ---------------------------------------------------------------------------
-        # Call 2: dedicated sections
+        # Call 3: Company Watch
         # ---------------------------------------------------------------------------
         start_idx = len(ws_indexed) + 1
-        call2_parsed, dedicated_indexed = _call_dedicated_sections(
-            client, settings, dedicated_items, today, start_idx=start_idx
+
+        call4_items = sr_items + sr_pm_items
+
+        logger.info(
+            "Call 3/4 split: %d company_strategy → Call 3, %d startup + %d PM Craft → Call 4",
+            len(cw_items), len(sr_items), len(sr_pm_items),
         )
+
+        call3_parsed, cw_indexed = _call_company_watch(
+            client, settings, cw_items, today, start_idx=start_idx
+        )
+
+        # ---------------------------------------------------------------------------
+        # Call 4: Startup Radar + PM Craft
+        # ---------------------------------------------------------------------------
+        call4_parsed, sr_pm_indexed = _call_sr_pm_craft(
+            client, settings, call4_items, today,
+            start_idx=start_idx + len(cw_indexed),
+        )
+
+        dedicated_indexed = cw_indexed + sr_pm_indexed
+
+        # Merge into the shape the rest of the pipeline expects
+        call2_parsed = {
+            "company_watch":  call3_parsed.get("company_watch") or {},
+            "startup_radar":  call4_parsed.get("startup_radar") or [],
+            "pm_craft_today": call4_parsed.get("pm_craft_today") or {"text": "", "source_indices": []},
+            "_call3_reasoning": call3_parsed.get("_call3_reasoning", ""),
+            "_call2b_reasoning": call4_parsed.get("_call2b_reasoning", ""),
+        }
 
         for entry in dedicated_indexed:
             source_index_lookup[str(entry["index"])] = {
@@ -1235,8 +1607,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
         # 4 + 5. Routing canary (merged — previously validators 4 and 5 checked the
         # same company_watch condition independently, producing duplicate warnings).
-        # FIX: design_ux items are intentionally dual-routed (ws_items AND dedicated_items)
-        # — exempted from the WS-cites-dedicated canary to prevent false positives.
         routing_warnings = []
         omit_rule_warnings = []
 
@@ -1245,15 +1615,13 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 if idx_val in dedicated_eligible_indices:
                     source_info = source_index_lookup.get(str(idx_val), {})
                     source_theme = source_info.get("theme", "")
-                    # FIX: design_ux cross_market items are legitimately in both pools
-                    if source_theme != "design_ux":
-                        routing_warnings.append({
-                            "section": f"whats_shifting[{i}]",
-                            "source_index": idx_val,
-                            "source_title": source_info.get("title", "unknown"),
-                            "source_theme": source_theme,
-                            "warning": "CANARY: DEDICATED_SECTION source cited in whats_shifting"
-                        })
+                    routing_warnings.append({
+                        "section": f"whats_shifting[{i}]",
+                        "source_index": idx_val,
+                        "source_title": source_info.get("title", "unknown"),
+                        "source_theme": source_theme,
+                        "warning": "CANARY: DEDICATED_SECTION source cited in whats_shifting"
+                    })
 
         for company, value in normalized_company_watch.items():
             for idx_val in value.get("source_indices", []):
@@ -1508,6 +1876,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "headline": ws.get("headline", ""),
                 "paragraph": ws.get("paragraph", ""),
                 "source_indices": ws.get("source_indices", []),
+                "theme": _get_theme_for_ws(ws, ws_indexed, source_index_lookup),
             }
             for ws in ws_paragraphs
             if ws.get("paragraph", "").strip()
@@ -1516,7 +1885,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         logger.info(
             "WS DISPLAY PAYLOAD: %d paragraphs, themes: %s",
             len(ws_display_payload),
-            [_get_theme_for_ws(ws, ws_indexed, source_index_lookup) for ws in ws_display_payload],
+            [ws.get("theme") for ws in ws_display_payload],
         )
 
         return {
@@ -1539,7 +1908,10 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "theme_audit_warnings": theme_audit_warnings,
                 "theme_diversity_warnings": theme_diversity_warnings,
                 "call1_anchor_reasoning_debug": call1_parsed.get("_call1_reasoning", ""),
-                "call2_anchor_reasoning_debug": call2_parsed.get("_call2_reasoning", ""),
+                "call1a_cross_market_debug": cross_market_map,
+                "call3_anchor_reasoning_debug": call2_parsed.get("_call3_reasoning", ""),
+                "call2b_anchor_reasoning_debug": call2_parsed.get("_call2b_reasoning", ""),
+                "call4a_startup_debug": startup_map,
                 "fill_anchor_reasoning_debug": fill_reasonings,
             },
         }

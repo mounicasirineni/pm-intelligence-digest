@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from anthropic import Anthropic
 
@@ -12,26 +12,34 @@ from ..constants import OG_DESCRIPTION_PREFIX
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
-    "You are an intelligent research assistant for a Senior Product Manager "
-    "preparing for interviews at top tech companies. Your job is to extract signal "
-    "from content — not just summarize, but identify what actually matters for "
-    "someone tracking industry trends, technology direction, company strategy, and "
-    "market behavior shifts. "
-    "For every insight, ask: would a reader get this from the headline or first paragraph alone? "
-    "If yes, it is not an insight — it is a restatement. A genuine insight names a non-obvious implication, "
-    "a second-order consequence, a strategic tradeoff, or a pattern that requires reading the full content to surface. "
-    "Format each bullet as plain text only. Do not bold, italicize, or use any markdown formatting inside bullet text."
-)
-
 # Hard skip — don't hit the API below this word count.
-# Raised from 100 to 200: articles between 100–199 words were reaching Claude,
-# consuming tokens, and producing low-confidence outputs that got filtered anyway.
 MINIMUM_CONTENT_WORDS = 200
 
 # Articles below this word count get confidence capped at "medium" in code,
 # regardless of what Claude returns.
 CONFIDENCE_FLOOR_WORDS = 400
+
+# ---------------------------------------------------------------------------
+# pm_interview_relevance derived in code — no LLM call needed
+# ---------------------------------------------------------------------------
+_PM_RELEVANCE_DESCRIPTIONS = {
+    "high":   "Directly relevant to product strategy, company moves, or market shifts a PM interviewer would ask about.",
+    "medium": "Tangentially relevant — useful context but not a likely interview topic.",
+    "low":    "Not relevant to PM interview preparation.",
+}
+
+# ---------------------------------------------------------------------------
+# Call A — Extract (Sonnet)
+# ---------------------------------------------------------------------------
+
+_CALL_A_SYSTEM = (
+    "You are an intelligent research assistant for a Senior Product Manager. "
+    "Your job is to extract signal from content — not just summarize, but identify what actually matters. "
+    "For every insight, ask: would a reader get this from the headline or first paragraph alone? "
+    "If yes, it is not an insight — it is a restatement. A genuine insight names a non-obvious implication, "
+    "a second-order consequence, a strategic tradeoff, or a pattern that requires reading the full content to surface. "
+    "Format each bullet as plain text only. No bold, italics, or markdown inside bullet text."
+)
 
 
 def _build_client() -> Anthropic:
@@ -57,27 +65,329 @@ def _extract_json(text: str) -> str:
     return text.strip()
 
 
+def _build_call_a_prompt(
+    source_name: str,
+    theme: str,
+    title: str,
+    url: str,
+    content: str,
+) -> str:
+    return f"""
+Source: {source_name}
+Theme: {theme}
+Title: {title}
+URL: {url}
+
+Content:
+\"\"\"{content}\"\"\"
+
+Extract 3-5 insight bullets from this content.
+
+Return strict JSON: {{"insights": ["bullet 1", "bullet 2", ...]}}
+
+RULES:
+
+SPECIFICITY-FIRST RULE: Order bullets from most specific (named mechanisms, products, concrete
+tradeoffs, verifiable numbers) to most abstract (patterns, strategic observations).
+
+INSIGHT PRIORITIZATION RULE: Rank bullets in this order:
+  (1) Specific product design consequence, architectural decision, or measurable tradeoff
+  (2) Strategic pattern or competitive dynamic with a named mechanism
+  (3) Market observation or trend without a concrete action
+Include highest-ranked first. A bullet that tells a PM what to decide differently outranks
+one that tells them what is happening.
+
+CONTRADICTION MANDATE: If the content contains a fact, data point, or claim that contradicts,
+qualifies, or significantly complicates the article's central claim, you MUST include it as a
+bullet. A qualifying fact that changes the conclusion a reader would draw is as important as
+an explicit contradiction.
+
+SOURCE FIDELITY RULES:
+  - Every bullet must trace to a specific claim, data point, or quote in the content body.
+  - Do not introduce named entities (companies, products, people) not in the content.
+  - Do not assert specific numbers (percentages, dollar figures, timelines) not in the content.
+  - Do not assign strategic motivations a source does not explicitly state.
+  - QUALIFIER PRESERVATION: Match source hedge levels exactly. If source says 'suggests',
+    write 'suggests', not 'demonstrates' or 'proves'.
+  - UNIVERSALITY TEST: A single company's move does not establish a universal pattern.
+    Scope claims to actual examples — 'this suggests platforms in X category may...'
+    not 'all platforms must...'.
+  - VERIFIED MOTIVATION RULE: Do not assert why a company did something unless the source
+    explicitly states it. Use 'this may signal' or 'this suggests' framing for inferred intent.
+
+ROUTINE UPDATE RULE: If this content is cadence-driven (weekly roundup, new title/game
+additions, event listing, award announcement) with no strategic mechanism revealed, return
+1 bullet naming what it is and why it lacks signal. Do not force insights from thin content.
+
+ROUNDUP HANDLING RULE: If this is a newsletter or roundup with multiple distinct stories,
+extract at least one bullet per PM-relevant story. Do not limit to the lead story.
+""".strip()
+
+
+def _call_extract(
+    client: Anthropic,
+    settings: Any,
+    content: str,
+    content_word_count: int,
+    title: str,
+    source_name: str,
+    theme: str,
+    url: str,
+) -> List[str]:
+    """Call A: extract insight bullets from article content. Returns insights list."""
+    max_tokens = 1800 if content_word_count > 1000 else 1200
+
+    response = client.messages.create(
+        model=settings.claude_model,
+        max_tokens=max_tokens,
+        temperature=0,
+        system=_CALL_A_SYSTEM,
+        messages=[{
+            "role": "user",
+            "content": _build_call_a_prompt(source_name, theme, title, url, content),
+        }],
+    )
+
+    stop_reason = getattr(response, "stop_reason", None)
+
+    if stop_reason == "max_tokens":
+        logger.warning(
+            "Call A truncated at max_tokens for '%s' (words=%d, max_tokens=%d)",
+            title, content_word_count, max_tokens,
+        )
+
+    if stop_reason == "refusal":
+        logger.warning("Call A refusal for '%s'", title)
+        return []
+
+    if not response.content:
+        return []
+
+    block = response.content[0]
+    text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+    cleaned = _extract_json(text or "")
+
+    try:
+        parsed = json.loads(cleaned)
+        insights = parsed.get("insights") or []
+        if not isinstance(insights, list):
+            insights = [str(insights)]
+        return [str(b) for b in insights if b]
+    except Exception:
+        logger.warning(
+            "Call A JSON parse failed for '%s'. Raw (first 300): %s",
+            title, (text or "")[:300],
+        )
+        return []
+
+
+# ---------------------------------------------------------------------------
+# Call B — Confidence (Haiku)
+# ---------------------------------------------------------------------------
+
+_CALL_B_SYSTEM = (
+    "You are a content quality classifier for a PM intelligence digest. "
+    "Assess how well a set of insight bullets is grounded in verifiable source content. "
+    "Be skeptical — a source must earn high confidence by providing specific, traceable claims."
+)
+
+
+def _build_call_b_prompt(
+    source_name: str,
+    title: str,
+    theme: str,
+    content_word_count: int,
+    is_og_fallback: bool,
+    insights: List[str],
+) -> str:
+    insights_block = "\n".join(f"  - {b}" for b in insights) if insights else "  (none extracted)"
+    og_note = "\nNote: content was sourced from og:description fallback — likely very thin." if is_og_fallback else ""
+
+    return f"""
+Source: {source_name}
+Title: {title}
+Theme: {theme}
+Content word count: {content_word_count}{og_note}
+
+Extracted bullets:
+{insights_block}
+
+Classify CONFIDENCE — how well does the source support producing accurate, grounded bullets?
+
+high   = bullets name specific mechanisms, products, numbers, or quotes traceable to
+         substantive source content (300+ words of original reporting or analysis).
+         Bullets are specific and would require reading the full content to write.
+medium = bullets are plausible but some inference required. Source was thin (200-300 words),
+         partially paywalled, or a press release stub. 2-3 bullets grounded, rest inferred.
+low    = bullets are primarily inference. Source was boilerplate, a stub, or a cadence post
+         with no original analysis. Any bullet could have been written from the headline alone.
+
+Return strict JSON: {{"confidence": "high|medium|low"}}
+""".strip()
+
+
+def _call_confidence(
+    client: Anthropic,
+    settings: Any,
+    insights: List[str],
+    title: str,
+    source_name: str,
+    theme: str,
+    content_word_count: int,
+    is_og_fallback: bool,
+) -> str:
+    """Call B (Haiku): classify confidence from bullets. Returns 'high'|'medium'|'low'."""
+
+    if is_og_fallback:
+        logger.info("Call B skipped for '%s' — og:description fallback → low", title)
+        return "low"
+
+    if content_word_count < CONFIDENCE_FLOOR_WORDS and not insights:
+        return "low"
+
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=64,
+        temperature=0,
+        system=_CALL_B_SYSTEM,
+        messages=[{
+            "role": "user",
+            "content": _build_call_b_prompt(
+                source_name, title, theme,
+                content_word_count, is_og_fallback, insights,
+            ),
+        }],
+    )
+
+    block = response.content[0]
+    text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+    try:
+        parsed = json.loads(_extract_json(text or ""))
+        confidence = str(parsed.get("confidence") or "medium").lower()
+        if confidence not in {"high", "medium", "low"}:
+            confidence = "medium"
+        if content_word_count < CONFIDENCE_FLOOR_WORDS and confidence == "high":
+            logger.info(
+                "Call B: overriding 'high' → 'medium' for '%s' — only %d words",
+                title, content_word_count,
+            )
+            confidence = "medium"
+        return confidence
+    except Exception:
+        logger.warning("Call B parse failed for '%s' — defaulting to medium", title)
+        return "medium"
+
+
+# ---------------------------------------------------------------------------
+# Call C — PM Relevance (Haiku)
+# ---------------------------------------------------------------------------
+
+_CALL_C_SYSTEM = (
+    "You are a PM relevance classifier for a product management intelligence digest. "
+    "Assess whether a set of insight bullets would be useful to a Senior PM "
+    "preparing for interviews at top tech companies including Google, Meta, Apple, "
+    "Amazon, Netflix, NVIDIA, Microsoft, and OpenAI."
+)
+
+
+def _build_call_c_prompt(
+    source_name: str,
+    title: str,
+    theme: str,
+    insights: List[str],
+) -> str:
+    insights_block = "\n".join(f"  - {b}" for b in insights) if insights else "  (none)"
+
+    return f"""
+Source: {source_name}
+Title: {title}
+Theme: {theme}
+
+Insight bullets:
+{insights_block}
+
+Classify PM_RELEVANCE_SCORE:
+
+high   = bullets directly name product strategy decisions, competitive moves, architectural
+         tradeoffs, or market shifts a PM interviewer would ask about. A PM could walk into
+         an interview and form a prepared opinion from these bullets.
+medium = bullets provide useful industry context but are not likely interview topics.
+         Tangentially relevant — good background, not foreground signal.
+low    = bullets are not relevant to PM interview preparation.
+
+DOMAIN FILTER RULE: Score low if bullets are primarily about:
+  - Foreign policy, military operations, or armed conflict
+  - Domestic party politics or electoral outcomes
+  - Celebrity news or entertainment gossip
+  - Sports outcomes or athlete news
+  A PM analogy requiring translation through two or more conceptual layers does not qualify.
+  Example: naval operations → negotiation strategy → compliance framing = low, not medium.
+
+ROUTINE UPDATE RULE: Score low if bullets describe routine operational activity with no
+strategic mechanism revealed — weekly content additions, cadence posts, minor feature
+releases with no architectural significance, event listings, award announcements.
+The company name alone does not determine the score — the strategic signal does.
+
+Return strict JSON: {{"pm_relevance_score": "high|medium|low"}}
+""".strip()
+
+
+def _call_pm_relevance(
+    client: Anthropic,
+    settings: Any,
+    insights: List[str],
+    title: str,
+    source_name: str,
+    theme: str,
+) -> str:
+    """Call C (Haiku): classify PM relevance from bullets. Returns 'high'|'medium'|'low'."""
+
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=64,
+        temperature=0,
+        system=_CALL_C_SYSTEM,
+        messages=[{
+            "role": "user",
+            "content": _build_call_c_prompt(source_name, title, theme, insights),
+        }],
+    )
+
+    block = response.content[0]
+    text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+    try:
+        parsed = json.loads(_extract_json(text or ""))
+        score = str(parsed.get("pm_relevance_score") or "medium").lower()
+        if score not in {"high", "medium", "low"}:
+            score = "medium"
+        return score
+    except Exception:
+        logger.warning("Call C parse failed for '%s' — defaulting to medium", title)
+        return "medium"
+
+
+def _low_result(content_word_count: int, is_og_fallback: bool, reason: str = "") -> Dict[str, Any]:
+    """Return a low-score result dict with consistent shape."""
+    return {
+        "insights": [],
+        "pm_relevance_score": "low",
+        "pm_interview_relevance": _PM_RELEVANCE_DESCRIPTIONS["low"],
+        "confidence": "low",
+        "content_word_count": content_word_count,
+        "is_og_fallback": is_og_fallback,
+        "_skip_reason": reason,
+    }
+
+
 def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Summarize a single content item using Claude.
+    Summarize a single content item using a 3-call pipeline.
 
-    Args:
-        item: dict with at least title, url, summary (or full content),
-              source_name, and theme.  Optional ``rss_summary``: RSS text before
-              any full-article enrichment (used to retry once if Claude returns
-              ``stop_reason=refusal`` on the full body).
+    Call A (Sonnet)  — extract insight bullets from article content
+    Call B (Haiku)   — classify confidence (source quality)
+    Call C (Haiku)   — classify PM relevance (only if confidence is high/medium)
 
-    Returns:
-        {
-          "insights": [ "...", ... ],
-          "pm_interview_relevance": "...",
-          "pm_relevance_score": "high" | "medium" | "low",
-          "confidence": "high" | "medium" | "low",
-          "company_maturity": "startup" | "established" | "not_applicable",
-          "scope": "cross_market" | "company_specific",
-          "content_word_count": int,
-          "is_og_fallback": bool,
-        }
+    Short-circuit: low confidence → skip Call C, return immediately.
     """
     title = item.get("title") or ""
     url = item.get("url") or ""
@@ -85,329 +395,82 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     theme = item.get("theme") or ""
     raw_content = item.get("summary") or item.get("content") or ""
 
-    # --- Detect and strip OG_DESCRIPTION prefix (imported from constants.py) ---
-    # FIX: previously this constant was defined locally as "OG_DESCRIPTION:" (no
-    # trailing space) while fetcher.py wrote "OG_DESCRIPTION: " (with space).
-    # Both now import from constants.py, guaranteeing exact match.
     is_og_fallback = raw_content.startswith(OG_DESCRIPTION_PREFIX)
+    content = raw_content[len(OG_DESCRIPTION_PREFIX):] if is_og_fallback else raw_content
+    content_word_count = len(content.split())
+
     if is_og_fallback:
-        content = raw_content[len(OG_DESCRIPTION_PREFIX):]  # no .strip() needed — exact match
         logger.info(
             "Content for '%s' sourced from og:description fallback — "
             "confidence will be capped at low regardless of Claude output",
             title,
         )
-    else:
-        content = raw_content
 
-    content_word_count = len(content.split())
-    logger.info("Content word count for '%s': %d words", title, content_word_count)
     logger.info(
-        "Fetch quality for '%s': %d words | url=%s",
-        source_name,
-        content_word_count,
-        url,
+        "SUMMARIZER [%s]: %d words | og_fallback=%s | url=%s",
+        title[:60], content_word_count, is_og_fallback, url,
     )
 
-    # --- Hard skip ---
     if content_word_count < MINIMUM_CONTENT_WORDS:
         logger.info(
-            "Skipping '%s' — content too short (%d words, minimum %d)",
-            title,
-            content_word_count,
-            MINIMUM_CONTENT_WORDS,
+            "SUMMARIZER [%s]: hard skip — %d words < minimum %d",
+            title[:60], content_word_count, MINIMUM_CONTENT_WORDS,
         )
-        return {
-            "insights": [],
-            "pm_interview_relevance": "Content too short to summarize reliably.",
-            "pm_relevance_score": "low",
-            "confidence": "low",
-            "company_maturity": "not_applicable",
-            "scope": "cross_market",
-            "content_word_count": content_word_count,
-            "is_og_fallback": is_og_fallback,
-        }
-
-    user_prompt = f"""
-You are analyzing a single content item for a Senior Product Manager.
-
-Content metadata:
-- Source: {source_name}
-- Theme: {theme}
-- Title: {title}
-- URL: {url}
-
-Content body:
-\"\"\"{content}\"\"\"
-
-Please respond in strict JSON with the following structure:
-{{
-  "insights": [
-    "bullet 1",
-    "bullet 2",
-    "bullet 3"
-  ],
-  "pm_interview_relevance": "one line explaining why this matters (or doesn't) for a PM interview",
-  "pm_relevance_score": "high" | "medium" | "low",
-  "confidence": "high" | "medium" | "low",
-  "company_maturity": "startup" | "established" | "not_applicable",
-  "scope": "cross_market" | "company_specific"
-}}
-
-Guidance:
-- Insights should be 3–5 bullets.
-- Go beyond what happened; explain why it matters in terms of product strategy, AI/tech direction, company moves, and market behavior. Each bullet must pass this test: could a reader have written this bullet from the headline and first paragraph alone? If yes, rewrite it. Surface the implication, tradeoff, or pattern that only emerges from reading the full content.
-- SPECIFICITY-FIRST RULE: Structure your bullets from most specific to most abstract. Put bullets naming specific mechanisms, named products, concrete tradeoffs, or verifiable numbers first. Put bullets naming broader patterns or strategic observations last. This ordering helps the synthesizer find your most grounded content quickly rather than defaulting to the first bullet which is often the most abstract framing.
-- Avoid generic PM glosses like 'this has implications for product strategy' or 'PMs should pay attention to this trend.' Instead, name the specific implication: what decision does this change, what assumption does it challenge, or what risk does it reveal?
-- INSIGHT PRIORITIZATION RULE: When you have more than 3 insight bullets and must choose which to include, rank them in this order:
-    (1) Bullets naming a specific product design consequence, architectural decision, or measurable tradeoff — what should a PM build differently, test differently, or price differently as a result of this?
-    (2) Bullets naming a strategic pattern or competitive dynamic with a named mechanism.
-    (3) Bullets naming a market observation or trend without a concrete action attached.
-  A bullet that tells a PM what to build or decide differently outranks a bullet that tells them what is happening. Both are valuable, but the synthesizer will select from your bullets — give it your most actionable ones first. When in doubt, ask: could a PM use this bullet to change a decision in a meeting tomorrow? If yes, it ranks above bullets where the answer is 'it depends' or 'it's a useful frame.'
-- COMPLICATION RULE: If the content body contains a fact, data point, mechanism, or claim that contradicts, qualifies, or significantly complicates the article's central claim, you MUST include it as a bullet regardless of where it falls in the prioritization order. This is not optional. A bullet that reverses or limits the central implication is more valuable than a bullet that restates it from a different angle. Ask: is there anything in this content that would make a reader second-guess the main takeaway? If yes, that belongs in the bullets. CONTRADICTION MANDATE: If the content body contains a named data point, statistic, expert claim, or explicit mechanism that directly contradicts, qualifies, or limits the article's central thesis, it must appear as a bullet. You may not omit it because it complicates the narrative. A qualifying fact (e.g. a number that limits the scope of a claim, a geographic or demographic restriction, a named alternative that undermines the central argument) is as important as an explicit contradiction. The trigger is not 'does this directly oppose the thesis' but 'does this change the conclusion a reader would draw.' If yes, include it.
-- SOURCE FIDELITY RULE: Every bullet must be traceable to a specific claim, data point, or quote in the content body above. You may reason one logical step beyond the source (e.g. identifying an implication), but you may not:
-    (a) Introduce named entities (companies, products, people, technologies) that do not appear in the content body
-    (b) Assert specific numbers (multipliers, percentages, dollar figures, timelines) that do not appear in the content body
-    (c) Assign strategic motivations to a company that the source does not state
-  If you find yourself writing "this is similar to how X did Y" or "this follows the pattern of Z" using a company or event not mentioned in the content — stop. That bullet is from your training knowledge, not from the source. Either ground it in the source or cut it.
-  HALLUCINATION TEST: Before finalizing each bullet, ask: "Is the specific company name, product name, number, or causal claim I am asserting actually in the content body above?" If no, rewrite without it.
-  QUALIFIER PRESERVATION RULE: If the source uses hedged language to describe a finding ('suggests,' 'implies,' 'may,' 'could,' 'changes,' 'shifts'), your bullet must match that hedge level. Do not convert a source observation into a prescription. If the source says 'this changes how PMs prioritize,' do not write 'PMs must prioritize X from day one.' If the source says 'this suggests a tradeoff,' do not write 'PMs should always choose Y.' Preserving the source's epistemic confidence level is part of source fidelity. Converting hedged observations into prescriptive mandates is an inference boundary violation at the summarizer stage.
-  UNIVERSALITY TEST: Before writing any bullet that uses universalizing language ('all companies,' 'any platform,' 'every PM,' 'platforms must,' 'this shows that X always'), count the number of distinct examples the content body actually provides. If the content describes a single company's move, a single product's behavior, or a single market's dynamic, you may NOT generalize to 'all companies' or 'any platform.' Scope the bullet to the actual subject: 'this suggests that platforms in X category may need to...' or 'for companies in Y situation, this implies...' A single data point does not establish a universal pattern. Universalizing language is only permitted when the content body itself explicitly claims the finding applies broadly AND provides multiple supporting examples.
-  VERIFIED MOTIVATION RULE: Do not assert a company's strategic motivation unless the source explicitly states it. Press releases, company blogs, and first-party announcements almost never state strategic motivations directly — they state actions and outcomes. If the source says 'Company X launched Y,' you may not write 'Company X launched Y to outmaneuver Z' unless the source explicitly names that motivation. Frame bullets around observable actions and their described outcomes, not inferred intent. If the strategic implication is important, use 'this suggests' or 'this may signal' framing, not assertion.
-- "pm_relevance_score" should be a categorical assessment of how useful this item is for PM interview preparation:
-    high   = directly relevant to product strategy, company moves, or market shifts a PM interviewer would ask about
-    medium = tangentially relevant; useful context but not a likely interview topic
-    low    = not relevant to PM interview prep (e.g. sports tech, celebrity news, off-topic content)
-  ROUTINE UPDATE RULE: Content that reports routine operational activity without revealing strategic intent scores low, even if published by a major company. This includes: weekly content additions (new games, new titles, new episodes), cadence-driven posts (GFN Thursday, weekly roundups), minor feature releases with no architectural significance, and event listings or award announcements. A post scores medium or high only if it explains WHY the company made a move, WHAT it reveals about competitive positioning or product direction, or WHAT new capability it demonstrates. The company name alone does not determine the score — the strategic signal does.
-  DOMAIN FILTER RULE: The following content domains score low regardless of
-  whether a PM analogy can be constructed: foreign policy, military operations,
-  armed conflict, domestic party politics, celebrity news, and sports.
-  Country-level technology investment, industrial AI policy, or startup ecosystem
-  coverage is NOT in scope of this filter — score it on PM relevance as normal.
-  A story about naval operations in the Strait of Hormuz is a foreign policy
-  story even if a regulatory framing analogy exists. A PM analogy that requires
-  translating the content through two or more conceptual layers (military posture
-  → negotiation strategy → compliance framing) does not qualify as tangential
-  relevance — it qualifies as inference. Score low.
-- COMPANY MATURITY RULE: If this article's primary subject is a named company, assess whether that company is early-stage or established. Set "company_maturity" to:
-    startup     = primary subject is an early-stage, emerging, or privately held company valued below $1B without dominant market position
-    established = primary subject is (a) a publicly traded company, (b) a subsidiary of one, OR (c) a privately held company with $1B+ valuation AND significant market presence
-    not_applicable = article is not primarily about a named company, or covers multiple companies without a single primary subject
-  NAMED EXAMPLES (established): Anthropic, OpenAI, Stripe, SpaceX, Databricks, Canva, Intuit, Google, Meta, Amazon, Salesforce, Microsoft, Apple, Netflix, NVIDIA. These companies are established regardless of public/private status.
-  MATURITY EDGE CASE RULE: If you recognize a company as a widely known name in tech, media, or finance — a company a PM interviewer would immediately recognize — classify it as established. When in doubt between startup and established, ask: would a senior PM at Google consider this company a peer or a startup? If peer, it is established.
-  This field is used downstream to filter Startup Radar — established companies will not appear in Startup Radar regardless of feed tag.
-- SCOPE RULE: Assess whether this article describes a pattern affecting multiple companies or an entire product category ('cross_market'), or whether it is primarily about one named company's specific regulatory situation, legal case, government contract, or product decision ('company_specific').
-    cross_market    = the article's central claim applies to an industry, a product category, or a regulatory framework that affects multiple companies or builders.
-    company_specific = the article is primarily about what one named company did, faces, or decided.
-  DESIGN_UX SCOPE NOTE: Articles about design patterns, UX frameworks, or product
-  craft that use named companies as examples (not as primary subjects) are
-  cross_market. The test is whether the central claim applies to any builder in
-  that category, not whether a company name appears in the article.
-  This field is used downstream to route regulation_policy and design_ux articles —
-  only cross_market articles are eligible for What's Shifting.
-- "pm_interview_relevance" should be a one-line text explanation supporting your pm_relevance_score judgment.
-- "confidence" should reflect how well the content body above supports producing accurate, grounded insight bullets — it is a self-assessment of source quality, NOT a judgment of topic interest. Ask: how much of what I would write comes from the content body vs. from my own training knowledge?
-    high   = content body is substantive (300+ words of original reporting, analysis, or primary source material) and provides enough specific detail to write 3-5 grounded bullets without drawing on outside knowledge
-    medium = content body is adequate but thin (200-300 words, or partially paywalled) — can produce 2-3 grounded bullets but some inference required
-    low    = content body is too thin to support grounded bullets (under 200 words of original content after reaching this prompt — note: items below 200 words are hard-skipped before you see them, so if you are summarizing this content it is at least 200 words; 'low' at this stage means 200-299 words with significant paywall obstruction, boilerplate, or press-release stub content) — any bullets would be primarily inference from training knowledge, not from the source
-  IMPORTANT: A thin source on an interesting topic still gets low confidence. Topic relevance is measured by pm_relevance_score, not confidence. These are independent judgments.
-- ROUNDUP HANDLING RULE: If this article is a newsletter or roundup containing multiple distinct stories, extract insights from each distinct story separately — do not limit analysis to the lead story. Each distinct story should contribute at least one insight bullet if PM-relevant. Bullets from different stories within the same roundup should each be self-contained and traceable to their specific story. If the roundup contains 4 stories, aim for 4-5 bullets total covering all stories, not 3-5 bullets covering only the first. Exception: if secondary stories are clearly minor (brief mentions, event listings, link digests with no analysis), skip them. Apply the same PM-relevance test to each story independently.
-""".strip()
+        return _low_result(content_word_count, is_og_fallback, reason="content_too_short")
 
     settings = load_settings()
     client = _build_client()
 
-    # --- FIX: temperature=0 for deterministic structured output.
-    #     Previously 0.2, which introduced day-to-day variance in classification
-    #     fields (pm_relevance_score, confidence, scope, company_maturity) making
-    #     eval baselines harder to compare. The insight bullets are already
-    #     tightly constrained by prompt rules — 0.2 vs 0 was noise, not signal.
-    # --- FIX: max_tokens scales with content length to prevent truncation on
-    #     dense roundup articles (ROUNDUP HANDLING RULE can push output > 1200 tokens).
-    max_tokens = 1800 if content_word_count > 1000 else 1200
-
-    response = client.messages.create(
-        model=settings.claude_model,
-        max_tokens=max_tokens,
-        temperature=0,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": user_prompt,
-            }
-        ],
+    insights = _call_extract(
+        client, settings, content, content_word_count,
+        title, source_name, theme, url,
     )
 
-    # --- Check for max_tokens truncation before touching response.content ---
-    stop_reason = getattr(response, "stop_reason", None)
-
-    if stop_reason == "max_tokens":
-        logger.warning(
-            "Response truncated at max_tokens for '%s' — JSON likely malformed, "
-            "insights may be incomplete (content_word_count=%d, max_tokens=%d)",
-            title,
-            content_word_count,
-            max_tokens,
-        )
-
-    # --- Check stop_reason for refusal ---
-    if stop_reason == "refusal":
-        logger.warning(
-            "Claude refused to summarize '%s' (stop_reason=refusal) — "
-            "retrying with RSS summary only",
-            title,
-        )
+    if not insights:
         rss_fallback = item.get("rss_summary") or ""
-
-        # _refusal_retry is a copy-not-mutate sentinel.  It is set on a shallow
-        # copy of item (not on item itself) so callers never see it.
         if (
             rss_fallback
             and len(rss_fallback.split()) >= MINIMUM_CONTENT_WORDS
             and not item.get("_refusal_retry")
         ):
+            logger.warning("Call A returned no insights for '%s' — retrying with RSS summary", title)
             fallback_item = {**item, "summary": rss_fallback, "_refusal_retry": True}
             return summarize_item(fallback_item)
 
-        # Log the specific reason retry didn't run — conditions are exhaustive.
-        if not rss_fallback:
-            logger.warning("No rss_summary available for '%s' — skipping.", title)
-        elif len(rss_fallback.split()) < MINIMUM_CONTENT_WORDS:
-            logger.warning(
-                "rss_summary too short for '%s' (%d words, minimum %d) — skipping.",
-                title,
-                len(rss_fallback.split()),
-                MINIMUM_CONTENT_WORDS,
-            )
-        else:
-            # _refusal_retry must be True — the only remaining case.
-            logger.warning("Refusal on RSS fallback for '%s' — skipping.", title)
+        logger.warning("Call A returned no insights for '%s' — skipping", title)
+        return _low_result(content_word_count, is_og_fallback, reason="no_insights_extracted")
 
+    confidence = _call_confidence(
+        client, settings, insights, title, source_name,
+        theme, content_word_count, is_og_fallback,
+    )
+
+    logger.info("SUMMARIZER [%s]: confidence=%s", title[:60], confidence)
+
+    if confidence == "low":
         return {
-            "insights": [],
-            "pm_interview_relevance": "Claude declined to summarize this content.",
+            "insights": insights,
             "pm_relevance_score": "low",
+            "pm_interview_relevance": _PM_RELEVANCE_DESCRIPTIONS["low"],
             "confidence": "low",
-            "company_maturity": "not_applicable",
-            "scope": "cross_market",
             "content_word_count": content_word_count,
             "is_og_fallback": is_og_fallback,
         }
 
-    if not response.content:
-        logger.warning(
-            "Empty response content for '%s' — skipping item. "
-            "Full response: stop_reason=%s, usage=%s",
-            title,
-            stop_reason,
-            getattr(response, "usage", "unknown"),
-        )
-        return {
-            "insights": [],
-            "pm_interview_relevance": "",
-            "pm_relevance_score": "low",
-            "confidence": "low",
-            "company_maturity": "not_applicable",
-            "scope": "cross_market",
-            "content_word_count": content_word_count,
-            "is_og_fallback": is_og_fallback,
-        }
-
-    try:
-        content_block = response.content[0]
-        text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
-    except Exception as exc:
-        logger.exception("Unexpected Claude response format: %s", exc)
-        raise
-
-    logger.debug("Raw Claude response text: %s", text)
-
-    cleaned_text = _extract_json(text)
-
-    try:
-        parsed = json.loads(cleaned_text)
-    except Exception:
-        # --- FIX: JSON parse failure previously returned medium scores, misleading
-        #     the downstream filter into treating a malformed response as valid content.
-        #     Now returns low scores and logs the raw text for debugging. ---
-        logger.warning(
-            "Claude response was not valid JSON for '%s' — raw text (first 500 chars): %s",
-            title,
-            (text or "")[:500],
-        )
-        return {
-            "insights": [],
-            "pm_interview_relevance": "JSON parse failed — Claude output malformed.",
-            "pm_relevance_score": "low",
-            "confidence": "low",
-            "company_maturity": "not_applicable",
-            "scope": "cross_market",
-            "content_word_count": content_word_count,
-            "is_og_fallback": is_og_fallback,
-        }
-
-    # Ensure required keys exist with safe defaults.
-    insights = parsed.get("insights") or []
-    if not isinstance(insights, list):
-        insights = [str(insights)]
-
-    pm_interview_relevance = parsed.get("pm_interview_relevance") or ""
-    pm_relevance_score = str(parsed.get("pm_relevance_score") or "medium").lower()
-    if pm_relevance_score not in {"high", "medium", "low"}:
-        pm_relevance_score = "medium"
-
-    confidence = str(parsed.get("confidence") or "medium").lower()
-    if confidence not in {"high", "medium", "low"}:
-        confidence = "medium"
-
-    company_maturity = str(parsed.get("company_maturity") or "not_applicable").lower()
-    if company_maturity not in {"startup", "established", "not_applicable"}:
-        company_maturity = "not_applicable"
-
-    scope = str(parsed.get("scope") or "cross_market").lower()
-    if scope not in {"cross_market", "company_specific"}:
-        scope = "cross_market"
-
-    # --- Code-level confidence enforcement ---
-    if is_og_fallback:
-        if confidence != "low":
-            logger.info(
-                "Overriding confidence from '%s' to 'low' for '%s' — "
-                "content sourced from og:description fallback",
-                confidence,
-                title,
-            )
-        confidence = "low"
-    elif content_word_count < CONFIDENCE_FLOOR_WORDS and confidence == "high":
-        logger.info(
-            "Overriding confidence from 'high' to 'medium' for '%s' — "
-            "content only %d words (floor is %d)",
-            title,
-            content_word_count,
-            CONFIDENCE_FLOOR_WORDS,
-        )
-        confidence = "medium"
+    pm_relevance_score = _call_pm_relevance(
+        client, settings, insights, title, source_name, theme,
+    )
 
     logger.info(
-        "SUMMARIZER OUTPUT for '%s': score=%s, confidence=%s, scope=%s, maturity=%s, "
-        "og_fallback=%s, words=%d",
-        title,
-        pm_relevance_score,
-        confidence,
-        scope,
-        company_maturity,
-        is_og_fallback,
-        content_word_count,
+        "SUMMARIZER OUTPUT [%s]: confidence=%s pm_relevance=%s words=%d",
+        title[:60], confidence, pm_relevance_score, content_word_count,
     )
 
     return {
         "insights": insights,
-        "pm_interview_relevance": str(pm_interview_relevance),
         "pm_relevance_score": pm_relevance_score,
+        "pm_interview_relevance": _PM_RELEVANCE_DESCRIPTIONS.get(pm_relevance_score, ""),
         "confidence": confidence,
-        "company_maturity": company_maturity,
-        "scope": scope,
         "content_word_count": content_word_count,
         "is_og_fallback": is_og_fallback,
     }

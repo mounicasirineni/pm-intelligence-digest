@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow, noarchive"/>
+  <title>PM Digest — Source Pipeline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#FAFAF8;--text:#1A1A18;--accent:#1B3A6B;--muted:#7A7A72;
+      --border:#DFDED7;--green:#2D6A4F;--amber:#B45309;--red:#991B1B;}
+    *{box-sizing:border-box;}
+    body{margin:0;padding:24px 16px 40px;background:var(--bg);color:var(--text);
+      font-family:"Source Serif 4",-apple-system,serif;-webkit-font-smoothing:antialiased;}
+    .page{max-width:900px;margin:0 auto;}
+    h1,h2{font-family:"Playfair Display",serif;font-weight:600;letter-spacing:0.02em;margin:0;}
+    .header{margin-bottom:2rem;border-bottom:1px solid var(--border);padding-bottom:1.25rem;}
+    .header-title{font-size:clamp(1.8rem,3vw,2.4rem);text-transform:uppercase;letter-spacing:0.18em;}
+    .header-subtitle{margin-top:0.4rem;font-size:0.9rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.16em;}
+    .header-nav{margin-top:0.5rem;font-size:0.85rem;display:flex;gap:1.25rem;}
+    .header-nav a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(27,58,107,0.25);}
+    .header-nav a:hover{border-bottom-color:rgba(27,58,107,0.6);}
+    .header-nav span{color:var(--muted);font-style:italic;}
+
+    .section{padding:1.5rem 0 1.75rem;border-bottom:1px solid var(--border);}
+    .section:last-of-type{border-bottom:none;}
+    .section-heading{font-size:1.15rem;margin-bottom:0.3rem;}
+    .section-sub{font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;}
+
+    /* Funnel steps */
+    .funnel-row{display:flex;gap:0;margin-bottom:1.5rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+    .funnel-step{flex:1;padding:1rem;text-align:center;border-right:1px solid var(--border);background:#fff;}
+    .funnel-step:last-child{border-right:none;}
+    .funnel-step .fs-label{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:4px;}
+    .funnel-step .fs-value{font-size:1.5rem;font-weight:700;font-family:"Playfair Display",serif;}
+    .funnel-step .fs-pct{font-size:0.75rem;margin-top:2px;}
+    .good{color:var(--green);} .amber{color:var(--amber);} .bad{color:var(--red);}
+
+    /* Tables */
+    .tbl{width:100%;border-collapse:collapse;font-size:0.85rem;}
+    .tbl thead tr{border-bottom:1px solid var(--border);}
+    .tbl th{text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;
+      color:var(--muted);padding:0 0.75rem 0.5rem 0;white-space:nowrap;font-weight:600;}
+    .tbl th:first-child{padding-left:0;}
+    .tbl td{padding:0.45rem 0.75rem 0.45rem 0;border-top:1px solid rgba(223,222,215,0.5);
+      vertical-align:middle;white-space:nowrap;}
+    .tbl td:first-child{padding-left:0;}
+    .tbl tbody tr:first-child td{border-top:none;}
+    .date-cell{font-weight:500;color:var(--accent);}
+    .toggle-btn{font-size:0.72rem;color:var(--muted);background:none;border:none;cursor:pointer;
+      padding:0;text-decoration:underline;}
+    .warning-box{padding:0.5rem 0.75rem;background:rgba(180,83,9,0.07);
+      border:1px solid rgba(180,83,9,0.25);border-radius:4px;
+      color:var(--amber);font-size:0.78rem;margin-top:0.25rem;white-space:normal;}
+    .mono{font-family:"SF Mono","Fira Code",monospace;font-size:0.78rem;}
+    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
+
+    /* Theme table */
+    .theme-section{margin-top:1.5rem;}
+    .theme-label{font-size:0.78rem;font-weight:600;text-transform:uppercase;
+      letter-spacing:0.08em;color:var(--accent);margin-bottom:0.5rem;}
+    .bar-track{width:100%;height:6px;background:#e8e6de;border-radius:3px;overflow:hidden;}
+    .bar-fill{height:100%;border-radius:3px;background:var(--accent);}
+    .bar-fill.good{background:var(--green);}
+    .bar-fill.amber{background:var(--amber);}
+    .bar-fill.bad{background:var(--red);}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header class="header">
+    <h1 class="header-title">PM Digest</h1>
+    <div class="header-subtitle">Source Pipeline Health</div>
+    <nav class="header-nav">
+      <a href="/">Digest</a>
+      <a href="/history">Archive</a>
+      <a href="/digest-health?token={{ token }}">Digest Health</a>
+      <span>Pipeline</span>
+    </nav>
+  </header>
+
+  {% if rows %}
+
+  <!-- Today's funnel -->
+  {% set today = rows[0] %}
+  <section class="section">
+    <h2 class="section-heading">Today — {{ today.label }}</h2>
+    <div class="section-sub">Overall source funnel from configured sources to synthesis citations</div>
+
+    <div class="funnel-row">
+      <div class="funnel-step">
+        <div class="fs-label">Configured</div>
+        <div class="fs-value">{{ today.sources_configured }}</div>
+        <div class="fs-pct" style="color:var(--muted)">sources</div>
+      </div>
+      <div class="funnel-step">
+        <div class="fs-label">Active</div>
+        <div class="fs-value {% if today.sources_active_pct >= 80 %}good{% elif today.sources_active_pct >= 60 %}amber{% else %}bad{% endif %}">
+          {{ today.sources_active }}
+        </div>
+        <div class="fs-pct {% if today.sources_active_pct >= 80 %}good{% elif today.sources_active_pct >= 60 %}amber{% else %}bad{% endif %}">
+          {{ "%.0f"|format(today.sources_active_pct) }}%
+        </div>
+      </div>
+      <div class="funnel-step">
+        <div class="fs-label">Fetched</div>
+        <div class="fs-value">{{ today.fetched }}</div>
+        <div class="fs-pct" style="color:var(--muted)">articles</div>
+      </div>
+      <div class="funnel-step">
+        <div class="fs-label">Confident</div>
+        <div class="fs-value {% if today.confident_pct >= 80 %}good{% elif today.confident_pct >= 60 %}amber{% else %}bad{% endif %}">
+          {{ today.confident }}
+        </div>
+        <div class="fs-pct {% if today.confident_pct >= 80 %}good{% elif today.confident_pct >= 60 %}amber{% else %}bad{% endif %}">
+          {{ "%.0f"|format(today.confident_pct) }}% of fetched
+        </div>
+      </div>
+      <div class="funnel-step">
+        <div class="fs-label">Relevant</div>
+        <div class="fs-value {% if today.relevant_pct >= 70 %}good{% elif today.relevant_pct >= 50 %}amber{% else %}bad{% endif %}">
+          {{ today.relevant }}
+        </div>
+        <div class="fs-pct {% if today.relevant_pct >= 70 %}good{% elif today.relevant_pct >= 50 %}amber{% else %}bad{% endif %}">
+          {{ "%.0f"|format(today.relevant_pct) }}% of confident
+        </div>
+      </div>
+      <div class="funnel-step">
+        <div class="fs-label">Utilized</div>
+        <div class="fs-value {% if today.utilized_pct >= 80 %}good{% elif today.utilized_pct >= 60 %}amber{% else %}bad{% endif %}">
+          {{ today.utilized }}
+        </div>
+        <div class="fs-pct {% if today.utilized_pct >= 80 %}good{% elif today.utilized_pct >= 60 %}amber{% else %}bad{% endif %}">
+          {{ "%.0f"|format(today.utilized_pct) }}% of relevant
+        </div>
+      </div>
+    </div>
+
+    {% if today.theme_funnel %}
+    <div class="theme-section">
+      <div class="theme-label">Per theme — today</div>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Theme</th>
+            <th>Fetched</th>
+            <th>Confident</th>
+            <th>Relevant</th>
+            <th style="width:160px;">Relevant / Fetched</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for theme, counts in today.theme_funnel.items() | sort %}
+          {% set rel_pct = (counts.relevant / counts.fetched * 100) if counts.fetched else 0 %}
+          <tr>
+            <td class="mono">{{ theme }}</td>
+            <td>{{ counts.fetched }}</td>
+            <td>{{ counts.confident }}</td>
+            <td class="{% if rel_pct >= 60 %}good{% elif rel_pct >= 40 %}amber{% else %}bad{% endif %}">
+              {{ counts.relevant }}
+            </td>
+            <td>
+              <div class="bar-track">
+                <div class="bar-fill {% if rel_pct >= 60 %}good{% elif rel_pct >= 40 %}amber{% else %}bad{% endif %}"
+                     style="width:{{ [rel_pct,100]|min }}%"></div>
+              </div>
+              <span style="font-size:0.72rem;color:var(--muted);">{{ "%.0f"|format(rel_pct) }}%</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if today.empty_source_names %}
+    <div class="warning-box" style="margin-top:1rem;">
+      <strong>Silent sources today:</strong> {{ today.empty_source_names | join(', ') }}
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- 14-day history -->
+  <section class="section">
+    <h2 class="section-heading">14-day history</h2>
+    <div class="section-sub">Overall funnel per day — expand for theme detail and silent sources</div>
+
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Active %</th>
+          <th>Fetched</th>
+          <th>Confident %</th>
+          <th>Relevant %</th>
+          <th>Utilized %</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="date-cell">{{ row.label }}</td>
+          <td class="{% if row.sources_active_pct >= 80 %}good{% elif row.sources_active_pct >= 60 %}amber{% else %}bad{% endif %}">
+            {{ "%.0f"|format(row.sources_active_pct) }}%
+          </td>
+          <td>{{ row.fetched }}</td>
+          <td class="{% if row.confident_pct >= 80 %}good{% elif row.confident_pct >= 60 %}amber{% else %}bad{% endif %}">
+            {{ "%.0f"|format(row.confident_pct) }}%
+          </td>
+          <td class="{% if row.relevant_pct >= 70 %}good{% elif row.relevant_pct >= 50 %}amber{% else %}bad{% endif %}">
+            {{ "%.0f"|format(row.relevant_pct) }}%
+          </td>
+          <td class="{% if row.utilized_pct >= 80 %}good{% elif row.utilized_pct >= 60 %}amber{% else %}bad{% endif %}">
+            {{ "%.0f"|format(row.utilized_pct) }}%
+          </td>
+          <td>
+            {% if row.empty_source_names %}
+            <button class="toggle-btn" onclick="toggle('feeds-{{ row.date }}')">silent</button>
+            {% endif %}
+            {% if row.theme_funnel %}
+            <button class="toggle-btn" onclick="toggle('themes-{{ row.date }}')">themes</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% if row.empty_source_names %}
+        <tr id="feeds-{{ row.date }}" style="display:none;">
+          <td colspan="7">
+            <div class="warning-box">{{ row.empty_source_names | join(', ') }}</div>
+          </td>
+        </tr>
+        {% endif %}
+        {% if row.theme_funnel %}
+        <tr id="themes-{{ row.date }}" style="display:none;">
+          <td colspan="7" style="padding:0.25rem 0 0.75rem;">
+            <div class="warning-box" style="font-family:monospace;font-size:0.75rem;">
+              <strong>fetched / confident / relevant</strong><br>
+              {% for theme, counts in row.theme_funnel.items() | sort %}
+              {{ theme }}: {{ counts.fetched }} / {{ counts.confident }} / {{ counts.relevant }}<br>
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {% else %}
+  <p class="empty">No pipeline data available yet.</p>
+  {% endif %}
+
+</div>
+<script>
+function toggle(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+</script>
+</body>
+</html>
