@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="robots" content="noindex, nofollow, noarchive"/>
-  <title>PM Digest — Source Pipeline</title>
+  <title>PM Intelligence Digest — Source Pipeline Health</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
@@ -23,11 +23,22 @@
     .header-nav a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(27,58,107,0.25);}
     .header-nav a:hover{border-bottom-color:rgba(27,58,107,0.6);}
     .header-nav span{color:var(--muted);font-style:italic;}
-
     .section{padding:1.5rem 0 1.75rem;border-bottom:1px solid var(--border);}
     .section:last-of-type{border-bottom:none;}
     .section-heading{font-size:1.15rem;margin-bottom:0.3rem;}
     .section-sub{font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;}
+    .good{color:var(--green);} .amber{color:var(--amber);} .bad{color:var(--red);}
+    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
+
+    /* Metric definitions — static */
+    .def-tbl{width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:1.5rem;}
+    .def-tbl th{text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;
+      color:var(--muted);padding:0 1rem 0.5rem 0;font-weight:600;border-bottom:1px solid var(--border);}
+    .def-tbl td{padding:0.5rem 1rem 0.5rem 0;border-top:1px solid rgba(223,222,215,0.5);
+      vertical-align:top;line-height:1.5;}
+    .def-tbl td:first-child{white-space:nowrap;font-weight:600;color:var(--accent);width:160px;}
+    .def-tbl td:nth-child(2){width:220px;}
+    .def-tbl tbody tr:first-child td{border-top:none;}
 
     /* Funnel steps */
     .funnel-row{display:flex;gap:0;margin-bottom:1.5rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
@@ -36,7 +47,6 @@
     .funnel-step .fs-label{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:4px;}
     .funnel-step .fs-value{font-size:1.5rem;font-weight:700;font-family:"Playfair Display",serif;}
     .funnel-step .fs-pct{font-size:0.75rem;margin-top:2px;}
-    .good{color:var(--green);} .amber{color:var(--amber);} .bad{color:var(--red);}
 
     /* Tables */
     .tbl{width:100%;border-collapse:collapse;font-size:0.85rem;}
@@ -54,25 +64,19 @@
     .warning-box{padding:0.5rem 0.75rem;background:rgba(180,83,9,0.07);
       border:1px solid rgba(180,83,9,0.25);border-radius:4px;
       color:var(--amber);font-size:0.78rem;margin-top:0.25rem;white-space:normal;}
-    .mono{font-family:"SF Mono","Fira Code",monospace;font-size:0.78rem;}
     .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
 
     /* Theme table */
     .theme-section{margin-top:1.5rem;}
     .theme-label{font-size:0.78rem;font-weight:600;text-transform:uppercase;
       letter-spacing:0.08em;color:var(--accent);margin-bottom:0.5rem;}
-    .bar-track{width:100%;height:6px;background:#e8e6de;border-radius:3px;overflow:hidden;}
-    .bar-fill{height:100%;border-radius:3px;background:var(--accent);}
-    .bar-fill.good{background:var(--green);}
-    .bar-fill.amber{background:var(--amber);}
-    .bar-fill.bad{background:var(--red);}
   </style>
 </head>
 <body>
 <div class="page">
 
   <header class="header">
-    <h1 class="header-title">PM Digest</h1>
+    <h1 class="header-title">PM Intelligence Digest</h1>
     <div class="header-subtitle">Source Pipeline Health</div>
     <nav class="header-nav">
       <a href="/">Digest</a>
@@ -84,84 +88,80 @@
 
   {% if rows %}
 
-  <!-- Today's funnel -->
   {% set today = rows[0] %}
   <section class="section">
     <h2 class="section-heading">Today — {{ today.label }}</h2>
     <div class="section-sub">Overall source funnel from configured sources to synthesis citations</div>
 
-    <details style="margin-bottom:1.25rem;">
-      <summary style="font-size:0.78rem;color:var(--accent);cursor:pointer;letter-spacing:0.08em;text-transform:uppercase;">Metric definitions</summary>
-      <table class="tbl" style="margin-top:0.75rem;">
-        <thead>
-          <tr>
-            <th style="width:130px;">Metric</th>
-            <th>What it measures</th>
-            <th>Color logic</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="mono">Configured</td>
-            <td>Total sources registered in sources.json</td>
-            <td style="color:var(--muted)">No color — fixed baseline</td>
-          </tr>
-          <tr>
-            <td class="mono">Published Today</td>
-            <td>Sources that had at least one new item in today's fetch window</td>
-            <td style="color:var(--muted)">No color — reflects content cadence, not a health signal</td>
-          </tr>
-          <tr>
-            <td class="mono">Fetched</td>
-            <td>Total articles retrieved across all active sources</td>
-            <td style="color:var(--muted)">No color — raw volume</td>
-          </tr>
-          <tr>
-            <td class="mono">Confident</td>
-            <td>Articles passing the confidence classifier (high or medium confidence extraction)</td>
-            <td>🟢 ≥80% · 🟡 ≥60% · 🔴 &lt;60%</td>
-          </tr>
-          <tr>
-            <td class="mono">Relevant</td>
-            <td>Confident articles scored high or medium on PM relevance</td>
-            <td>🟢 ≥70% · 🟡 ≥50% · 🔴 &lt;50%</td>
-          </tr>
-          <tr>
-            <td class="mono">Utilized</td>
-            <td>Relevant articles actually cited in today's synthesis output</td>
-            <td>🟢 ≥80% · 🟡 ≥60% · 🔴 &lt;60%</td>
-          </tr>
-          <tr>
-            <td class="mono">Silent Sources</td>
-            <td>Configured sources that published nothing today — expected on weekends and holidays</td>
-            <td style="color:var(--muted)">No color — informational only</td>
-          </tr>
-        </tbody>
-      </table>
-    </details>
+    <!-- Metric definitions — static -->
+    <table class="def-tbl">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>What it measures</th>
+          <th>Color logic</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Configured Sources</td>
+          <td>Total sources registered in sources.json</td>
+          <td style="color:var(--muted)">No color — fixed baseline</td>
+        </tr>
+        <tr>
+          <td>Published Sources</td>
+          <td>Sources that had at least one new item in today's fetch window</td>
+          <td style="color:var(--muted)">No color — content cadence, not a health signal</td>
+        </tr>
+        <tr>
+          <td>Fetched Articles</td>
+          <td>Total articles retrieved across all published sources</td>
+          <td style="color:var(--muted)">No color — raw volume</td>
+        </tr>
+        <tr>
+          <td>Confident Articles</td>
+          <td>Articles passing the confidence classifier (high or medium confidence extraction)</td>
+          <td>🟢 ≥80% of fetched · 🟡 ≥60% · 🔴 &lt;60%</td>
+        </tr>
+        <tr>
+          <td>Relevant Articles</td>
+          <td>Confident articles scored high or medium on PM relevance</td>
+          <td>🟢 ≥70% of confident · 🟡 ≥50% · 🔴 &lt;50%</td>
+        </tr>
+        <tr>
+          <td>Utilized Articles</td>
+          <td>Relevant articles actually cited in today's synthesis output</td>
+          <td>🟢 ≥80% of relevant · 🟡 ≥60% · 🔴 &lt;60%</td>
+        </tr>
+        <tr>
+          <td>Silent Sources</td>
+          <td>Configured sources that published nothing today — expected on weekends and holidays</td>
+          <td style="color:var(--muted)">No color — informational only</td>
+        </tr>
+      </tbody>
+    </table>
 
+    <!-- Funnel -->
     <div class="funnel-row">
       <div class="funnel-step">
-        <div class="fs-label">Configured</div>
+        <div class="fs-label">Configured Sources</div>
         <div class="fs-value">{{ today.sources_configured }}</div>
         <div class="fs-pct" style="color:var(--muted)">sources</div>
       </div>
       <div class="funnel-step">
-        <div class="fs-label">Published Today</div>
-        <div class="fs-value" style="color:var(--text)">
-          {{ today.sources_active }}
-        </div>
+        <div class="fs-label">Published Sources</div>
+        <div class="fs-value" style="color:var(--text)">{{ today.sources_active }}</div>
         <div class="fs-pct" style="color:var(--muted)">
           {{ "%.0f"|format(today.sources_active_pct) }}% of configured
         </div>
       </div>
       <div class="funnel-step">
-        <div class="fs-label">Fetched</div>
+        <div class="fs-label">Fetched Articles</div>
         <div class="fs-value">{{ today.fetched }}</div>
         <div class="fs-pct" style="color:var(--muted)">articles</div>
       </div>
       <div class="funnel-step">
-        <div class="fs-label">Confident</div>
+        <div class="fs-label">Confident Articles</div>
         <div class="fs-value {% if today.confident_pct >= 80 %}good{% elif today.confident_pct >= 60 %}amber{% else %}bad{% endif %}">
           {{ today.confident }}
         </div>
@@ -170,7 +170,7 @@
         </div>
       </div>
       <div class="funnel-step">
-        <div class="fs-label">Relevant</div>
+        <div class="fs-label">Relevant Articles</div>
         <div class="fs-value {% if today.relevant_pct >= 70 %}good{% elif today.relevant_pct >= 50 %}amber{% else %}bad{% endif %}">
           {{ today.relevant }}
         </div>
@@ -179,7 +179,7 @@
         </div>
       </div>
       <div class="funnel-step">
-        <div class="fs-label">Utilized</div>
+        <div class="fs-label">Utilized Articles</div>
         <div class="fs-value {% if today.utilized_pct >= 80 %}good{% elif today.utilized_pct >= 60 %}amber{% else %}bad{% endif %}">
           {{ today.utilized }}
         </div>
@@ -189,6 +189,7 @@
       </div>
     </div>
 
+    <!-- Per theme -->
     {% if today.theme_funnel %}
     <div class="theme-section">
       <div class="theme-label">Per theme — today</div>
@@ -196,28 +197,20 @@
         <thead>
           <tr>
             <th>Theme</th>
-            <th>Fetched</th>
-            <th>Confident</th>
-            <th>Relevant</th>
-            <th style="width:160px;">Relevant / Fetched</th>
+            <th>Fetched Articles</th>
+            <th>Confident Articles</th>
+            <th>Relevant Articles</th>
           </tr>
         </thead>
         <tbody>
           {% for theme, counts in today.theme_funnel.items() | sort %}
           {% set rel_pct = (counts.relevant / counts.fetched * 100) if counts.fetched else 0 %}
           <tr>
-            <td class="mono">{{ theme }}</td>
+            <td>{{ theme | replace("_", " ") | title }}</td>
             <td>{{ counts.fetched }}</td>
             <td>{{ counts.confident }}</td>
             <td class="{% if rel_pct >= 60 %}good{% elif rel_pct >= 40 %}amber{% else %}bad{% endif %}">
               {{ counts.relevant }}
-            </td>
-            <td>
-              <div class="bar-track">
-                <div class="bar-fill {% if rel_pct >= 60 %}good{% elif rel_pct >= 40 %}amber{% else %}bad{% endif %}"
-                     style="width:{{ [rel_pct,100]|min }}%"></div>
-              </div>
-              <span style="font-size:0.72rem;color:var(--muted);">{{ "%.0f"|format(rel_pct) }}%</span>
             </td>
           </tr>
           {% endfor %}
@@ -242,11 +235,11 @@
       <thead>
         <tr>
           <th>Date</th>
-          <th>Published %</th>
-          <th>Fetched</th>
-          <th>Confident %</th>
-          <th>Relevant %</th>
-          <th>Utilized %</th>
+          <th>Published Sources</th>
+          <th>Fetched Articles</th>
+          <th>Confident Articles</th>
+          <th>Relevant Articles</th>
+          <th>Utilized Articles</th>
           <th></th>
         </tr>
       </thead>
@@ -254,9 +247,7 @@
         {% for row in rows %}
         <tr>
           <td class="date-cell">{{ row.label }}</td>
-          <td style="color:var(--muted)">
-            {{ "%.0f"|format(row.sources_active_pct) }}%
-          </td>
+          <td style="color:var(--muted)">{{ "%.0f"|format(row.sources_active_pct) }}%</td>
           <td>{{ row.fetched }}</td>
           <td class="{% if row.confident_pct >= 80 %}good{% elif row.confident_pct >= 60 %}amber{% else %}bad{% endif %}">
             {{ "%.0f"|format(row.confident_pct) }}%
@@ -286,10 +277,10 @@
         {% if row.theme_funnel %}
         <tr id="themes-{{ row.date }}" style="display:none;">
           <td colspan="7" style="padding:0.25rem 0 0.75rem;">
-            <div class="warning-box" style="font-family:monospace;font-size:0.75rem;">
-              <strong>fetched / confident / relevant</strong><br>
+            <div class="warning-box" style="font-size:0.78rem;">
+              <strong>Fetched Articles / Confident Articles / Relevant Articles</strong><br><br>
               {% for theme, counts in row.theme_funnel.items() | sort %}
-              {{ theme }}: {{ counts.fetched }} / {{ counts.confident }} / {{ counts.relevant }}<br>
+              {{ theme | replace("_", " ") | title }}: {{ counts.fetched }} / {{ counts.confident }} / {{ counts.relevant }}<br>
               {% endfor %}
             </div>
           </td>
