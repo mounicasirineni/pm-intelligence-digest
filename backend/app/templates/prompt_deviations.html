@@ -27,40 +27,47 @@
     .section:last-of-type{border-bottom:none;}
     .section-heading{font-size:1.15rem;margin-bottom:0.3rem;}
     .section-sub{font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;}
+    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
 
-    /* Warning history table */
-    .tbl{width:100%;border-collapse:collapse;font-size:0.82rem;}
-    .tbl thead tr{border-bottom:1px solid var(--border);}
-    .tbl th{text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;
-      color:var(--muted);padding:0 0.5rem 0.5rem 0;white-space:nowrap;font-weight:600;}
-    .tbl th:first-child{padding-left:0;}
-    .tbl td{padding:0.4rem 0.5rem 0.4rem 0;border-top:1px solid rgba(223,222,215,0.5);
-      vertical-align:top;white-space:nowrap;}
-    .tbl td:first-child{padding-left:0;}
-    .tbl tbody tr:first-child td{border-top:none;}
+    /* Ledger */
+    .ledger{width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:0.5rem;}
+    .ledger th{text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;
+      color:var(--muted);padding:0 1rem 0.5rem 0;font-weight:600;border-bottom:1px solid var(--border);}
+    .ledger td{padding:0.55rem 1rem 0.55rem 0;border-top:1px solid rgba(223,222,215,0.5);
+      vertical-align:top;line-height:1.5;}
+    .ledger td:first-child{white-space:nowrap;font-weight:500;color:var(--accent);font-size:0.78rem;}
+    .ledger tbody tr:first-child td{border-top:none;}
+    .threshold-badge{display:inline-block;font-size:0.65rem;padding:1px 6px;border-radius:3px;
+      background:rgba(27,58,107,0.08);border:1px solid rgba(27,58,107,0.2);
+      color:var(--accent);white-space:nowrap;margin-left:0.4rem;vertical-align:middle;}
 
-    /* Prompt change row */
-    .tbl tr.prompt-change td{
-      background:rgba(27,58,107,0.04);
-      border-top:2px solid var(--accent);
-    }
-    .tbl tr.prompt-change + tr td{border-top:none;}
+    /* Daily feed */
+    .feed{margin-top:0.5rem;}
+    .feed-day{padding:0.75rem 0;border-bottom:1px solid rgba(223,222,215,0.5);}
+    .feed-day:last-child{border-bottom:none;}
+    .feed-day-header{display:flex;align-items:baseline;gap:0.75rem;margin-bottom:0.3rem;}
+    .feed-date{font-weight:500;color:var(--accent);font-size:0.85rem;min-width:56px;}
+    .feed-quiet{font-size:0.82rem;color:var(--muted);font-style:italic;}
+    .feed-warning{display:flex;align-items:baseline;gap:0.6rem;
+      font-size:0.82rem;margin-top:0.3rem;line-height:1.5;}
+    .feed-warning-name{font-weight:600;min-width:180px;color:var(--text);}
+    .streak-pill{display:inline-block;font-size:0.68rem;padding:1px 6px;border-radius:3px;
+      white-space:nowrap;flex-shrink:0;}
+    .streak-pill.active{background:rgba(180,83,9,0.12);border:1px solid rgba(180,83,9,0.3);color:var(--amber);}
+    .streak-pill.patch{background:rgba(153,27,27,0.1);border:1px solid rgba(153,27,27,0.3);color:var(--red);}
+    .feed-detail{font-size:0.78rem;color:var(--muted);}
+
+    /* Prompt change banner */
     .prompt-change-banner{
+      display:flex;align-items:center;gap:8px;
+      padding:0.6rem 0;margin-bottom:0;
       font-size:0.72rem;font-weight:600;color:var(--accent);
-      display:flex;align-items:center;gap:6px;
+      border-top:2px solid var(--accent);
     }
     .prompt-change-banner::before{
       content:"";display:inline-block;width:8px;height:8px;
       border-radius:50%;background:var(--accent);flex-shrink:0;
     }
-
-    /* Warning pills in cells */
-    .warn-cell{white-space:normal;}
-    .warn-pill{display:inline-block;font-size:0.68rem;padding:1px 6px;border-radius:3px;
-      margin:1px 2px 1px 0;white-space:nowrap;}
-    .warn-pill.active{background:rgba(180,83,9,0.12);border:1px solid rgba(180,83,9,0.3);color:var(--amber);}
-    .warn-pill.streak{background:rgba(153,27,27,0.1);border:1px solid rgba(153,27,27,0.3);color:var(--red);}
-    .warn-pill.ok{background:rgba(45,106,79,0.08);border:1px solid rgba(45,106,79,0.25);color:var(--green);}
 
     /* Version history */
     .version-group{margin-bottom:1.5rem;}
@@ -74,10 +81,6 @@
     .v-active{font-size:0.65rem;background:#dcfce7;color:#166534;padding:1px 5px;border-radius:3px;font-weight:700;}
     .v-reason{color:var(--text);flex:1;}
     .v-by{font-size:0.72rem;color:var(--muted);}
-    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
-
-    /* Legend */
-    .legend{font-size:0.78rem;color:var(--muted);line-height:1.8;margin-bottom:1.25rem;}
   </style>
 </head>
 <body>
@@ -94,91 +97,119 @@
     </nav>
   </header>
 
-  <!-- Warning history -->
+  <!-- Warning ledger -->
   <section class="section">
-    <h2 class="section-heading">Warning history — last 30 days</h2>
+    <h2 class="section-heading">Warning ledger</h2>
     <div class="section-sub">
-      Each row is one digest run. Blue markers show when a prompt version changed.
-      Pill color: amber = warning fired, red = fired at or above threshold (patch signal).
-    </div>
-    <div class="legend">
-      Tracked: split implication (3d) · theme diversity (3d) · theme audit (2d) ·
-      routing (2d) · CW source integrity (1d) · PM craft source (1d)
+      Warnings fire when the LLM output violates a prompt rule that code cannot deterministically fix.
+      Each warning type has a consecutive-day threshold — reaching it flags a candidate for prompt patching.
     </div>
 
-    {% set tracked = [
-      "split_implication_warnings",
-      "theme_diversity_warnings",
-      "theme_audit_warnings",
-      "routing_warnings",
-      "cw_source_integrity_violations",
-      "pm_craft_source_violations"
-    ] %}
-
-    {% set thresholds = {
-      "split_implication_warnings": 3,
-      "theme_diversity_warnings": 3,
-      "theme_audit_warnings": 2,
-      "routing_warnings": 2,
-      "cw_source_integrity_violations": 1,
-      "pm_craft_source_violations": 1
-    } %}
-
-    {% if warnings %}
-    <table class="tbl">
+    <table class="ledger">
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Split impl.</th>
-          <th>Theme div.</th>
-          <th>Theme audit</th>
-          <th>Routing</th>
-          <th>CW integrity</th>
-          <th>PM craft src</th>
+          <th style="width:180px;">Warning</th>
+          <th>What it means</th>
+          <th style="width:120px;">Patch threshold</th>
         </tr>
       </thead>
       <tbody>
-        {% for row in warnings %}
-
-        {# Prompt change banner row #}
-        {% if row.date in change_dates %}
-        <tr class="prompt-change">
-          <td colspan="7">
-            <div class="prompt-change-banner">
-              Prompt updated on {{ row.date }} —
-              {% set changed_calls = [] %}
-              {% for call_name, versions in versions.items() %}
-                {% for v in versions %}
-                  {% if v.active_from == row.date %}
-                    {% if changed_calls.append(call_name | replace("_"," ")) %}{% endif %}
-                  {% endif %}
-                {% endfor %}
-              {% endfor %}
-              {{ changed_calls | join(', ') or 'see version history below' }}
-            </div>
-          </td>
-        </tr>
-        {% endif %}
-
         <tr>
-          <td style="color:var(--accent);font-weight:500;">{{ row.label }}</td>
-          {% for wtype in tracked %}
-          {% set wdata = row.warnings.get(wtype) %}
-          <td class="warn-cell">
-            {% if wdata %}
-              {% set threshold = thresholds.get(wtype, 99) %}
-              <span class="warn-pill {% if wdata.consecutive_days >= threshold %}streak{% else %}active{% endif %}">
-                {{ wdata.consecutive_days }}d
-              </span>
-            {% else %}
-              <span class="warn-pill ok">✓</span>
-            {% endif %}
-          </td>
-          {% endfor %}
+          <td>split_implication <span class="threshold-badge">3d</span></td>
+          <td>A closing sentence states two separate consequences instead of one. The synthesizer is combining implications it should keep separate.</td>
+          <td>3 consecutive days</td>
         </tr>
-        {% endfor %}
+        <tr>
+          <td>theme_diversity <span class="threshold-badge">3d</span></td>
+          <td>A theme had cross-market items in the WS pool but no paragraph was produced after all fill calls. Coverage gap in What's Shifting.</td>
+          <td>3 consecutive days</td>
+        </tr>
+        <tr>
+          <td>theme_audit <span class="threshold-badge">2d</span></td>
+          <td>The same theme anchors more than one WS paragraph after deduplication. Dedup should prevent this — indicates upstream routing issue.</td>
+          <td>2 consecutive days</td>
+        </tr>
+        <tr>
+          <td>routing <span class="threshold-badge">2d</span></td>
+          <td>A source was cited in the wrong section — a dedicated-section source appeared in What's Shifting, or vice versa.</td>
+          <td>2 consecutive days</td>
+        </tr>
+        <tr>
+          <td>market_signals_sr_empty <span class="threshold-badge">2d</span></td>
+          <td>No market_signals items remained for Startup Radar after What's Shifting consumed them. Startup Radar ran empty today.</td>
+          <td>2 consecutive days</td>
+        </tr>
       </tbody>
     </table>
+  </section>
+
+  <!-- Warning history feed -->
+  <section class="section">
+    <h2 class="section-heading">Warning history — last 30 days</h2>
+    <div class="section-sub">
+      Each day shows only what fired. Quiet days are a single line.
+      Amber = warning fired below threshold. Red = at or above threshold (patch signal).
+    </div>
+
+    {% set tracked_warnings = {
+      "split_implication_warnings": {"label": "Split implication", "threshold": 3},
+      "theme_diversity_warnings":   {"label": "Theme diversity",   "threshold": 3},
+      "theme_audit_warnings":       {"label": "Theme audit",       "threshold": 2},
+      "routing_warnings":           {"label": "Routing",           "threshold": 2},
+      "market_signals_sr_empty":    {"label": "SR pool empty",     "threshold": 2}
+    } %}
+
+    {% if warnings %}
+    <div class="feed">
+      {% for row in warnings %}
+
+        {# Prompt change banner #}
+        {% if row.date in change_dates %}
+        <div class="prompt-change-banner">
+          Prompt updated on {{ row.date }} —
+          {% set changed_calls = [] %}
+          {% for call_name, vlist in versions.items() %}
+            {% for v in vlist %}
+              {% if v.active_from == row.date %}
+                {% if changed_calls.append(call_name | replace("_"," ")) %}{% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          {{ changed_calls | join(', ') or 'see version history below' }}
+        </div>
+        {% endif %}
+
+        {% set fired = [] %}
+        {% for wtype, meta in tracked_warnings.items() %}
+          {% set wdata = row.warnings.get(wtype) %}
+          {% if wdata %}
+            {% if fired.append((wtype, meta, wdata)) %}{% endif %}
+          {% endif %}
+        {% endfor %}
+
+        <div class="feed-day">
+          <div class="feed-day-header">
+            <span class="feed-date">{{ row.label }}</span>
+            {% if not fired %}
+              <span class="feed-quiet">No warnings</span>
+            {% endif %}
+          </div>
+
+          {% for wtype, meta, wdata in fired %}
+          {% set at_threshold = wdata.consecutive_days >= meta.threshold %}
+          <div class="feed-warning">
+            <span class="feed-warning-name">{{ meta.label }}</span>
+            <span class="streak-pill {% if at_threshold %}patch{% else %}active{% endif %}">
+              {{ wdata.consecutive_days }}d streak
+              · {{ wdata.count }} occurrence{{ 's' if wdata.count != 1 else '' }}
+              {% if at_threshold %} · patch signal{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+
+      {% endfor %}
+    </div>
     {% else %}
     <p class="empty">No warning history yet — warning_counts table is empty.</p>
     {% endif %}
@@ -192,16 +223,20 @@
     </div>
 
     {% set ordered_calls = [
-      "summarizer.call_a.system", "summarizer.call_b.system", "summarizer.call_c.system",
-      "synthesizer.call_1a", "synthesizer.call_1b",
-      "synthesizer.call_2_pm_craft", "synthesizer.call_3_cw", "synthesizer.call_4a", "synthesizer.call_4b_sr"
+      "summarizer.call_a.system",
+      "summarizer.call_b.system",
+      "summarizer.call_c.system",
+      "synthesizer.shared.system",
+      "synthesizer.call_1a.system",
+      "synthesizer.call_2_pm_craft",
+      "synthesizer.call_3_cw",
+      "synthesizer.call_4a.system",
+      "synthesizer.call_4b_sr"
     ] %}
 
     {% set ns = namespace(has_any=false) %}
     {% for call_name in ordered_calls %}
-      {% if versions.get(call_name) %}
-        {% set ns.has_any = true %}
-      {% endif %}
+      {% if versions.get(call_name) %}{% set ns.has_any = true %}{% endif %}
     {% endfor %}
 
     {% if ns.has_any %}
@@ -209,7 +244,7 @@
       {% set vlist = versions.get(call_name) %}
       {% if vlist %}
       <div class="version-group">
-        <div class="version-group-label">{{ call_name | replace("."," · ") }}</div>
+        <div class="version-group-label">{{ call_name | replace("."," · ") | replace("_"," ") }}</div>
         {% for v in vlist %}
         <div class="version-row">
           <span class="v-date">{{ v.active_from }}</span>
@@ -223,10 +258,7 @@
       {% endif %}
       {% endfor %}
     {% else %}
-      <p class="empty">
-        No prompt versions registered yet.
-        Call <code>register_prompt(call_name, prompt_text)</code> in <code>create_app()</code> to begin tracking.
-      </p>
+      <p class="empty">No prompt versions registered yet.</p>
     {% endif %}
   </section>
 
