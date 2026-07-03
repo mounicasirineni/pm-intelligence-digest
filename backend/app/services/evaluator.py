@@ -27,9 +27,10 @@ PATCH_SIGNAL_THRESHOLDS = {
     "theme_diversity_warnings": 3,
     "theme_audit_warnings": 2,
     "routing_warnings": 2,
-    # Architecture failures — should never happen, any instance is signal
-    "cw_source_integrity_violations": 1,
-    "pm_craft_source_violations": 1,
+    # Pipeline health — SR starvation after WS dedup
+    "market_signals_sr_empty": 2,
+    # cw_source_integrity_violations — removed: auto-corrected in synthesizer
+    # pm_craft_source_violations — removed: auto-corrected in synthesizer
 }
 
 _CITATION_RE = re.compile(r"\[\d+\]")

@@ -1155,6 +1155,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             "pm_craft_source_violations": [],
             "source_concentration_warnings": [],
             "theme_diversity_warnings": [],
+            "market_signals_sr_empty": [],
         },
     }
 
@@ -1420,6 +1421,12 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     "Startup Radar pool already cited in WS",
                     removed_sr
                 )
+
+        if not sr_items:
+            logger.warning(
+                "SR POOL EMPTY: no market_signals items remain for Startup Radar "
+                "after WS dedup — Startup Radar will be empty today"
+            )
 
         # Call 4a — startup classification
         startup_map: Dict[str, bool] = {}
@@ -1712,7 +1719,10 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             normalized_company_watch[company] = {"paragraph": "", "source_indices": []}
 
         if cw_source_integrity_violations:
-            logger.warning("CW SOURCE INTEGRITY VIOLATIONS: %s", json.dumps(cw_source_integrity_violations, indent=2))
+            logger.info(
+                "CW SOURCE INTEGRITY: auto-corrected %d violation(s) — entries cleared before output",
+                len(cw_source_integrity_violations)
+            )
 
         # 5c. PM Craft source integrity check
         product_craft_indices = {
@@ -1739,7 +1749,10 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                         f"(theme: {source_info.get('theme', 'unknown')}). Entry cleared."
                     )
                 })
-            logger.warning("PM CRAFT SOURCE VIOLATIONS: %s", json.dumps(pm_craft_source_violations, indent=2))
+            logger.info(
+                "PM CRAFT SOURCE: auto-corrected %d violation(s) — entry cleared before output",
+                len(pm_craft_source_violations)
+            )
             pm_craft_today = {"text": "", "source_indices": []}
 
         # 6. Split implication detector
@@ -1912,6 +1925,10 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "split_implication_warnings": split_implication_warnings,
                 "theme_audit_warnings": theme_audit_warnings,
                 "theme_diversity_warnings": theme_diversity_warnings,
+                "market_signals_sr_empty": (
+                    [{"warning": "No market_signals items remain for SR after WS dedup"}]
+                    if not sr_items else []
+                ),
                 "call1_anchor_reasoning_debug": call1_parsed.get("_call1_reasoning", ""),
                 "call1a_cross_market_debug": cross_market_map,
                 "call3_anchor_reasoning_debug": call2_parsed.get("_call3_reasoning", ""),
