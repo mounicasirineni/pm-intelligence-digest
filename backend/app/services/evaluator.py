@@ -394,10 +394,20 @@ def pipeline_funnel(
             if str(i.get("confidence") or "medium").lower() in {"high", "medium"}
             and str(i.get("pm_relevance_score") or "medium").lower() in {"high", "medium"}
         )
+        t_utilized = sum(
+            1 for i in theme_items
+            if str(i.get("confidence") or "medium").lower() in {"high", "medium"}
+            and str(i.get("pm_relevance_score") or "medium").lower() in {"high", "medium"}
+            and (
+                str(i.get("item_id") or "") in output_cited_item_ids
+                or str(i.get("title") or "") in output_cited_titles
+            )
+        )
         theme_funnel[theme] = {
             "fetched": len(theme_items),
             "confident": t_confident,
             "relevant": t_relevant,
+            "utilized": t_utilized,
         }
 
     return {

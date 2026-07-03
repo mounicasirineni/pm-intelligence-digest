@@ -30,16 +30,6 @@
     .good{color:var(--green);} .amber{color:var(--amber);} .bad{color:var(--red);}
     .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
 
-    /* Metric definitions — static */
-    .def-tbl{width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:1.5rem;}
-    .def-tbl th{text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;
-      color:var(--muted);padding:0 1rem 0.5rem 0;font-weight:600;border-bottom:1px solid var(--border);}
-    .def-tbl td{padding:0.5rem 1rem 0.5rem 0;border-top:1px solid rgba(223,222,215,0.5);
-      vertical-align:top;line-height:1.5;}
-    .def-tbl td:first-child{white-space:nowrap;font-weight:600;color:var(--accent);width:160px;}
-    .def-tbl td:nth-child(2){width:220px;}
-    .def-tbl tbody tr:first-child td{border-top:none;}
-
     /* Funnel steps */
     .funnel-row{display:flex;gap:0;margin-bottom:1.5rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
     .funnel-step{flex:1;padding:1rem;text-align:center;border-right:1px solid var(--border);background:#fff;}
@@ -52,7 +42,7 @@
     .tbl{width:100%;border-collapse:collapse;font-size:0.85rem;}
     .tbl thead tr{border-bottom:1px solid var(--border);}
     .tbl th{text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;
-      color:var(--muted);padding:0 0.75rem 0.5rem 0;white-space:nowrap;font-weight:600;}
+      color:var(--muted);padding:0 0.75rem 0.5rem 0;font-weight:600;}
     .tbl th:first-child{padding-left:0;}
     .tbl td{padding:0.45rem 0.75rem 0.45rem 0;border-top:1px solid rgba(223,222,215,0.5);
       vertical-align:middle;white-space:nowrap;}
@@ -94,7 +84,7 @@
     <div class="section-sub">Overall source funnel from configured sources to synthesis citations</div>
 
     <!-- Metric definitions — static -->
-    <table class="def-tbl">
+    <table class="tbl">
       <thead>
         <tr>
           <th>Metric</th>
@@ -200,17 +190,22 @@
             <th>Fetched Articles</th>
             <th>Confident Articles</th>
             <th>Relevant Articles</th>
+            <th>Utilized Articles</th>
           </tr>
         </thead>
         <tbody>
           {% for theme, counts in today.theme_funnel.items() | sort %}
           {% set rel_pct = (counts.relevant / counts.fetched * 100) if counts.fetched else 0 %}
+          {% set util_pct = (counts.utilized / counts.relevant * 100) if counts.get('utilized') and counts.relevant else 0 %}
           <tr>
             <td>{{ theme | replace("_", " ") | title }}</td>
             <td>{{ counts.fetched }}</td>
             <td>{{ counts.confident }}</td>
             <td class="{% if rel_pct >= 60 %}good{% elif rel_pct >= 40 %}amber{% else %}bad{% endif %}">
               {{ counts.relevant }}
+            </td>
+            <td class="{% if counts.get('utilized') is not none %}{% if util_pct >= 60 %}good{% elif util_pct >= 30 %}amber{% else %}bad{% endif %}{% endif %}">
+              {{ counts.get('utilized', '—') }}
             </td>
           </tr>
           {% endfor %}
@@ -278,9 +273,9 @@
         <tr id="themes-{{ row.date }}" style="display:none;">
           <td colspan="7" style="padding:0.25rem 0 0.75rem;">
             <div class="warning-box" style="font-size:0.78rem;">
-              <strong>Fetched Articles / Confident Articles / Relevant Articles</strong><br><br>
+              <strong>Fetched / Confident / Relevant / Utilized</strong><br><br>
               {% for theme, counts in row.theme_funnel.items() | sort %}
-              {{ theme | replace("_", " ") | title }}: {{ counts.fetched }} / {{ counts.confident }} / {{ counts.relevant }}<br>
+              {{ theme | replace("_", " ") | title }}: {{ counts.fetched }} / {{ counts.confident }} / {{ counts.relevant }} / {{ counts.get('utilized', '—') }}<br>
               {% endfor %}
             </div>
           </td>
