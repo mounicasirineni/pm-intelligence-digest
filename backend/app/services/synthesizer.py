@@ -26,7 +26,6 @@ WHATS_SHIFTING_THEMES = {
 
 DEDICATED_SECTION_THEMES = {
     "company_strategy",
-    "market_signals",
     "pm_craft",
 }
 
@@ -75,7 +74,7 @@ _CALL_1A_SYSTEM = (
 _CALL_2_SYSTEM = (
     "You are writing a PM Craft insight for a Senior PM digest. "
     "Your job is to surface the single most actionable, non-obvious practitioner insight "
-    "from product_craft and design_ux sources. Prefer specific reframes over general advice."
+    "from pm_craft sources. Prefer specific reframes over general advice."
 )
 
 _CALL_3_SYSTEM = SYSTEM_PROMPT  # Company Watch uses the shared synthesizer system prompt
@@ -800,7 +799,7 @@ Then produce a JSON object:
     }}
   ],
   "pm_craft_today": {{
-    "text": "Single most actionable PM craft insight. Draw ONLY from items tagged pm_craft_today ONLY (product_craft) OR pm_craft_today eligible (design_ux). Empty string if no such item exists. INSIGHT QUALITY: non-obvious pattern, tradeoff, or reframe that changes how a PM approaches a real decision. SPLIT CHECK: closing sentence must state exactly one actionable consequence traceable to a cited bullet.",
+    "text": "Single most actionable PM craft insight. Draw ONLY from items tagged pm_craft_today ONLY (pm_craft). Empty string if no such item exists. INSIGHT QUALITY: non-obvious pattern, tradeoff, or reframe that changes how a PM approaches a real decision. SPLIT CHECK: closing sentence must state exactly one actionable consequence traceable to a cited bullet.",
     "source_indices": []
   }}
 }}
@@ -1256,22 +1255,16 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         elif theme == "pm_craft":
             sr_pm_items.append(item)
         elif theme == "market_signals":
-            if cross_market_map.get(item["item_id"], True):
+            if cross_market_map.get(item["item_id"], False):
                 ws_items.append(item)
             sr_items.append(item)  # all market_signals eligible for SR regardless
         elif theme in WHATS_SHIFTING_THEMES:
-            if cross_market_map.get(item["item_id"], True):
+            if cross_market_map.get(item["item_id"], False):
                 ws_items.append(item)
 
-    design_ux_ws = sum(1 for i in ws_items if i["theme"] == "design_ux")
-    design_ux_pm = sum(1 for i in sr_pm_items if i["theme"] == "design_ux")
     logger.info(
-        "Call 1a design_ux routing: %d cross-market → WS, %d company-specific → PM Craft",
-        design_ux_ws, design_ux_pm,
-    )
-    logger.info(
-        "Call 1a: %d items in WS pool after cross-market filter",
-        len(ws_items),
+        "Call 1a: %d items in WS pool, %d in SR pool after cross-market filter",
+        len(ws_items), len(sr_items),
     )
 
     dedicated_items = cw_items + sr_items + sr_pm_items
@@ -1443,7 +1436,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             ]
             dropped = before_count - len(sr_items)
             logger.info(
-                "Call 4a: %d established companies removed from startup_disruption pool",
+                "Call 4a: %d established companies removed from market_signals SR pool",
                 dropped,
             )
 
@@ -1631,13 +1624,14 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 if idx_val in dedicated_eligible_indices:
                     source_info = source_index_lookup.get(str(idx_val), {})
                     source_theme = source_info.get("theme", "")
-                    routing_warnings.append({
-                        "section": f"whats_shifting[{i}]",
-                        "source_index": idx_val,
-                        "source_title": source_info.get("title", "unknown"),
-                        "source_theme": source_theme,
-                        "warning": "CANARY: DEDICATED_SECTION source cited in whats_shifting"
-                    })
+                    if source_theme not in WHATS_SHIFTING_THEMES:
+                        routing_warnings.append({
+                            "section": f"whats_shifting[{i}]",
+                            "source_index": idx_val,
+                            "source_title": source_info.get("title", "unknown"),
+                            "source_theme": source_theme,
+                            "warning": "CANARY: DEDICATED_SECTION source cited in whats_shifting"
+                        })
 
         for company, value in normalized_company_watch.items():
             for idx_val in value.get("source_indices", []):
@@ -1727,7 +1721,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         # 5c. PM Craft source integrity check
         product_craft_indices = {
             entry["index"] for entry in dedicated_indexed
-            if entry["theme"] in {"product_craft", "design_ux"}
+            if entry["theme"] == "pm_craft"
         }
 
         pm_craft_source_violations = []
