@@ -662,8 +662,7 @@ async def llm_judge(
         if len(declared_theme_map) == len(paragraph_blocks):
             declared_themes = list(declared_theme_map.values())
             valid_themes = {
-                "ai_technology", "market_behavior", "consumer_behavior",
-                "regulation_policy", "design_ux"
+                "technology_trends", "market_signals", "user_behavior", "regulation_policy",
             }
             declared_themes_clean = [t for t in declared_themes if t in valid_themes]
             distinct_valid = len(set(declared_themes_clean))
@@ -714,23 +713,22 @@ async def llm_judge(
             ),
             messages=[{"role": "user", "content": (
                 "Evaluate the TOPICAL BREADTH of this What's Shifting section.\n\n"
-                "The five eligible themes for What's Shifting are:\n"
-                "1. AI & technology — central claim depends on an AI capability, product, adoption pattern, or AI safety/policy\n"
-                "2. Market behavior — central claim is about market dynamics, competitive shifts, pricing, supply/demand, or financial markets\n"
-                "3. Consumer behavior — central claim is about how end users are changing what they want, do, or expect\n"
-                "4. Regulation & policy — central claim is about regulatory moves, compliance requirements, or government policy\n"
-                "5. Design & UX — central claim is about product design patterns, user experience shifts, or interface paradigms\n\n"
+                "The four eligible themes for What's Shifting are:\n"
+                "1. Technology trends — central claim depends on a technology capability, AI model, platform shift, or ecosystem change affecting multiple builders\n"
+                "2. Market signals — central claim is about market dynamics, competitive shifts, startup activity, funding patterns, or category-wide consolidation\n"
+                "3. User behavior — central claim is about how consumers, enterprise users, or prosumers are changing what they want, do, or expect across multiple products\n"
+                "4. Regulation & policy — central claim is about regulatory moves, compliance requirements, or government policy affecting an industry\n\n"
                 "For each paragraph, identify its central theme based solely on the opening sentence's primary claim. "
                 "A theme appearing only as a supporting example does not count — only the central claim determines the theme.\n\n"
                 + available_themes_block +
                 "Score based on theme diversity across paragraphs:\n"
-                "1 = One theme dominates all or nearly all paragraphs (e.g. 4-5 regulation paragraphs)\n"
+                "1 = One theme dominates all or nearly all paragraphs\n"
                 "2 = Only two distinct themes represented across all paragraphs\n"
                 "3 = Three distinct themes represented, but one theme appears in 2+ paragraphs\n"
                 "4 = Four distinct themes represented with no theme appearing more than once\n"
-                "5 = Five distinct themes each represented exactly once — ideal spread\n\n"
-                "A five-paragraph brief scoring 5 must have each paragraph covering a different theme. "
-                "A four-paragraph brief scoring 5 must cover at least four distinct themes.\n\n"
+                "5 = All four themes represented with strong cross-theme signal — ideal spread\n\n"
+                "A four-paragraph brief scoring 5 must cover all four distinct themes.\n"
+                "A three-paragraph brief scoring 4 must cover three distinct themes with no repeats.\n\n"
                 f"What's Shifting section:\n{combined}\n\n"
                 'Return only valid JSON: '
                 '{"topical_breadth": N, "topical_breadth_reason": "one sentence listing the central theme of each paragraph, how many distinct themes are represented, and whether any theme with available source material was omitted"}'
@@ -1035,7 +1033,7 @@ def run(
     pm_relevance_result = pm_relevance(items_by_theme)
 
     WHATS_SHIFTING_THEMES = {
-        "ai_technology", "market_behavior", "consumer_behavior", "regulation_policy", "design_ux"
+        "technology_trends", "market_signals", "user_behavior", "regulation_policy",
     }
     ws_available_themes: Dict[str, int] = {}
     for theme, items in (items_by_theme or {}).items():
