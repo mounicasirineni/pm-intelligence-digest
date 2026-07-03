@@ -607,6 +607,11 @@ def _admin_token() -> str:
     return request.args.get("token", "")
 
 
+def _refresh_token() -> str:
+    settings = load_settings()
+    return getattr(settings, "refresh_token", None) or os.environ.get("REFRESH_TOKEN", "")
+
+
 @app.route("/")
 def index():
     synthesis, items_by_theme, generated_at, fetch_metadata = _get_or_run_pipeline(force_refresh=False)
@@ -632,6 +637,7 @@ def index():
         citation_index_map=citation_index_map,
         citation_sort_map=citation_sort_map,
         utilized_keys=utilized_keys,
+        token=_refresh_token(),
     )
 
 
@@ -843,6 +849,7 @@ def digest_by_date(date_str: str):
         citation_index_map=citation_index_map,
         citation_sort_map=citation_sort_map,
         utilized_keys=utilized_keys,
+        token=_refresh_token(),
     )
 
 
