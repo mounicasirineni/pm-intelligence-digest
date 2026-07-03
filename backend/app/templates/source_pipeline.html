@@ -90,6 +90,56 @@
     <h2 class="section-heading">Today — {{ today.label }}</h2>
     <div class="section-sub">Overall source funnel from configured sources to synthesis citations</div>
 
+    <details style="margin-bottom:1.25rem;">
+      <summary style="font-size:0.78rem;color:var(--accent);cursor:pointer;letter-spacing:0.08em;text-transform:uppercase;">Metric definitions</summary>
+      <table class="tbl" style="margin-top:0.75rem;">
+        <thead>
+          <tr>
+            <th style="width:130px;">Metric</th>
+            <th>What it measures</th>
+            <th>Color logic</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">Configured</td>
+            <td>Total sources registered in sources.json</td>
+            <td style="color:var(--muted)">No color — fixed baseline</td>
+          </tr>
+          <tr>
+            <td class="mono">Published Today</td>
+            <td>Sources that had at least one new item in today's fetch window</td>
+            <td style="color:var(--muted)">No color — reflects content cadence, not a health signal</td>
+          </tr>
+          <tr>
+            <td class="mono">Fetched</td>
+            <td>Total articles retrieved across all active sources</td>
+            <td style="color:var(--muted)">No color — raw volume</td>
+          </tr>
+          <tr>
+            <td class="mono">Confident</td>
+            <td>Articles passing the confidence classifier (high or medium confidence extraction)</td>
+            <td>🟢 ≥80% · 🟡 ≥60% · 🔴 &lt;60%</td>
+          </tr>
+          <tr>
+            <td class="mono">Relevant</td>
+            <td>Confident articles scored high or medium on PM relevance</td>
+            <td>🟢 ≥70% · 🟡 ≥50% · 🔴 &lt;50%</td>
+          </tr>
+          <tr>
+            <td class="mono">Utilized</td>
+            <td>Relevant articles actually cited in today's synthesis output</td>
+            <td>🟢 ≥80% · 🟡 ≥60% · 🔴 &lt;60%</td>
+          </tr>
+          <tr>
+            <td class="mono">Silent Sources</td>
+            <td>Configured sources that published nothing today — expected on weekends and holidays</td>
+            <td style="color:var(--muted)">No color — informational only</td>
+          </tr>
+        </tbody>
+      </table>
+    </details>
+
     <div class="funnel-row">
       <div class="funnel-step">
         <div class="fs-label">Configured</div>
