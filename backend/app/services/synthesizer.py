@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import traceback
 import uuid
 from datetime import date
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -71,11 +70,8 @@ _CALL_1A_SYSTEM = (
     "company's regulatory trouble is company-specific even if it has broader implications."
 )
 
-_CALL_2_SYSTEM = (
-    "You are writing a PM Craft insight for a Senior PM digest. "
-    "Your job is to surface the single most actionable, non-obvious practitioner insight "
-    "from pm_craft sources. Prefer specific reframes over general advice."
-)
+# PM Craft uses SYSTEM_PROMPT via _CALL_4B_SYSTEM — no separate system prompt needed
+# since it shares a call with Startup Radar.
 
 _CALL_3_SYSTEM = SYSTEM_PROMPT  # Company Watch uses the shared synthesizer system prompt
 
@@ -772,7 +768,7 @@ def _call_sr_pm_craft(
     context_block, sr_pm_indexed, _ = _build_context_block(sr_pm_items, start_idx=start_idx)
 
     user_prompt = f"""
-You are reasoning across startup_disruption and product_craft items for a Senior PM digest.
+You are reasoning across market_signals and pm_craft items for a Senior PM digest.
 Today's date is {today}.
 
 Items are tagged either:

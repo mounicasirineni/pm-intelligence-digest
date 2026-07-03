@@ -835,7 +835,6 @@ def _register_all_prompts() -> None:
         from .services.synthesizer import (
             SYSTEM_PROMPT,
             _CALL_1A_SYSTEM,
-            _CALL_2_SYSTEM,
             _CALL_3_SYSTEM,
             _CALL_4A_SYSTEM,
             _CALL_4B_SYSTEM,
@@ -846,7 +845,6 @@ def _register_all_prompts() -> None:
         register_prompt("summarizer.call_c.system", _CALL_C_SYSTEM)
         register_prompt("synthesizer.shared.system", SYSTEM_PROMPT)
         register_prompt("synthesizer.call_1a.system", _CALL_1A_SYSTEM)
-        register_prompt("synthesizer.call_2_pm_craft", _CALL_2_SYSTEM)
         register_prompt("synthesizer.call_3_cw", _CALL_3_SYSTEM)
         register_prompt("synthesizer.call_4a.system", _CALL_4A_SYSTEM)
         register_prompt("synthesizer.call_4b_sr", _CALL_4B_SYSTEM)
