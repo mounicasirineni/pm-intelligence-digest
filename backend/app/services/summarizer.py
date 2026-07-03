@@ -285,8 +285,10 @@ def _call_confidence(
 _CALL_C_SYSTEM = (
     "You are a PM relevance classifier for a product management intelligence digest. "
     "Assess whether a set of insight bullets would be useful to a Senior PM "
-    "preparing for interviews at top tech companies including Google, Meta, Apple, "
-    "Amazon, Netflix, NVIDIA, Microsoft, and OpenAI."
+    "doing their job — making product strategy decisions, tracking competitors, "
+    "understanding how user behavior is evolving, monitoring regulatory constraints, "
+    "and staying current on technology trends. "
+    "The digest serves working PMs, not just interview candidates."
 )
 
 
@@ -309,11 +311,12 @@ Insight bullets:
 Classify PM_RELEVANCE_SCORE:
 
 high   = bullets directly name product strategy decisions, competitive moves, architectural
-         tradeoffs, or market shifts a PM interviewer would ask about. A PM could walk into
-         an interview and form a prepared opinion from these bullets.
-medium = bullets provide useful industry context but are not likely interview topics.
-         Tangentially relevant — good background, not foreground signal.
-low    = bullets are not relevant to PM interview preparation.
+         tradeoffs, market shifts, regulatory constraints, technology unlocks, or user
+         behavior changes a working PM needs to track. A PM could read these and immediately
+         update their product thinking, competitive awareness, or roadmap priorities.
+medium = bullets provide useful industry context but are not immediately actionable.
+         Good background signal — relevant to a PM's domain but not foreground decision input.
+low    = bullets are not relevant to product management work.
 
 DOMAIN FILTER RULE: Score low if bullets are primarily about:
   - Foreign policy, military operations, or armed conflict
@@ -327,6 +330,10 @@ ROUTINE UPDATE RULE: Score low if bullets describe routine operational activity 
 strategic mechanism revealed — weekly content additions, cadence posts, minor feature
 releases with no architectural significance, event listings, award announcements.
 The company name alone does not determine the score — the strategic signal does.
+
+GLOBAL SIGNAL RULE: Market shifts, regulatory changes, user behavior trends, and startup
+activity in non-US markets (EU, Asia, Latin America, Africa) are valid high or medium signals
+if they reveal patterns relevant to product strategy — do not score low purely due to geography.
 
 Return strict JSON: {{"pm_relevance_score": "high|medium|low"}}
 """.strip()
