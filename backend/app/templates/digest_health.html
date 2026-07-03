@@ -91,7 +91,7 @@
   <!-- Status cards linking to sub-pages -->
   <div class="status-grid">
 
-    <a class="status-card" href="/digest-health/pipeline?token={{ token }}">
+    <a class="status-card" href="/digest-health/pipeline">
       <div class="sc-label">Source pipeline</div>
       {% if today_pipeline %}
         <div class="sc-value {% if today_pipeline.sources_active_pct >= 80 %}good{% elif today_pipeline.sources_active_pct >= 60 %}amber{% else %}bad{% endif %}">
@@ -106,7 +106,7 @@
       <div class="sc-link">View pipeline health →</div>
     </a>
 
-    <a class="status-card" href="/digest-health/deviations?token={{ token }}">
+    <a class="status-card" href="/digest-health/deviations">
       <div class="sc-label">Prompt deviations</div>
       <div class="sc-value {% if signals|length == 0 %}good{% elif signals|length <= 2 %}amber{% else %}bad{% endif %}">
         {{ signals|length }}
@@ -121,7 +121,7 @@
       <div class="sc-link">View deviation history →</div>
     </a>
 
-    <a class="status-card" href="/digest-health/quality?token={{ token }}">
+    <a class="status-card" href="/digest-health/quality">
       <div class="sc-label">Output quality</div>
       {% if trend and trend.scores %}
         <div class="sc-value {% if trend.avg_overall >= 70 %}good{% elif trend.avg_overall >= 60 %}amber{% else %}bad{% endif %}">
@@ -175,14 +175,12 @@
           </div>
           <form method="POST" action="/digest-health/patches/accept"
             onsubmit="document.getElementById('na-{{ patch.id }}').value=document.getElementById('notes-{{ patch.id }}').value">
-            <input type="hidden" name="token" value="{{ token }}">
             <input type="hidden" name="patch_id" value="{{ patch.id }}">
             <input type="hidden" name="notes" id="na-{{ patch.id }}">
             <button type="submit" class="btn btn-accept">✓ Accept</button>
           </form>
           <form method="POST" action="/digest-health/patches/reject"
             onsubmit="document.getElementById('nr-{{ patch.id }}').value=document.getElementById('notes-{{ patch.id }}').value">
-            <input type="hidden" name="token" value="{{ token }}">
             <input type="hidden" name="patch_id" value="{{ patch.id }}">
             <input type="hidden" name="notes" id="nr-{{ patch.id }}">
             <button type="submit" class="btn btn-reject">✗ Reject</button>

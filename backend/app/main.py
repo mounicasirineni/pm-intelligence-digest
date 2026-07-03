@@ -596,22 +596,6 @@ def _get_quality_scores(days: int = 30) -> List[Dict[str, Any]]:
     return result
 
 
-def _admin_auth() -> bool:
-    """Return True if request is authenticated."""
-    settings = load_settings()
-    token = getattr(settings, "refresh_token", None) or os.environ.get("REFRESH_TOKEN", "")
-    return not token or request.args.get("token") == token
-
-
-def _admin_token() -> str:
-    return request.args.get("token", "")
-
-
-def _refresh_token() -> str:
-    settings = load_settings()
-    return getattr(settings, "refresh_token", None) or os.environ.get("REFRESH_TOKEN", "")
-
-
 @app.route("/")
 def index():
     synthesis, items_by_theme, generated_at, fetch_metadata = _get_or_run_pipeline(force_refresh=False)
@@ -637,7 +621,6 @@ def index():
         citation_index_map=citation_index_map,
         citation_sort_map=citation_sort_map,
         utilized_keys=utilized_keys,
-        token=_refresh_token(),
     )
 
 
@@ -656,41 +639,26 @@ def refresh():
 
 @app.route("/digest-health/patches/accept", methods=["POST"])
 def digest_health_patches_accept():
-    settings = load_settings()
-    refresh_token = getattr(settings, "refresh_token", None) or os.environ.get("REFRESH_TOKEN", "")
-    if refresh_token and request.form.get("token") != refresh_token:
-        abort(403)
-
     patch_id = request.form.get("patch_id")
     notes = request.form.get("notes", "")
     if patch_id:
         accept_patch(int(patch_id), reviewer_notes=notes)
 
-    token_param = f"?token={request.form.get('token')}" if request.form.get("token") else ""
-    return redirect(url_for("digest_health") + token_param)
+    return redirect(url_for("digest_health"))
 
 
 @app.route("/digest-health/patches/reject", methods=["POST"])
 def digest_health_patches_reject():
-    settings = load_settings()
-    refresh_token = getattr(settings, "refresh_token", None) or os.environ.get("REFRESH_TOKEN", "")
-    if refresh_token and request.form.get("token") != refresh_token:
-        abort(403)
-
     patch_id = request.form.get("patch_id")
     notes = request.form.get("notes", "")
     if patch_id:
         reject_patch(int(patch_id), reviewer_notes=notes)
 
-    token_param = f"?token={request.form.get('token')}" if request.form.get("token") else ""
-    return redirect(url_for("digest_health") + token_param)
+    return redirect(url_for("digest_health"))
 
 
 @app.route("/digest-health")
 def digest_health():
-    if not _admin_auth():
-        abort(403)
-
     signals = get_consecutive_warning_types()
     pending = get_pending_patches()
     trend = get_score_trend(lookback_days=7)
@@ -703,22 +671,17 @@ def digest_health():
         pending=pending,
         trend=trend,
         today_pipeline=today_pipeline,
-        token=_admin_token(),
     )
 
 
 @app.route("/digest-health/pipeline")
 def digest_health_pipeline():
-    if not _admin_auth():
-        abort(403)
     rows = _get_pipeline_health(days=14)
-    return render_template("source_pipeline.html", rows=rows, token=_admin_token())
+    return render_template("source_pipeline.html", rows=rows)
 
 
 @app.route("/digest-health/deviations")
 def digest_health_deviations():
-    if not _admin_auth():
-        abort(403)
     warnings = _get_warning_history(days=30)
     versions = _get_prompt_versions_all()
     change_dates = {
@@ -735,14 +698,11 @@ def digest_health_deviations():
         versions=versions,
         change_dates=change_dates,
         warning_types=warning_types,
-        token=_admin_token(),
     )
 
 
 @app.route("/digest-health/quality")
 def digest_health_quality():
-    if not _admin_auth():
-        abort(403)
     scores = _get_quality_scores(days=30)
     versions = _get_prompt_versions_all()
     change_dates = {
@@ -755,7 +715,6 @@ def digest_health_quality():
         scores=scores,
         versions=versions,
         change_dates=change_dates,
-        token=_admin_token(),
     )
 
 
@@ -849,7 +808,6 @@ def digest_by_date(date_str: str):
         citation_index_map=citation_index_map,
         citation_sort_map=citation_sort_map,
         utilized_keys=utilized_keys,
-        token=_refresh_token(),
     )
 
 
