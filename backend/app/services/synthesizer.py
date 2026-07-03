@@ -18,17 +18,16 @@ logger = logging.getLogger(__name__)
 # Theme routing constants
 # ---------------------------------------------------------------------------
 WHATS_SHIFTING_THEMES = {
-    "ai_technology",
-    "market_behavior",
-    "consumer_behavior",
+    "technology_trends",
+    "market_signals",
+    "user_behavior",
     "regulation_policy",
-    "design_ux",
 }
 
 DEDICATED_SECTION_THEMES = {
     "company_strategy",
-    "startup_disruption",
-    "product_craft",
+    "market_signals",
+    "pm_craft",
 }
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
@@ -37,11 +36,10 @@ HAIKU_MODEL = "claude-haiku-4-5-20251001"
 # System prompt — shared across all calls
 # ---------------------------------------------------------------------------
 SYSTEM_PROMPT = (
-    "You are a senior intelligence analyst briefing a Product Manager who is "
-    "actively interviewing at top tech companies including Google, Microsoft, "
-    "Apple, Meta, Amazon, Netflix, NVIDIA, and OpenAI. Your job is to "
-    "reason across multiple sources and surface what is actually shifting in "
-    "the industry — not what happened, but what it means and what patterns are emerging. "
+    "You are a senior intelligence analyst briefing a Senior Product Manager. "
+    "Your job is to reason across multiple sources and surface what is actually "
+    "shifting in the industry — not what happened, but what it means and what "
+    "patterns are emerging. "
     "For every insight, ask: what would a reader NOT get from reading any single source? "
     "A good insight names the underlying force driving multiple seemingly unrelated events, "
     "challenges a conventional assumption, or identifies a second-order consequence that "
@@ -56,8 +54,7 @@ SYSTEM_PROMPT = (
     "violation regardless of how actionable it sounds. Prefer a hedged specific consequence over a "
     "confident general one. "
     "The broad observation is usually derivable from the headline. "
-    "The specific mechanical consequence requires reading the full content. Keep the latter. "
-    "A sharp PM should be able to walk into any interview and have a prepared opinion on the insights you surface."
+    "The specific mechanical consequence requires reading the full content. Keep the latter."
 )
 
 # ---------------------------------------------------------------------------
@@ -147,14 +144,10 @@ def _build_context_block(
         theme = item["theme"]
         if theme == "company_strategy":
             allowed_section = "company_watch ONLY"
-        elif theme == "startup_disruption":
-            allowed_section = "startup_radar ONLY"
-        elif theme == "product_craft":
+        elif theme == "pm_craft":
             allowed_section = "pm_craft_today ONLY"
-        elif theme == "design_ux":
-            allowed_section = "pm_craft_today eligible (design_ux)"
         else:
-            allowed_section = "any dedicated section"
+            allowed_section = "whats_shifting eligible"
 
         company_id = item.get("company_id")
 
@@ -474,7 +467,7 @@ Then produce a JSON object with this exact structure:
       "headline": "One declarative sentence, maximum 15 words, naming the underlying structural force or pattern. Not an event description. Renders as the visible collapsed card headline — scannable and self-contained.",
       "paragraph": "Open by restating the headline claim with one additional clause of context. Develop across 3-4 sentences. If drawing from a single source, build depth by incorporating its strongest and most complicating bullets. If drawing from multiple sources, only combine them if you can name a specific causal mechanism that connects them — one that neither source states alone. A shared category label ('both are about AI costs') is not a mechanism. A shared causal chain ('both reveal that X causes Y through mechanism Z') is. When in doubt, anchor to one source's strongest bullet and build depth rather than breadth. Close with one PM implication directly traceable to a cited source. Every sentence ends with inline [n] citations. HEDGE MATCH: match source hedge levels throughout — 'suggests' not 'demonstrates'. NO TIMELINE: omit any timeline not verbatim in a source. NO UNIVERSALITY: scope claims to actual examples. Draw from at least 2 distinct insight bullets — use the best available rather than omitting the paragraph. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. If any exist, either incorporate them or scope the closing implication to reflect the limitation. A paragraph that ignores complicating evidence from its own cited sources will score lower than one that acknowledges the complication and commits to a narrower claim. INSIGHT SELECTION RULE: The closing implication must trace to the single highest-ranked bullet identified in your reasoning — the most non-obvious, specific, and source-grounded insight available. Do not close with a broad pattern observation when a more specific mechanical consequence is available in the source bullets. The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'means' or 'demonstrates'. Do not convert a source observation into a prescription. If no source bullet explicitly states a PM action, use 'this suggests' or 'this may signal' framing. Never write 'this means PMs must/should' unless a cited source explicitly states that directive. A well-hedged implication that commits to one specific consequence scores higher than a confident assertion that goes beyond the source.",
       "source_indices": [1, 2],
-      "theme": "The single theme this paragraph addresses. Must be exactly one of: ai_technology | market_behavior | consumer_behavior | regulation_policy | design_ux. Pick the theme whose core claim this paragraph develops — not a secondary mention."
+      "theme": "The single theme this paragraph addresses. Must be exactly one of: technology_trends | market_signals | user_behavior | regulation_policy. Pick the theme whose core claim this paragraph develops — not a secondary mention."
     }}
   ],
   "interview_angle": "One specific tradeoff a PM should have a prepared opinion on this week, derived from a whats_shifting source. Empty string if no whats_shifting paragraph was produced. Frame as a debatable tradeoff at PM decision level — feature prioritization, architecture, safety design, retention, compliance, pricing, or go-to-market. Scope to the context the source describes. DOMAIN RULE: Do not frame in legal, financial, or policy terms even if the source is a legal or regulatory story — translate into a product decision a PM owns. The angle must be answerable by a PM from product judgment, not legal or financial expertise."
@@ -780,9 +773,8 @@ You are reasoning across startup_disruption and product_craft items for a Senior
 Today's date is {today}.
 
 Items are tagged either:
-  - startup_radar ONLY  (theme: startup_disruption)
-  - pm_craft_today ONLY (theme: product_craft)
-  - pm_craft_today eligible (design_ux)
+  - startup_radar ONLY  (theme: market_signals)
+  - pm_craft_today ONLY (theme: pm_craft)
 
 Items:
 {context_block}
@@ -810,7 +802,7 @@ Then produce a JSON object:
 }}
 
 IMPORTANT: Do not include reasoning inside the JSON. All reasoning goes in <reasoning> only.
-SECTION ROUTING RULE: startup_radar ONLY items → startup_radar only. pm_craft_today ONLY items → pm_craft_today only. pm_craft_today eligible (design_ux) → pm_craft_today only. Hard constraints, not suggestions.
+SECTION ROUTING RULE: startup_radar ONLY items (market_signals) → startup_radar only. pm_craft_today ONLY items (pm_craft) → pm_craft_today only. Hard constraints, not suggestions.
 CITATION RULE: Only cite item [n] if a specific insight bullet directly supports the exact claim.
 STARTUP FILTER: Only include companies with company_maturity=startup in startup_radar. Established companies must not appear here.
 EMPTY STRING RULE: If no eligible items exist for a section, return empty string or empty array — do not hallucinate content.
@@ -1228,22 +1220,12 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
 
     for item in filtered_items:
         theme = item["theme"]
-        if theme == "design_ux":
-            # Cross-market design_ux → WS only; company-specific → PM Craft only.
-            # Never both — avoids double-dipping the same insight.
-            if cross_market_map.get(item["item_id"], False):
-                ws_items.append(item)
-            else:
-                sr_pm_items.append(item)
-        elif theme == "company_strategy":
+        if theme == "company_strategy":
             cw_items.append(item)
-        elif theme == "startup_disruption":
-            sr_items.append(item)
-        elif theme == "product_craft":
+        elif theme == "pm_craft":
             sr_pm_items.append(item)
         elif theme in WHATS_SHIFTING_THEMES:
-            if cross_market_map.get(item["item_id"], True):
-                ws_items.append(item)
+            ws_items.append(item)
 
     design_ux_ws = sum(1 for i in ws_items if i["theme"] == "design_ux")
     design_ux_pm = sum(1 for i in sr_pm_items if i["theme"] == "design_ux")
@@ -1277,11 +1259,10 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
     # Build required anchors
     # ---------------------------------------------------------------------------
     WHATS_SHIFTING_THEMES_ORDERED = [
-        "ai_technology",
-        "market_behavior",
+        "technology_trends",
+        "market_signals",
         "regulation_policy",
-        "consumer_behavior",
-        "design_ux",
+        "user_behavior",
     ]
 
     required_anchors = []
@@ -1787,27 +1768,25 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "shutdown", "ban", "ruling", "verdict", "ftc", "doj", "gdpr",
                 "cybercrime", "arrest", "detained", "prosecution",
             ],
-            "market_behavior": [
+            "market_signals": [
                 "market", "acqui", "merger", "ipo", "valuation", "invest", "fund",
                 "compet", "price", "pricing", "revenue", "monetiz", "platform",
                 "asset-light", "vertical integrat", "supply chain", "demand",
                 "abandon", "pivot", "writedown", "infrastructure", "capital",
+                "startup", "early-stage", "seed", "series",
             ],
-            "consumer_behavior": [
+            "user_behavior": [
                 "consumer", "user", "worker", "employee", "customer", "adoption",
                 "preference", "workforce", "talent", "credential", "overqualif",
                 "retention", "engagement", "behavior", "choice", "lifestyle",
+                "enterprise", "prosumer", "audience",
             ],
-            "design_ux": [
-                "design", "ux", "interface", "user experience", "interaction",
-                "consent", "onboarding", "friction", "accessibility", "pattern",
-                "navigation", "layout", "visual",
-            ],
-            "ai_technology": [
+            "technology_trends": [
                 "ai ", "artificial intelligence", "model", "llm", "machine learning",
                 "gpt", "gemini", "claude", "neural", "inference", "token",
                 "foundation model", "generative", "autonomous", "robotaxi",
-                "compute", "gpu", "blackwell", "hopper",
+                "compute", "gpu", "blackwell", "hopper", "technology", "tech",
+                "platform", "infrastructure", "open source", "api",
             ],
         }
 
