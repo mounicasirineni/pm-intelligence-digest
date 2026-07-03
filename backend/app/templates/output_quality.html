@@ -29,24 +29,6 @@
     .section-sub{font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;}
     .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
 
-    /* Metric definitions — collapsible */
-    .collapsible-header{display:flex;align-items:center;justify-content:space-between;
-      cursor:pointer;user-select:none;margin-bottom:0.75rem;}
-    .collapsible-toggle{font-size:0.8rem;color:var(--accent);text-transform:uppercase;
-      letter-spacing:0.18em;}
-    .collapsible-icon{font-size:0.9rem;color:var(--muted);margin-left:0.5rem;}
-    .collapsible-body{display:none;margin-bottom:1.25rem;}
-    .collapsible-body.open{display:block;}
-
-    .def-tbl{width:100%;border-collapse:collapse;font-size:0.82rem;}
-    .def-tbl th{text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;
-      color:var(--muted);padding:0 1rem 0.5rem 0;font-weight:600;border-bottom:1px solid var(--border);}
-    .def-tbl td{padding:0.5rem 1rem 0.5rem 0;border-top:1px solid rgba(223,222,215,0.5);
-      vertical-align:top;line-height:1.5;font-size:0.82rem;}
-    .def-tbl td:first-child{white-space:nowrap;font-weight:600;color:var(--accent);width:100px;}
-    .def-tbl td:nth-child(2){color:var(--muted);width:80px;}
-    .def-tbl tbody tr:first-child td{border-top:none;}
-
     /* Score table */
     .tbl{width:100%;border-collapse:collapse;font-size:0.82rem;}
     .tbl thead tr{border-bottom:1px solid var(--border);}
@@ -96,6 +78,11 @@
 
     .reasons-grid{display:flex;flex-direction:column;gap:0.5rem;
       font-size:0.77rem;color:#555;line-height:1.5;padding:0.25rem 0;}
+    .reasons-grid div{
+      overflow-wrap:break-word;
+      word-wrap:break-word;
+      white-space:normal;
+    }
     .reasons-grid strong{color:var(--text);}
   </style>
 </head>
@@ -120,61 +107,61 @@
       compare scores before and after to evaluate whether a change helped.
     </div>
 
-    <!-- Metric definitions — collapsible -->
-    <div id="defs-header" class="collapsible-header">
-      <span style="font-size:0.8rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.18em;">
-        Metric definitions
-      </span>
-      <span class="collapsible-toggle">Show <span class="collapsible-icon" id="defs-icon">+</span></span>
-    </div>
-    <div class="collapsible-body" id="defs-body">
-      <table class="def-tbl">
-        <thead>
-          <tr>
-            <th>Metric</th>
-            <th>Scale</th>
-            <th>What it measures</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Overall</td>
-            <td>0–100</td>
-            <td>Weighted composite across all scored sections. Only comparable across days where the same sections scored — days with missing sections are flagged.</td>
-          </tr>
-          <tr>
-            <td>Coherence</td>
-            <td>1–5</td>
-            <td>Does the paragraph deliver a single unified insight grounded in the sources? Penalizes synthesizer-imposed unity that ignores complicating evidence.</td>
-          </tr>
-          <tr>
-            <td>Insight</td>
-            <td>1–5</td>
-            <td>Is the closing implication non-obvious, traceable to a source bullet, and committed to exactly one consequence? Penalizes generic observations and split implications.</td>
-          </tr>
-          <tr>
-            <td>Grounding</td>
-            <td>1–5</td>
-            <td>Can every specific claim trace to a source? Also checks for selective omission — did the synthesis ignore bullets that would complicate its conclusion?</td>
-          </tr>
-          <tr>
-            <td>Breadth</td>
-            <td>1–5</td>
-            <td>How many of the 4 eligible What's Shifting themes are covered by distinct paragraphs? 5 = all 4 themes covered. Scores below 3 indicate a coverage gap.</td>
-          </tr>
-          <tr>
-            <td>Ins (PM Craft)</td>
-            <td>1–5</td>
-            <td>Is the PM Craft insight actionable, non-obvious, and grounded in the source? Penalizes generic PM blog advice.</td>
-          </tr>
-          <tr>
-            <td>Rel (Interview Angle)</td>
-            <td>1–5</td>
-            <td>Would a PM candidate use this to demonstrate strategic thinking in an interview? Penalizes domain-specific insights whose underlying principle doesn't transfer.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <!-- Metric definitions — static -->
+    <table class="tbl" style="margin-bottom:1.5rem;">
+      <thead>
+        <tr>
+          <th style="width:140px;">Metric</th>
+          <th style="width:60px;">Scale</th>
+          <th>What it measures</th>
+          <th>Color logic</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:600;color:var(--accent)">Overall</td>
+          <td style="color:var(--muted)">0–100</td>
+          <td>Weighted composite across all scored sections. Only comparable across days where the same sections scored — days with missing sections show —.</td>
+          <td style="color:var(--muted)">🟢 ≥75 · 🟡 ≥65 · 🔴 &lt;65</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;color:var(--accent)">Coherence</td>
+          <td style="color:var(--muted)">1–5</td>
+          <td>Does the paragraph deliver a single unified insight grounded in the sources? Penalizes synthesizer-imposed unity that ignores complicating evidence.</td>
+          <td style="color:var(--muted)">🟢 ≥4 · 🟡 ≥3 · 🔴 &lt;3</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;color:var(--accent)">Insight</td>
+          <td style="color:var(--muted)">1–5</td>
+          <td>Is the closing implication non-obvious, traceable to a source bullet, and committed to exactly one consequence? Penalizes generic observations and split implications.</td>
+          <td style="color:var(--muted)">🟢 ≥4 · 🟡 ≥3 · 🔴 &lt;3</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;color:var(--accent)">Grounding</td>
+          <td style="color:var(--muted)">1–5</td>
+          <td>Can every specific claim trace to a source? Also checks for selective omission — did the synthesis ignore bullets that would complicate its conclusion?</td>
+          <td style="color:var(--muted)">🟢 ≥4 · 🟡 ≥3 · 🔴 &lt;3</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;color:var(--accent)">Breadth</td>
+          <td style="color:var(--muted)">1–5</td>
+          <td>How many of the 4 eligible What's Shifting themes are covered by distinct paragraphs? 5 = all 4 themes covered. Scores below 3 indicate a coverage gap.</td>
+          <td style="color:var(--muted)">🟢 ≥4 · 🟡 ≥3 · 🔴 &lt;3</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;color:var(--accent)">PM Craft</td>
+          <td style="color:var(--muted)">1–5</td>
+          <td>Is the PM Craft insight actionable, non-obvious, and grounded in the source? Penalizes generic PM blog advice.</td>
+          <td style="color:var(--muted)">🟢 ≥4 · 🟡 ≥3 · 🔴 &lt;3</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;color:var(--accent)">Interview Angle</td>
+          <td style="color:var(--muted)">1–5</td>
+          <td>Would a PM candidate use this to demonstrate strategic thinking in an interview? Penalizes domain-specific insights whose underlying principle doesn't transfer.</td>
+          <td style="color:var(--muted)">🟢 ≥4 · 🟡 ≥3 · 🔴 &lt;3</td>
+        </tr>
+      </tbody>
+    </table>
 
     {% if scores %}
     {% macro sc(v) %}{% if v %}{{ "%.2f"|format(v) }}{% else %}<span class="dash">—</span>{% endif %}{% endmacro %}
@@ -280,16 +267,6 @@ function toggle(id) {
   if (el) el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
 }
 
-// Collapsible metric definitions
-var defsHeader = document.getElementById('defs-header');
-var defsBody = document.getElementById('defs-body');
-var defsIcon = document.getElementById('defs-icon');
-if (defsHeader && defsBody && defsIcon) {
-  defsHeader.addEventListener('click', function() {
-    var isOpen = defsBody.classList.toggle('open');
-    defsIcon.textContent = isOpen ? '−' : '+';
-  });
-}
 </script>
 </body>
 </html>
