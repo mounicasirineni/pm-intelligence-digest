@@ -48,9 +48,9 @@
     .feed-day-header{display:flex;align-items:baseline;gap:0.75rem;margin-bottom:0.3rem;}
     .feed-date{font-weight:500;color:var(--accent);font-size:0.85rem;min-width:56px;}
     .feed-quiet{font-size:0.82rem;color:var(--muted);font-style:italic;}
-    .feed-warning{display:flex;align-items:baseline;gap:0.6rem;
-      font-size:0.82rem;margin-top:0.3rem;line-height:1.5;}
-    .feed-warning-name{font-weight:600;min-width:180px;color:var(--text);}
+    .feed-warning{display:flex;align-items:center;gap:0.75rem;
+      font-size:0.82rem;margin-top:0.3rem;}
+    .feed-warning-name{font-weight:600;color:var(--text);}
     .streak-pill{display:inline-block;font-size:0.68rem;padding:1px 6px;border-radius:3px;
       white-space:nowrap;flex-shrink:0;}
     .streak-pill.active{background:rgba(180,83,9,0.12);border:1px solid rgba(180,83,9,0.3);color:var(--amber);}
@@ -115,27 +115,27 @@
       </thead>
       <tbody>
         <tr>
-          <td>split_implication <span class="threshold-badge">3d</span></td>
+          <td>Split Implication <span class="threshold-badge">3d</span></td>
           <td>A closing sentence states two separate consequences instead of one. The synthesizer is combining implications it should keep separate.</td>
           <td>3 consecutive days</td>
         </tr>
         <tr>
-          <td>theme_diversity <span class="threshold-badge">3d</span></td>
+          <td>Theme Diversity <span class="threshold-badge">3d</span></td>
           <td>A theme had cross-market items in the WS pool but no paragraph was produced after all fill calls. Coverage gap in What's Shifting.</td>
           <td>3 consecutive days</td>
         </tr>
         <tr>
-          <td>theme_audit <span class="threshold-badge">2d</span></td>
+          <td>Theme Audit <span class="threshold-badge">2d</span></td>
           <td>The same theme anchors more than one WS paragraph after deduplication. Dedup should prevent this — indicates upstream routing issue.</td>
           <td>2 consecutive days</td>
         </tr>
         <tr>
-          <td>routing <span class="threshold-badge">2d</span></td>
+          <td>Routing <span class="threshold-badge">2d</span></td>
           <td>A source was cited in the wrong section — a dedicated-section source appeared in What's Shifting, or vice versa.</td>
           <td>2 consecutive days</td>
         </tr>
         <tr>
-          <td>market_signals_sr_empty <span class="threshold-badge">2d</span></td>
+          <td>Startup Radar Pool Empty <span class="threshold-badge">2d</span></td>
           <td>No market_signals items remained for Startup Radar after What's Shifting consumed them. Startup Radar ran empty today.</td>
           <td>2 consecutive days</td>
         </tr>
@@ -152,11 +152,11 @@
     </div>
 
     {% set tracked_warnings = {
-      "split_implication_warnings": {"label": "Split implication", "threshold": 3},
-      "theme_diversity_warnings":   {"label": "Theme diversity",   "threshold": 3},
-      "theme_audit_warnings":       {"label": "Theme audit",       "threshold": 2},
+      "split_implication_warnings": {"label": "Split Implication", "threshold": 3},
+      "theme_diversity_warnings":   {"label": "Theme Diversity",   "threshold": 3},
+      "theme_audit_warnings":       {"label": "Theme Audit",       "threshold": 2},
       "routing_warnings":           {"label": "Routing",           "threshold": 2},
-      "market_signals_sr_empty":    {"label": "SR pool empty",     "threshold": 2}
+      "market_signals_sr_empty":    {"label": "Startup Radar Pool Empty",     "threshold": 2}
     } %}
 
     {% if warnings %}
@@ -166,16 +166,7 @@
         {# Prompt change banner #}
         {% if row.date in change_dates %}
         <div class="prompt-change-banner">
-          Prompt updated on {{ row.date }} —
-          {% set changed_calls = [] %}
-          {% for call_name, vlist in versions.items() %}
-            {% for v in vlist %}
-              {% if v.active_from == row.date %}
-                {% if changed_calls.append(call_name | replace("_"," ")) %}{% endif %}
-              {% endif %}
-            {% endfor %}
-          {% endfor %}
-          {{ changed_calls | join(', ') or 'see version history below' }}
+          Prompt updated — {{ row.date }} · see git log for details
         </div>
         {% endif %}
 
@@ -200,9 +191,7 @@
           <div class="feed-warning">
             <span class="feed-warning-name">{{ meta.label }}</span>
             <span class="streak-pill {% if at_threshold %}patch{% else %}active{% endif %}">
-              {{ wdata.consecutive_days }}d streak
-              · {{ wdata.count }} occurrence{{ 's' if wdata.count != 1 else '' }}
-              {% if at_threshold %} · patch signal{% endif %}
+              {{ wdata.consecutive_days }}d streak · {{ wdata.count }} occurrence{{ 's' if wdata.count != 1 else '' }}{% if at_threshold %} · patch signal{% endif %}
             </span>
           </div>
           {% endfor %}
