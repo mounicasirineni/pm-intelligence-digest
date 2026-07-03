@@ -97,12 +97,12 @@
         <div class="fs-pct" style="color:var(--muted)">sources</div>
       </div>
       <div class="funnel-step">
-        <div class="fs-label">Active</div>
-        <div class="fs-value {% if today.sources_active_pct >= 80 %}good{% elif today.sources_active_pct >= 60 %}amber{% else %}bad{% endif %}">
+        <div class="fs-label">Published Today</div>
+        <div class="fs-value" style="color:var(--text)">
           {{ today.sources_active }}
         </div>
-        <div class="fs-pct {% if today.sources_active_pct >= 80 %}good{% elif today.sources_active_pct >= 60 %}amber{% else %}bad{% endif %}">
-          {{ "%.0f"|format(today.sources_active_pct) }}%
+        <div class="fs-pct" style="color:var(--muted)">
+          {{ "%.0f"|format(today.sources_active_pct) }}% of configured
         </div>
       </div>
       <div class="funnel-step">
@@ -192,7 +192,7 @@
       <thead>
         <tr>
           <th>Date</th>
-          <th>Active %</th>
+          <th>Published %</th>
           <th>Fetched</th>
           <th>Confident %</th>
           <th>Relevant %</th>
@@ -204,7 +204,7 @@
         {% for row in rows %}
         <tr>
           <td class="date-cell">{{ row.label }}</td>
-          <td class="{% if row.sources_active_pct >= 80 %}good{% elif row.sources_active_pct >= 60 %}amber{% else %}bad{% endif %}">
+          <td style="color:var(--muted)">
             {{ "%.0f"|format(row.sources_active_pct) }}%
           </td>
           <td>{{ row.fetched }}</td>
