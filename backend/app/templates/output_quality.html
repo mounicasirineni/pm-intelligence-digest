@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="robots" content="noindex, nofollow, noarchive"/>
-  <title>PM Digest — Output Quality</title>
+  <title>PM Intelligence Digest — Output Quality</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
@@ -27,6 +27,25 @@
     .section:last-of-type{border-bottom:none;}
     .section-heading{font-size:1.15rem;margin-bottom:0.3rem;}
     .section-sub{font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;}
+    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
+
+    /* Metric definitions — collapsible */
+    .collapsible-header{display:flex;align-items:center;justify-content:space-between;
+      cursor:pointer;user-select:none;margin-bottom:0.75rem;}
+    .collapsible-toggle{font-size:0.8rem;color:var(--accent);text-transform:uppercase;
+      letter-spacing:0.18em;}
+    .collapsible-icon{font-size:0.9rem;color:var(--muted);margin-left:0.5rem;}
+    .collapsible-body{display:none;margin-bottom:1.25rem;}
+    .collapsible-body.open{display:block;}
+
+    .def-tbl{width:100%;border-collapse:collapse;font-size:0.82rem;}
+    .def-tbl th{text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;
+      color:var(--muted);padding:0 1rem 0.5rem 0;font-weight:600;border-bottom:1px solid var(--border);}
+    .def-tbl td{padding:0.5rem 1rem 0.5rem 0;border-top:1px solid rgba(223,222,215,0.5);
+      vertical-align:top;line-height:1.5;font-size:0.82rem;}
+    .def-tbl td:first-child{white-space:nowrap;font-weight:600;color:var(--accent);width:100px;}
+    .def-tbl td:nth-child(2){color:var(--muted);width:80px;}
+    .def-tbl tbody tr:first-child td{border-top:none;}
 
     /* Score table */
     .tbl{width:100%;border-collapse:collapse;font-size:0.82rem;}
@@ -38,6 +57,12 @@
       vertical-align:middle;white-space:nowrap;}
     .tbl td:first-child{padding-left:0;}
     .tbl tbody tr:first-child td{border-top:none;}
+
+    .col-divider{border-left:1px solid var(--border);padding-left:0.5rem!important;}
+    .col-group-header{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.12em;
+      color:var(--accent);padding-top:0.2rem;padding-bottom:0.35rem;
+      border-bottom:1px solid var(--border);text-align:center;}
+    .tbl thead tr:nth-child(2) th{padding-top:0.35rem;}
 
     /* Prompt change rows */
     .tbl tr.prompt-change td{
@@ -57,18 +82,13 @@
     .good{color:var(--green);font-weight:600;}
     .amber{color:var(--amber);}
     .bad{color:var(--red);}
+    .dash{color:var(--muted);}
 
     .overall-badge{
       display:inline-block;font-weight:700;font-size:0.95rem;
       min-width:2.5rem;padding:0.1rem 0.4rem;border-radius:4px;
       background:rgba(27,58,107,0.05);border:1px solid rgba(27,58,107,0.12);
     }
-
-    .col-divider{border-left:1px solid var(--border);padding-left:0.5rem!important;}
-    .col-group-header{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.12em;
-      color:var(--accent);padding-top:0.2rem;padding-bottom:0.35rem;
-      border-bottom:1px solid var(--border);text-align:center;}
-    .tbl thead tr:nth-child(2) th{padding-top:0.35rem;}
 
     .toggle-btn{font-size:0.7rem;color:var(--muted);background:none;border:none;
       cursor:pointer;padding:0;text-decoration:underline;}
@@ -77,14 +97,6 @@
     .reasons-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.4rem 1.25rem;
       font-size:0.77rem;color:#555;line-height:1.5;padding:0.25rem 0;}
     .reasons-grid strong{color:var(--text);}
-    .call-badge{display:inline-block;font-size:0.62rem;font-family:"SF Mono","Fira Code",monospace;
-      padding:1px 4px;border-radius:3px;background:rgba(27,58,107,0.08);color:var(--accent);margin-left:3px;}
-
-    .dash{color:var(--muted);}
-    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
-
-    /* Section missing badge */
-    .missing{font-size:0.65rem;color:var(--muted);font-style:italic;}
   </style>
 </head>
 <body>
@@ -108,19 +120,76 @@
       compare scores before and after to evaluate whether a change helped.
     </div>
 
+    <!-- Metric definitions — collapsible -->
+    <div id="defs-header" class="collapsible-header">
+      <span style="font-size:0.8rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.18em;">
+        Metric definitions
+      </span>
+      <span class="collapsible-toggle">Show <span class="collapsible-icon" id="defs-icon">+</span></span>
+    </div>
+    <div class="collapsible-body" id="defs-body">
+      <table class="def-tbl">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Scale</th>
+            <th>What it measures</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Overall</td>
+            <td>0–100</td>
+            <td>Weighted composite across all scored sections. Only comparable across days where the same sections scored — days with missing sections are flagged.</td>
+          </tr>
+          <tr>
+            <td>Coherence</td>
+            <td>1–5</td>
+            <td>Does the paragraph deliver a single unified insight grounded in the sources? Penalizes synthesizer-imposed unity that ignores complicating evidence.</td>
+          </tr>
+          <tr>
+            <td>Insight</td>
+            <td>1–5</td>
+            <td>Is the closing implication non-obvious, traceable to a source bullet, and committed to exactly one consequence? Penalizes generic observations and split implications.</td>
+          </tr>
+          <tr>
+            <td>Grounding</td>
+            <td>1–5</td>
+            <td>Can every specific claim trace to a source? Also checks for selective omission — did the synthesis ignore bullets that would complicate its conclusion?</td>
+          </tr>
+          <tr>
+            <td>Breadth</td>
+            <td>1–5</td>
+            <td>How many of the 4 eligible What's Shifting themes are covered by distinct paragraphs? 5 = all 4 themes covered. Scores below 3 indicate a coverage gap.</td>
+          </tr>
+          <tr>
+            <td>Ins (PM Craft)</td>
+            <td>1–5</td>
+            <td>Is the PM Craft insight actionable, non-obvious, and grounded in the source? Penalizes generic PM blog advice.</td>
+          </tr>
+          <tr>
+            <td>Rel (Interview Angle)</td>
+            <td>1–5</td>
+            <td>Would a PM candidate use this to demonstrate strategic thinking in an interview? Penalizes domain-specific insights whose underlying principle doesn't transfer.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     {% if scores %}
     {% macro sc(v) %}{% if v %}{{ "%.2f"|format(v) }}{% else %}<span class="dash">—</span>{% endif %}{% endmacro %}
     {% macro sc_cls(v) %}{% if v >= 4 %}good{% elif v >= 3 %}amber{% else %}bad{% endif %}{% endmacro %}
+
     <table class="tbl">
       <thead>
         <tr>
           <th rowspan="2">Date</th>
           <th rowspan="2">Overall</th>
-          <th colspan="4" class="col-divider col-group-header">What&rsquo;s Shifting <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_1b</span></th>
-          <th colspan="3" class="col-divider col-group-header">Company Watch <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_3</span></th>
-          <th colspan="3" class="col-divider col-group-header">Startup Radar <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_4b</span></th>
-          <th class="col-divider col-group-header">PM Craft <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_2</span></th>
-          <th class="col-divider col-group-header">IA <span style="font-weight:400;text-transform:none;letter-spacing:0;">call_1b</span></th>
+          <th colspan="4" class="col-divider col-group-header">What's Shifting</th>
+          <th colspan="3" class="col-divider col-group-header">Company Watch</th>
+          <th colspan="3" class="col-divider col-group-header">Startup Radar</th>
+          <th class="col-divider col-group-header">PM Craft</th>
+          <th class="col-divider col-group-header">Interview Angle</th>
           <th rowspan="2"></th>
         </tr>
         <tr>
@@ -139,14 +208,7 @@
         <tr class="prompt-change">
           <td colspan="15">
             <div class="prompt-change-banner">
-              Prompt updated — {{ row.date }}
-              {% set changed = [] %}
-              {% for call_name, vlist in versions.items() %}
-                {% for v in vlist %}{% if v.active_from == row.date %}
-                  {% if changed.append(call_name.split('.')[-1] | replace('_',' ')) %}{% endif %}
-                {% endif %}{% endfor %}
-              {% endfor %}
-              {% if changed %} · {{ changed | join(', ') }}{% endif %}
+              Prompt updated — {{ row.date }} · see git log for details
             </div>
           </td>
         </tr>
@@ -160,29 +222,26 @@
             <span class="overall-badge {% if row.overall_score >= 75 %}good{% elif row.overall_score >= 65 %}amber{% else %}bad{% endif %}">
               {{ "%.1f"|format(row.overall_score) }}
             </span>
-            {% if row.sections_scored|length < 5 %}
-            <span class="missing">{{ row.sections_scored|length }}/5</span>
-            {% endif %}
           </td>
           <!-- WS -->
-          <td class="col-divider {{ sc_cls(row.ws_coherence) }}">{{ sc(row.ws_coherence) }}</td>
-          <td class="{{ sc_cls(row.ws_insight) }}">{{ sc(row.ws_insight) }}</td>
-          <td class="{{ sc_cls(row.ws_grounding) }}">{{ sc(row.ws_grounding) }}</td>
-          <td class="{{ sc_cls(row.ws_breadth) }}">{{ sc(row.ws_breadth) }}</td>
+          <td class="col-divider {% if row.ws_coherence %}{{ sc_cls(row.ws_coherence) }}{% endif %}">{{ sc(row.ws_coherence) }}</td>
+          <td class="{% if row.ws_insight %}{{ sc_cls(row.ws_insight) }}{% endif %}">{{ sc(row.ws_insight) }}</td>
+          <td class="{% if row.ws_grounding %}{{ sc_cls(row.ws_grounding) }}{% endif %}">{{ sc(row.ws_grounding) }}</td>
+          <td class="{% if row.ws_breadth %}{{ sc_cls(row.ws_breadth) }}{% endif %}">{{ sc(row.ws_breadth) }}</td>
           <!-- CW -->
-          <td class="col-divider {{ sc_cls(row.cw_coherence) if row.cw_coherence else 'dash' }}">{{ sc(row.cw_coherence) }}</td>
-          <td class="{{ sc_cls(row.cw_insight) if row.cw_insight else '' }}">{{ sc(row.cw_insight) }}</td>
-          <td class="{{ sc_cls(row.cw_grounding) if row.cw_grounding else '' }}">{{ sc(row.cw_grounding) }}</td>
+          <td class="col-divider {% if row.cw_coherence %}{{ sc_cls(row.cw_coherence) }}{% endif %}">{{ sc(row.cw_coherence) }}</td>
+          <td class="{% if row.cw_insight %}{{ sc_cls(row.cw_insight) }}{% endif %}">{{ sc(row.cw_insight) }}</td>
+          <td class="{% if row.cw_grounding %}{{ sc_cls(row.cw_grounding) }}{% endif %}">{{ sc(row.cw_grounding) }}</td>
           <!-- SR -->
-          <td class="col-divider {{ sc_cls(row.sr_coherence) if row.sr_coherence else '' }}">{{ sc(row.sr_coherence) }}</td>
-          <td class="{{ sc_cls(row.sr_insight) if row.sr_insight else '' }}">{{ sc(row.sr_insight) }}</td>
-          <td class="{{ sc_cls(row.sr_grounding) if row.sr_grounding else '' }}">{{ sc(row.sr_grounding) }}</td>
+          <td class="col-divider {% if row.sr_coherence %}{{ sc_cls(row.sr_coherence) }}{% endif %}">{{ sc(row.sr_coherence) }}</td>
+          <td class="{% if row.sr_insight %}{{ sc_cls(row.sr_insight) }}{% endif %}">{{ sc(row.sr_insight) }}</td>
+          <td class="{% if row.sr_grounding %}{{ sc_cls(row.sr_grounding) }}{% endif %}">{{ sc(row.sr_grounding) }}</td>
           <!-- PM Craft -->
-          <td class="col-divider {{ sc_cls(row.pc_insight) if row.pc_insight else '' }}">{{ sc(row.pc_insight) }}</td>
-          <!-- IA -->
-          <td class="col-divider {{ sc_cls(row.ia_relevance) if row.ia_relevance else '' }}">{{ sc(row.ia_relevance) }}</td>
+          <td class="col-divider {% if row.pc_insight %}{{ sc_cls(row.pc_insight) }}{% endif %}">{{ sc(row.pc_insight) }}</td>
+          <!-- Interview Angle -->
+          <td class="col-divider {% if row.ia_relevance %}{{ sc_cls(row.ia_relevance) }}{% endif %}">{{ sc(row.ia_relevance) }}</td>
           <td>
-            <button class="toggle-btn" onclick="toggle('r-{{ row.date }}')">reasons</button>
+            <button class="toggle-btn" onclick="toggle('r-{{ row.date }}')">why →</button>
           </td>
         </tr>
 
@@ -190,14 +249,18 @@
         <tr id="r-{{ row.date }}" style="display:none;">
           <td colspan="15" style="padding:0.6rem 0.75rem 0.9rem;background:#f9f7f4;">
             <div class="reasons-grid">
-              {% if row.ws_coherence_reason %}<div><strong>WS Coherence</strong><span class="call-badge">call_1b</span><br>{{ row.ws_coherence_reason }}</div>{% endif %}
-              {% if row.ws_insight_reason %}<div><strong>WS Insight</strong><span class="call-badge">call_1b</span><br>{{ row.ws_insight_reason }}</div>{% endif %}
-              {% if row.ws_grounding_reason %}<div><strong>WS Grounding</strong><span class="call-badge">call_1b</span><br>{{ row.ws_grounding_reason }}</div>{% endif %}
-              {% if row.ws_breadth_reason %}<div><strong>WS Breadth</strong><span class="call-badge">declared</span><br>{{ row.ws_breadth_reason }}</div>{% endif %}
-              {% if row.cw_coherence_reason %}<div><strong>CW Coherence</strong><span class="call-badge">call_3</span><br>{{ row.cw_coherence_reason }}</div>{% endif %}
-              {% if row.sr_coherence_reason %}<div><strong>SR Coherence</strong><span class="call-badge">call_4b</span><br>{{ row.sr_coherence_reason }}</div>{% endif %}
-              {% if row.pc_insight_reason %}<div><strong>PM Craft Insight</strong><span class="call-badge">call_2</span><br>{{ row.pc_insight_reason }}</div>{% endif %}
-              {% if row.ia_relevance_reason %}<div><strong>Interview Angle</strong><span class="call-badge">call_1b</span><br>{{ row.ia_relevance_reason }}</div>{% endif %}
+              {% if row.ws_coherence_reason %}<div><strong>WS Coherence</strong><br>{{ row.ws_coherence_reason }}</div>{% endif %}
+              {% if row.ws_insight_reason %}<div><strong>WS Insight</strong><br>{{ row.ws_insight_reason }}</div>{% endif %}
+              {% if row.ws_grounding_reason %}<div><strong>WS Grounding</strong><br>{{ row.ws_grounding_reason }}</div>{% endif %}
+              {% if row.ws_breadth_reason %}<div><strong>WS Breadth</strong><br>{{ row.ws_breadth_reason }}</div>{% endif %}
+              {% if row.cw_coherence_reason %}<div><strong>Company Watch Coherence</strong><br>{{ row.cw_coherence_reason }}</div>{% endif %}
+              {% if row.cw_insight_reason %}<div><strong>Company Watch Insight</strong><br>{{ row.cw_insight_reason }}</div>{% endif %}
+              {% if row.cw_grounding_reason %}<div><strong>Company Watch Grounding</strong><br>{{ row.cw_grounding_reason }}</div>{% endif %}
+              {% if row.sr_coherence_reason %}<div><strong>Startup Radar Coherence</strong><br>{{ row.sr_coherence_reason }}</div>{% endif %}
+              {% if row.sr_insight_reason %}<div><strong>Startup Radar Insight</strong><br>{{ row.sr_insight_reason }}</div>{% endif %}
+              {% if row.sr_grounding_reason %}<div><strong>Startup Radar Grounding</strong><br>{{ row.sr_grounding_reason }}</div>{% endif %}
+              {% if row.pc_insight_reason %}<div><strong>PM Craft Insight</strong><br>{{ row.pc_insight_reason }}</div>{% endif %}
+              {% if row.ia_relevance_reason %}<div><strong>Interview Angle Relevance</strong><br>{{ row.ia_relevance_reason }}</div>{% endif %}
             </div>
           </td>
         </tr>
@@ -215,6 +278,17 @@
 function toggle(id) {
   const el = document.getElementById(id);
   if (el) el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+
+// Collapsible metric definitions
+var defsHeader = document.getElementById('defs-header');
+var defsBody = document.getElementById('defs-body');
+var defsIcon = document.getElementById('defs-icon');
+if (defsHeader && defsBody && defsIcon) {
+  defsHeader.addEventListener('click', function() {
+    var isOpen = defsBody.classList.toggle('open');
+    defsIcon.textContent = isOpen ? '−' : '+';
+  });
 }
 </script>
 </body>
