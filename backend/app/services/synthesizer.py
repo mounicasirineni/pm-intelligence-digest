@@ -1899,6 +1899,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             "pm_craft_today": pm_craft_today,
             "interview_angle": interview_angle,
             "source_index_lookup": source_index_lookup,
+            "ws_theme_dist": ws_theme_dist,
             "editorial_warnings": {
                 "multi_thread_violations": multi_thread_warnings,
                 "date_warnings": date_warnings,

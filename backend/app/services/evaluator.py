@@ -1032,20 +1032,16 @@ def run(
     pipeline_funnel_result = pipeline_funnel(items_by_theme, synthesis, fetch_metadata)
     pm_relevance_result = pm_relevance(items_by_theme)
 
-    WHATS_SHIFTING_THEMES = {
-        "technology_trends", "market_signals", "user_behavior", "regulation_policy",
-    }
-    ws_available_themes: Dict[str, int] = {}
-    for theme, items in (items_by_theme or {}).items():
-        if theme in WHATS_SHIFTING_THEMES:
-            relevant_count = sum(
-                1 for item in (items or [])
-                if isinstance(item, dict)
-                and str(item.get("confidence") or "low").lower() in {"high", "medium"}
-                and str(item.get("pm_relevance_score") or "low").lower() in {"high", "medium"}
-            )
-            if relevant_count > 0:
-                ws_available_themes[theme] = relevant_count
+    # Use the post-Call-1a cross-market pool distribution from synthesis.
+    # This reflects what the synthesizer actually had available — items filtered
+    # out as company-specific by Call 1a are correctly excluded, preventing false
+    # breadth penalties for themes that had no cross-market material.
+    ws_available_themes: Dict[str, int] = dict(synthesis.get("ws_theme_dist") or {})
+    if not ws_available_themes:
+        logger.warning(
+            "EVAL: ws_theme_dist not found in synthesis output — "
+            "breadth evaluation may penalize themes filtered by Call 1a"
+        )
 
     # FIX: gather all three async evals in a single event loop rather than three
     # separate asyncio.run() calls, saving ~4-8s and avoiding redundant loop creation.
