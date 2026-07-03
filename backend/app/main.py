@@ -19,11 +19,6 @@ from .config import load_settings
 from .digest_utils import get_used_indices
 from .services.cache import get_digest_for_today, init_db, save_digest
 from .services.evaluator import get_consecutive_warning_types, get_score_trend
-from .services.prompt_registry import (
-    accept_patch,
-    get_pending_patches,
-    reject_patch,
-)
 from .services.rss import fetch_items_grouped_by_theme
 from .services.summarizer import summarize_item
 from .services.synthesizer import synthesize_trends
@@ -637,40 +632,41 @@ def refresh():
     return redirect(url_for("index"))
 
 
-@app.route("/digest-health/patches/accept", methods=["POST"])
-def digest_health_patches_accept():
-    patch_id = request.form.get("patch_id")
-    notes = request.form.get("notes", "")
-    if patch_id:
-        accept_patch(int(patch_id), reviewer_notes=notes)
-
-    return redirect(url_for("digest_health"))
-
-
-@app.route("/digest-health/patches/reject", methods=["POST"])
-def digest_health_patches_reject():
-    patch_id = request.form.get("patch_id")
-    notes = request.form.get("notes", "")
-    if patch_id:
-        reject_patch(int(patch_id), reviewer_notes=notes)
-
-    return redirect(url_for("digest_health"))
-
-
 @app.route("/digest-health")
 def digest_health():
     signals = get_consecutive_warning_types()
-    pending = get_pending_patches()
     trend = get_score_trend(lookback_days=7)
     pipeline = _get_pipeline_health(days=1)
     today_pipeline = pipeline[0] if pipeline else {}
 
+    # Today's eval for Output Quality card
+    today_eval = None
+    quality_scores = _get_quality_scores(days=1)
+    if quality_scores:
+        row = quality_scores[0]
+        dimensions = {
+            "Breadth":   row.get("ws_breadth"),
+            "Coherence": row.get("ws_coherence"),
+            "Insight":   row.get("ws_insight"),
+            "Grounding": row.get("ws_grounding"),
+            "PM Craft":  row.get("pc_insight"),
+        }
+        scored = {k: v for k, v in dimensions.items() if v}
+        weakest_key = min(scored, key=scored.get) if scored else None
+        today_eval = {
+            "overall_score": row.get("overall_score"),
+            "weakest_dimension": {
+                "name": weakest_key,
+                "score": scored[weakest_key],
+            } if weakest_key else None,
+        }
+
     return render_template(
         "digest_health.html",
         signals=signals,
-        pending=pending,
         trend=trend,
         today_pipeline=today_pipeline,
+        today_eval=today_eval,
     )
 
 
