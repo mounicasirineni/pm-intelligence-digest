@@ -1226,6 +1226,8 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             sr_pm_items.append(item)
         elif theme in WHATS_SHIFTING_THEMES:
             ws_items.append(item)
+            if theme == "market_signals":
+                sr_items.append(item)
 
     design_ux_ws = sum(1 for i in ws_items if i["theme"] == "design_ux")
     design_ux_pm = sum(1 for i in sr_pm_items if i["theme"] == "design_ux")
@@ -1372,9 +1374,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 len(required_anchors), sorted(final_covered)
             )
 
-        # ---------------------------------------------------------------------------
-        # Remove WS-consumed items from PM Craft pool (prevents double-dipping)
-        # ---------------------------------------------------------------------------
+        # Remove WS-consumed market_signals items from Startup Radar pool
         ws_used_indices: Set[int] = set()
         for ws in ws_paragraphs:
             ws_used_indices.update(ws.get("source_indices", []))
@@ -1385,16 +1385,17 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 ws_used_item_ids.add(entry["item_id"])
 
         if ws_used_item_ids:
-            before_count = len(sr_pm_items)
-            sr_pm_items = [
-                item for item in sr_pm_items
+            before_sr_count = len(sr_items)
+            sr_items = [
+                item for item in sr_items
                 if item.get("item_id") not in ws_used_item_ids
             ]
-            removed = before_count - len(sr_pm_items)
-            if removed:
+            removed_sr = before_sr_count - len(sr_items)
+            if removed_sr:
                 logger.info(
-                    "DEDUP [ws_consumed]: Removed %d item(s) from PM Craft pool already cited in WS",
-                    removed
+                    "DEDUP [ws_consumed]: Removed %d market_signals item(s) from "
+                    "Startup Radar pool already cited in WS",
+                    removed_sr
                 )
 
         # Call 4a — startup classification
