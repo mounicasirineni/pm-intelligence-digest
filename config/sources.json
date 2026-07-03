@@ -5,7 +5,7 @@
       "type": "podcast",
       "name": "Andreessen Horowitz Podcast",
       "url": "https://feeds.simplecast.com/JGE3yC0V",
-      "theme": "ai_technology",
+      "theme": "technology_trends",
       "verified": false
     },
     {
@@ -13,7 +13,7 @@
       "type": "rss",
       "name": "Platformer",
       "url": "https://www.platformer.news/feed/",
-      "theme": "market_behavior",
+      "theme": "market_signals",
       "verified": false,
       "thin_feed": true
     },
@@ -22,7 +22,7 @@
       "type": "rss",
       "name": "MIT Technology Review",
       "url": "https://www.technologyreview.com/feed/",
-      "theme": "ai_technology",
+      "theme": "technology_trends",
       "verified": false
     },
     {
@@ -30,7 +30,7 @@
       "type": "rss",
       "name": "Import AI (Jack Clark)",
       "url": "https://importai.substack.com/feed",
-      "theme": "ai_technology",
+      "theme": "technology_trends",
       "verified": false
     },
     {
@@ -38,7 +38,7 @@
       "type": "rss",
       "name": "Shreyas Doshi",
       "url": "https://shreyasdoshi.substack.com/feed",
-      "theme": "product_craft",
+      "theme": "pm_craft",
       "verified": false
     },
     {
@@ -46,7 +46,7 @@
       "type": "rss",
       "name": "SVPG (Marty Cagan)",
       "url": "https://www.svpg.com/feed/",
-      "theme": "product_craft",
+      "theme": "pm_craft",
       "verified": false
     },
     {
@@ -54,7 +54,7 @@
       "type": "rss",
       "name": "TechCrunch",
       "url": "https://techcrunch.com/feed/",
-      "theme": "startup_disruption",
+      "theme": "market_signals",
       "verified": false,
       "thin_feed": true
     },
@@ -63,7 +63,7 @@
       "type": "rss",
       "name": "Y Combinator Blog",
       "url": "https://ycombinator.com/blog/rss",
-      "theme": "startup_disruption",
+      "theme": "market_signals",
       "verified": false
     },
     {
@@ -71,7 +71,7 @@
       "type": "rss",
       "name": "Hacker News Frontpage",
       "url": "https://hnrss.org/frontpage",
-      "theme": "ai_technology",
+      "theme": "technology_trends",
       "verified": false,
       "max_items": 3
     },
@@ -109,7 +109,7 @@
       "type": "rss",
       "name": "Simon Willison's Blog",
       "url": "https://simonwillison.net/atom/everything/",
-      "theme": "ai_technology",
+      "theme": "technology_trends",
       "verified": false,
       "thin_feed": true
     },
@@ -128,7 +128,7 @@
       "type": "rss",
       "name": "Rest of World",
       "url": "https://restofworld.org/feed/",
-      "theme": "market_behavior",
+      "theme": "market_signals",
       "verified": false,
       "thin_feed": true
     },
@@ -137,7 +137,7 @@
       "type": "rss",
       "name": "Benedict Evans",
       "url": "https://www.ben-evans.com/benedictevans/rss.xml",
-      "theme": "ai_technology",
+      "theme": "technology_trends",
       "verified": false
     },
     {
@@ -145,7 +145,7 @@
       "type": "rss",
       "name": "AI Snake Oil",
       "url": "https://aisnakeoil.substack.com/feed",
-      "theme": "ai_technology",
+      "theme": "technology_trends",
       "verified": false
     },
     {
@@ -153,7 +153,7 @@
       "type": "rss",
       "name": "The Verge",
       "url": "https://www.theverge.com/rss/index.xml",
-      "theme": "market_behavior",
+      "theme": "market_signals",
       "verified": false,
       "thin_feed": true
     },
@@ -191,14 +191,14 @@
       "type": "podcast",
       "name": "Lenny's Podcast",
       "url": "env:LENNYS_PODCAST_RSS",
-      "theme": "product_craft"
+      "theme": "pm_craft"
     },
     {
       "id": "stratechery",
       "type": "rss",
       "name": "Stratechery (Free)",
       "url": "https://stratechery.com/feed/",
-      "theme": "market_behavior",
+      "theme": "market_signals",
       "verified": false
     },
     {
@@ -206,7 +206,7 @@
       "type": "rss",
       "name": "Nielsen Norman Group",
       "url": "https://www.nngroup.com/feed/rss/",
-      "theme": "design_ux",
+      "theme": "pm_craft",
       "verified": false,
       "thin_feed": true
     },
@@ -215,7 +215,7 @@
       "type": "rss",
       "name": "UX Collective",
       "url": "https://uxdesign.cc/feed",
-      "theme": "design_ux",
+      "theme": "pm_craft",
       "verified": false,
       "fetch_blocked": true,
       "_note": "robots.txt disallows all article fetching. fetch_blocked=true skips full-fetch, uses RSS summary only."
@@ -244,7 +244,7 @@
       "type": "rss",
       "name": "Axios Business",
       "url": "https://www.axios.com/feeds/feed.rss",
-      "theme": "consumer_behavior",
+      "theme": "user_behavior",
       "verified": false
     },
     {
@@ -252,7 +252,7 @@
       "type": "podcast",
       "name": "Hard Fork",
       "url": "https://feeds.simplecast.com/l2i9YnTd",
-      "theme": "market_behavior",
+      "theme": "market_signals",
       "verified": false
     },
     {
@@ -260,7 +260,7 @@
       "type": "podcast",
       "name": "Dwarkesh Podcast",
       "url": "https://dwarkeshpatel.substack.com/feed",
-      "theme": "ai_technology",
+      "theme": "technology_trends",
       "verified": false
     },
     {
@@ -268,7 +268,7 @@
       "type": "podcast",
       "name": "Pivot",
       "url": "https://feeds.megaphone.fm/pivot",
-      "theme": "consumer_behavior",
+      "theme": "user_behavior",
       "verified": false
     },
     {
@@ -276,7 +276,7 @@
       "type": "rss",
       "name": "Lenny's Newsletter",
       "url": "env:LENNYS_NEWSLETTER_RSS",
-      "theme": "product_craft",
+      "theme": "pm_craft",
       "verified": false
     },
     {
@@ -284,7 +284,7 @@
       "type": "podcast",
       "name": "How I AI (Claire Vo)",
       "url": "env:HOW_I_AI_RSS",
-      "theme": "product_craft",
+      "theme": "pm_craft",
       "verified": false
     },
     {
@@ -292,7 +292,7 @@
       "type": "rss",
       "name": "Sifted",
       "url": "https://sifted.eu/feed",
-      "theme": "market_behavior",
+      "theme": "market_signals",
       "verified": false,
       "thin_feed": true
     },
@@ -301,10 +301,10 @@
       "type": "rss",
       "name": "YourStory",
       "url": "https://yourstory.com/feed",
-      "theme": "startup_disruption",
+      "theme": "market_signals",
       "verified": false,
       "fetch_blocked": true,
-      "_note": "Consistent 403. fetch_blocked=true uses RSS summary only. Low relevance pass rate \u2014 consider removing."
+      "_note": "Consistent 403. fetch_blocked=true uses RSS summary only. Low relevance pass rate — consider removing."
     },
     {
       "id": "netflix_techblog",
@@ -324,7 +324,73 @@
       "company_id": "Anthropic",
       "verified": false,
       "thin_feed": true,
-      "_note": "Third-party GitHub mirror \u2014 no native Anthropic RSS. Monitor https://www.anthropic.com/news for official feed."
+      "_note": "Third-party GitHub mirror — no native Anthropic RSS. Monitor https://www.anthropic.com/news for official feed."
+    },
+    {
+      "id": "ieee_spectrum",
+      "type": "rss",
+      "name": "IEEE Spectrum",
+      "url": "https://spectrum.ieee.org/feeds/feed.rss",
+      "theme": "technology_trends",
+      "verified": true
+    },
+    {
+      "id": "politico_eu",
+      "type": "rss",
+      "name": "Politico EU",
+      "url": "https://www.politico.eu/feed/",
+      "theme": "regulation_policy",
+      "verified": true
+    },
+    {
+      "id": "techpolicy_press",
+      "type": "rss",
+      "name": "TechPolicy Press",
+      "url": "https://www.techpolicy.press/feed/",
+      "theme": "regulation_policy",
+      "verified": true
+    },
+    {
+      "id": "latam_list",
+      "type": "rss",
+      "name": "LatAm List",
+      "url": "https://latamlist.com/feed/",
+      "theme": "market_signals",
+      "verified": true
+    },
+    {
+      "id": "techcabal",
+      "type": "rss",
+      "name": "TechCabal",
+      "url": "https://techcabal.com/feed",
+      "theme": "market_signals",
+      "verified": true,
+      "_note": "Africa tech ecosystem. May be soft-paywalled — monitor relevance pass rate. Added to JINA_PREFERRED_DOMAINS in fetcher.py."
+    },
+    {
+      "id": "behavioral_scientist",
+      "type": "rss",
+      "name": "Behavioral Scientist",
+      "url": "https://behavioralscientist.org/feed/",
+      "theme": "user_behavior",
+      "verified": true
+    },
+    {
+      "id": "pew_research",
+      "type": "rss",
+      "name": "Pew Research",
+      "url": "https://www.pewresearch.org/feed/",
+      "theme": "user_behavior",
+      "verified": true,
+      "_note": "Infrequent publisher — high quality data when it does publish. Expected to be silent most days."
+    },
+    {
+      "id": "morning_brew_daily",
+      "type": "podcast",
+      "name": "Morning Brew Daily",
+      "url": "https://feeds.megaphone.fm/MOBI8777994188",
+      "theme": "user_behavior",
+      "verified": true
     }
   ]
 }

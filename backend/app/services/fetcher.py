@@ -43,8 +43,10 @@ JINA_PREFERRED_DOMAINS = {
     "www.wsj.com",
     "www.ft.com",
     "www.politico.com",   # consistent 403 on tier 1
+    "www.politico.eu",    # same JS-rendering behavior as politico.com
     "uxdesign.cc",        # robots.txt disallows all fetching
     "qz.com",             # consistent 451 geo-block
+    "techcabal.com",      # soft-paywalled, JS-rendered — go straight to Jina
 }
 
 PAYWALL_SIGNALS = [
