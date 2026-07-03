@@ -65,7 +65,11 @@ SYSTEM_PROMPT = (
 _CALL_1A_SYSTEM = (
     "You are a content classifier for a PM intelligence digest. "
     "Classify items as cross-market or company-specific based on their central claim. "
-    "Be conservative — when in doubt, classify as company-specific."
+    "Be conservative — when in doubt, classify as company-specific. "
+    "Cross-market means the insight reveals a structural shift affecting an entire "
+    "industry, product category, or regulatory environment — not just one named company. "
+    "A story about one startup's funding, one company's product launch, or one "
+    "company's regulatory trouble is company-specific even if it has broader implications."
 )
 
 _CALL_2_SYSTEM = (
@@ -849,9 +853,11 @@ def _call_cross_market_classifier(
     today: str,
 ) -> Dict[str, bool]:
     """
-    Classify each WS-theme item as cross-market or not.
+    Classify each WS-theme item as cross-market or company-specific.
     Returns {item_id: is_cross_market} dict.
     Runs on Haiku — pure classification, no synthesis.
+    Defaults to False (company-specific) on failure — conservative fallback
+    prevents company-specific news from polluting What's Shifting.
     """
     if not ws_items:
         return {}
@@ -875,13 +881,36 @@ Today: {today}
 For each item below, classify whether it describes a CROSS-MARKET structural shift
 or COMPANY-SPECIFIC news.
 
-CROSS-MARKET = the central claim applies to an industry, product category, or regulatory
-framework affecting multiple companies or builders. The insight would be relevant to a PM
-at any company in that space, not just the company mentioned.
+CROSS-MARKET = the central claim describes a structural shift in an industry, product
+category, technology landscape, or regulatory environment that affects multiple companies
+or builders. The insight would be relevant to a PM at any company in that space.
+Examples:
+  - A new regulation affecting all AI companies → cross-market
+  - A platform behavior shift across an entire product category → cross-market
+  - A user behavior trend spanning multiple products or services → cross-market
+  - A technology capability unlock that changes what any builder can do → cross-market
 
-COMPANY-SPECIFIC = primarily about what one named company did, faces, or decided.
-A regulatory action against one company is company-specific even if it has industry
-implications — the central claim is still about that company's situation.
+COMPANY-SPECIFIC = primarily about what one named company did, faces, or decided —
+even if it has broader implications. One startup's funding round, one company's product
+launch, one company's legal trouble = company-specific.
+When in doubt: if the story would only matter to a PM at that specific company,
+classify as company-specific.
+Examples:
+  - A startup raising a Series B → company-specific
+  - One company launching a new product feature → company-specific
+  - A regulatory action targeting one named company → company-specific
+  - One company's earnings or revenue results → company-specific
+
+THEME GUIDANCE:
+  market_signals items: funding rounds, individual startup moves, and single-company
+  pivots are company-specific. Industry-wide pricing shifts, platform policy changes
+  affecting all builders, or category-wide consolidation trends are cross-market.
+  technology_trends items: a single model release is company-specific unless it
+  reveals a capability shift affecting the entire ecosystem.
+  user_behavior items: behavioral shifts observed across many users or platforms
+  are cross-market. A single product's retention metric is company-specific.
+  regulation_policy items: a law or ruling affecting an entire industry is
+  cross-market. An enforcement action against one company is company-specific.
 
 Items:
 {items_block}
@@ -915,13 +944,15 @@ Use the exact item_id strings shown in brackets above.
         }
         cross_market_count = sum(1 for v in result.values() if v)
         logger.info(
-            "Call 1a (cross-market): %d/%d items classified as cross-market",
+            "Call 1a (cross-market): %d/%d items classified as cross-market → WS pool",
             cross_market_count, len(ws_items),
         )
         return result
     except Exception:
-        logger.warning("Call 1a classification failed — defaulting all items to cross-market")
-        return {item["item_id"]: True for item in ws_items}
+        logger.warning(
+            "Call 1a classification failed — defaulting all items to company-specific (conservative)"
+        )
+        return {item["item_id"]: False for item in ws_items}
 
 
 # ---------------------------------------------------------------------------
@@ -1224,10 +1255,13 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             cw_items.append(item)
         elif theme == "pm_craft":
             sr_pm_items.append(item)
+        elif theme == "market_signals":
+            if cross_market_map.get(item["item_id"], True):
+                ws_items.append(item)
+            sr_items.append(item)  # all market_signals eligible for SR regardless
         elif theme in WHATS_SHIFTING_THEMES:
-            ws_items.append(item)
-            if theme == "market_signals":
-                sr_items.append(item)
+            if cross_market_map.get(item["item_id"], True):
+                ws_items.append(item)
 
     design_ux_ws = sum(1 for i in ws_items if i["theme"] == "design_ux")
     design_ux_pm = sum(1 for i in sr_pm_items if i["theme"] == "design_ux")
