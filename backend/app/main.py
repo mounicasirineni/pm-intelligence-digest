@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, datetime
 import json
-import sqlite3
 import logging
 import os
 import re
@@ -17,7 +17,19 @@ import pytz
 
 from .config import load_settings
 from .digest_utils import get_used_indices
-from .services.cache import get_digest_for_today, init_db, save_digest
+from .services.cache import (
+    get_digest_for_today,
+    get_digest_by_date,
+    get_eval_summary_for_date,
+    get_all_evals,
+    get_pipeline_health,
+    get_warning_history,
+    get_quality_scores,
+    get_digest_history,
+    init_db,
+    save_digest,
+    DigestRecord,
+)
 from .services.evaluator import get_consecutive_warning_types, get_score_trend
 from .services.rss import fetch_items_grouped_by_theme
 from .services.summarizer import summarize_item
@@ -93,30 +105,51 @@ def _build_utilized_keys(synthesis: dict) -> set:
 
 def _run_pipeline():
     """
-    Fetch -> summarize -> synthesize.
+    Fetch -> summarize (parallel) -> synthesize.
     Returns (synthesis, items_by_theme, generated_at, fetch_metadata).
     """
     grouped_raw, fetch_metadata = fetch_items_grouped_by_theme()
 
     items_by_theme = {}
 
-    for theme, items in grouped_raw.items():
-        summarized_items = []
-        failed = 0
-        total = len(items)
+    all_items = [
+        {**item, "_theme": theme}
+        for theme, items in grouped_raw.items()
+        for item in items
+    ]
 
-        for item in items:
-            try:
-                summary = summarize_item(item)
-            except Exception as exc:
-                failed += 1
-                logger.warning(
-                    "Summarizer failed for item '%s' in theme '%s': %s",
-                    item.get("title"), theme, exc,
-                )
+    total_items = len(all_items)
+    logger.info("Summarizer: %d items to process (parallel, max_workers=10)", total_items)
+
+    def _summarize_with_theme(item: dict) -> tuple[str, dict, dict]:
+        theme = item["_theme"]
+        try:
+            summary = summarize_item(item)
+            return theme, item, summary
+        except Exception as exc:
+            logger.warning(
+                "Summarizer failed for item '%s' in theme '%s': %s",
+                item.get("title"), theme, exc,
+            )
+            return theme, item, None
+
+    theme_results: dict[str, list] = {theme: [] for theme in grouped_raw}
+    theme_failed: dict[str, int] = {theme: 0 for theme in grouped_raw}
+    theme_total: dict[str, int] = {
+        theme: len(items) for theme, items in grouped_raw.items()
+    }
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {
+            executor.submit(_summarize_with_theme, item): item
+            for item in all_items
+        }
+        for future in as_completed(futures):
+            theme, item, summary = future.result()
+            if summary is None:
+                theme_failed[theme] = theme_failed.get(theme, 0) + 1
                 continue
-
-            summarized_items.append(
+            theme_results[theme].append(
                 {
                     "title": item.get("title"),
                     "url": item.get("url"),
@@ -127,28 +160,29 @@ def _run_pipeline():
                     "pm_interview_relevance": summary.get("pm_interview_relevance"),
                     "pm_relevance_score": summary.get("pm_relevance_score", "medium"),
                     "confidence": summary.get("confidence", "medium"),
-                    "company_maturity": summary.get("company_maturity", "not_applicable"),
-                    "scope": summary.get("scope", "cross_market"),
-                    "content_word_count": summary.get("content_word_count", 0),
                 }
             )
+
+    for theme in grouped_raw:
+        total = theme_total[theme]
+        failed = theme_failed[theme]
+        succeeded = len(theme_results[theme])
 
         if total > 0:
             logger.info(
                 "Summarization for theme '%s': %d/%d items succeeded, %d failed",
-                theme, total - failed, total, failed,
+                theme, succeeded, total, failed,
             )
-            # FIX: abort pipeline on mass summarizer failure to prevent a silent
-            # empty digest (e.g. caused by API key expiry mid-run).
-            if failed > 0 and total > 0 and failed / total > 0.5:
-                raise RuntimeError(
-                    f"Summarization mass failure in theme '{theme}': "
-                    f"{failed}/{total} items failed. "
-                    "Aborting pipeline to prevent an empty digest from being saved."
+            if failed > 0 and failed / total > 0.5:
+                logger.warning(
+                    "Summarization high failure rate in theme '%s': %d/%d items failed — "
+                    "continuing with %d succeeded items. "
+                    "Check API health if this persists across themes.",
+                    theme, failed, total, succeeded,
                 )
 
-        if summarized_items:
-            items_by_theme[theme] = summarized_items
+        if theme_results[theme]:
+            items_by_theme[theme] = theme_results[theme]
 
     synthesis = synthesize_trends(items_by_theme)
     generated_at = datetime.now()
@@ -200,15 +234,15 @@ def _start_scheduler_if_needed() -> None:
     atexit.register(_shutdown_scheduler)
 
 
-def _get_or_run_pipeline(force_refresh: bool = False):
+def _get_or_run_pipeline(force_refresh: bool = False) -> DigestRecord:
     with _CACHE_LOCK:
         if not force_refresh:
             if _CACHE["synthesis"] is not None:
-                return (
-                    _CACHE["synthesis"],
-                    _CACHE["items_by_theme"],
-                    _CACHE["generated_at"],
-                    _CACHE.get("fetch_metadata") or {},
+                return DigestRecord(
+                    synthesis=_CACHE["synthesis"],
+                    items_by_theme=_CACHE["items_by_theme"],
+                    generated_at=_CACHE["generated_at"],
+                    fetch_metadata=_CACHE.get("fetch_metadata") or {},
                 )
 
             record = get_digest_for_today()
@@ -217,7 +251,7 @@ def _get_or_run_pipeline(force_refresh: bool = False):
                 _CACHE["items_by_theme"] = record.items_by_theme
                 _CACHE["generated_at"] = record.generated_at
                 _CACHE["fetch_metadata"] = record.fetch_metadata
-                return record.synthesis, record.items_by_theme, record.generated_at, record.fetch_metadata
+                return record
 
         synthesis, items_by_theme, generated_at, fetch_metadata = _run_pipeline()
         _CACHE["synthesis"] = synthesis
@@ -234,370 +268,24 @@ def _get_or_run_pipeline(force_refresh: bool = False):
         evaluator.run(date_str, synthesis, items_by_theme, fetch_metadata=fetch_metadata)
         logger.info("[evals] Completed eval for %s", date_str)
     except Exception:
-        # FIX: use logger.exception() to capture full traceback — previously
-        # print(f"[evals] FAILED: {e}") logged only the exception message with
-        # no traceback, making it very hard to diagnose eval failures.
         logger.exception("[evals] FAILED for %s — eval not written to DB", date_str)
 
-    return synthesis, items_by_theme, generated_at, fetch_metadata
+    return DigestRecord(
+        synthesis=synthesis,
+        items_by_theme=items_by_theme,
+        generated_at=generated_at,
+        fetch_metadata=fetch_metadata,
+    )
 
-
-def _get_digest_for_date(date_str: str):
-    """Fetch a digest for a specific YYYY-MM-DD date from SQLite."""
-    settings = load_settings()
-    conn = sqlite3.connect(str(settings.database_path))
-    try:
-        cur = conn.execute(
-            "SELECT synthesis_json, items_by_theme_json, generated_at, fetch_metadata_json "
-            "FROM digests WHERE date = ?",
-            (date_str,),
-        )
-        row = cur.fetchone()
-    finally:
-        conn.close()
-
-    if row is None:
-        return None
-
-    synthesis_json, items_json, generated_at_str, fetch_metadata_json = row
-    try:
-        synthesis = json.loads(synthesis_json)
-        items_by_theme = json.loads(items_json)
-        generated_at = datetime.fromisoformat(generated_at_str)
-        fetch_metadata = json.loads(fetch_metadata_json) if fetch_metadata_json else {}
-    except Exception:
-        return None
-
-    return synthesis, items_by_theme, generated_at, fetch_metadata
-
-
-def _get_eval_summary_for_date(date_str: str):
-    """Fetch a compact eval summary for a specific YYYY-MM-DD date, or None."""
-    settings = load_settings()
-    conn = sqlite3.connect(str(settings.database_path))
-    try:
-        cur = conn.execute(
-            """
-            SELECT
-              pipeline_funnel_json,
-              llm_judge_json,
-              overall_score,
-              flags_json
-            FROM evals
-            WHERE date = ?
-            """,
-            (date_str,),
-        )
-        row = cur.fetchone()
-    except sqlite3.OperationalError:
-        return None
-    finally:
-        conn.close()
-
-    if row is None:
-        return None
-
-    pipeline_funnel_json, llm_judge_json, overall_score, flags_json = row
-    try:
-        llm_judge = json.loads(llm_judge_json) if llm_judge_json else {}
-        flags = json.loads(flags_json) if flags_json else {}
-    except Exception:
-        return None
-
-    return {
-        "overall_score": float(overall_score or 0.0),
-        "avg_coherence": float(llm_judge.get("ws_avg_coherence") or llm_judge.get("avg_coherence") or 0.0),
-        "avg_insight_depth": float(llm_judge.get("ws_avg_insight_depth") or llm_judge.get("avg_insight_depth") or 0.0),
-        "avg_citation_support": float(llm_judge.get("ws_avg_citation_support") or llm_judge.get("avg_citation_support") or 0.0),
-        "has_flags": bool(flags.get("flagged_paragraphs")),
-    }
-
-
-def _get_all_evals():
-    """Fetch all eval rows for the /evals page, newest first."""
-    settings = load_settings()
-    conn = sqlite3.connect(str(settings.database_path))
-    try:
-        cur = conn.execute(
-            """
-            SELECT
-              date,
-              pipeline_funnel_json,
-              pm_relevance_json,
-              llm_judge_json,
-              pm_craft_json,
-              interview_angle_json,
-              overall_score,
-              flags_json
-            FROM evals
-            ORDER BY date DESC
-            """
-        )
-        rows = cur.fetchall()
-    except sqlite3.OperationalError:
-        return []
-    finally:
-        conn.close()
-
-    result = []
-    for row in rows:
-        (date_str, pf_json, pm_json, llm_json, pc_json, ia_json, overall_score, flags_json) = row
-
-        try:
-            d = datetime.strptime(date_str, "%Y-%m-%d")
-            label = d.strftime("%B %d, %Y")
-        except ValueError:
-            # FIX: skip rows with malformed date strings (e.g. debug eval rows
-            # written by the old /debug-eval route).  Previously these appeared
-            # in the eval history with the raw date string as the label.
-            logger.debug("Skipping eval row with non-standard date string: %s", date_str)
-            continue
-
-        pf    = json.loads(pf_json)    if pf_json    else {}
-        pm    = json.loads(pm_json)    if pm_json    else {}
-        llm   = json.loads(llm_json)   if llm_json   else {}
-        pc    = json.loads(pc_json)    if pc_json    else {}
-        ia    = json.loads(ia_json)    if ia_json    else {}
-        flags = json.loads(flags_json) if flags_json else {}
-
-        result.append({
-            "date":          date_str,
-            "label":         label,
-            "overall_score": float(overall_score or 0.0),
-            "ws_coherence":        float(llm.get("ws_avg_coherence")  or llm.get("avg_coherence")  or 0.0),
-            "ws_coherence_reason": str(llm.get("ws_coherence_reason") or ""),
-            "ws_insight":          float(llm.get("ws_avg_insight_depth") or llm.get("avg_insight_depth") or 0.0),
-            "ws_insight_reason":   str(llm.get("ws_insight_reason") or ""),
-            "ws_grounding":        float(llm.get("ws_avg_citation_support") or llm.get("avg_citation_support") or 0.0),
-            "ws_grounding_reason": str(llm.get("ws_grounding_reason") or ""),
-            "ws_breadth":          float(llm.get("ws_topical_breadth") or 0.0),
-            "ws_breadth_reason":   str(llm.get("ws_topical_breadth_reason") or ""),
-            "cw_coherence":        float(llm.get("cw_avg_coherence")  or 0.0),
-            "cw_coherence_reason": str(llm.get("cw_coherence_reason") or ""),
-            "cw_insight":          float(llm.get("cw_avg_insight_depth")  or 0.0),
-            "cw_insight_reason":   str(llm.get("cw_insight_reason") or ""),
-            "cw_grounding":        float(llm.get("cw_avg_citation_support") or 0.0),
-            "cw_grounding_reason": str(llm.get("cw_grounding_reason") or ""),
-            "sr_coherence":        float(llm.get("sr_avg_coherence")  or 0.0),
-            "sr_coherence_reason": str(llm.get("sr_coherence_reason") or ""),
-            "sr_insight":          float(llm.get("sr_avg_insight_depth")  or 0.0),
-            "sr_insight_reason":   str(llm.get("sr_insight_reason") or ""),
-            "sr_grounding":        float(llm.get("sr_avg_citation_support") or 0.0),
-            "sr_grounding_reason": str(llm.get("sr_grounding_reason") or ""),
-            "pc_insight":         float(pc.get("insight_depth") or 0.0),
-            "pc_insight_reason":  str(pc.get("insight_depth_reason") or ""),
-            "ia_relevance":        float(ia.get("relevance") or 0.0),
-            "ia_relevance_reason": str(ia.get("relevance_reason") or ""),
-            "sources_configured": int(pf.get("sources_configured") or 0),
-            "sources_active":     int(pf.get("sources_active") or 0),
-            "sources_active_pct": float(pf.get("sources_active_pct") or 0.0),
-            "empty_source_names": [
-                str(name) for name in (pf.get("empty_source_names") or []) if name
-            ],
-            "fetched":            int(pf.get("fetched") or 0),
-            "confident":          int(pf.get("confident") or 0),
-            "confident_pct":      float(pf.get("confident_pct") or 0.0),
-            "relevant":           int(pf.get("relevant") or 0),
-            "relevant_pct":       float(pf.get("relevant_pct") or 0.0),
-            "utilized":           int(pf.get("utilized") or 0),
-            "utilized_pct":       float(pf.get("utilized_pct") or 0.0),
-            "theme_funnel":       pf.get("theme_funnel") or {},
-            "pm_high":   float(pm.get("high_pct") or 0.0),
-            "pm_med":    float(pm.get("medium_pct") or 0.0),
-            "pm_low":    float(pm.get("low_pct") or 0.0),
-            "weak_pct": float(flags.get("weak_pct") or 0.0),
-        })
-
-    return result
-
-
-def _get_pipeline_health(days: int = 14) -> List[Dict[str, Any]]:
-    """Fetch pipeline funnel data for the last N days."""
-    settings = load_settings()
-    conn = sqlite3.connect(str(settings.database_path))
-    try:
-        cur = conn.execute(
-            """
-            SELECT e.date, e.pipeline_funnel_json
-            FROM evals e
-            ORDER BY e.date DESC
-            LIMIT ?
-            """,
-            (days,),
-        )
-        rows = cur.fetchall()
-    finally:
-        conn.close()
-
-    result: List[Dict[str, Any]] = []
-    for date_str, pf_json in rows:
-        try:
-            d = datetime.strptime(date_str, "%Y-%m-%d")
-            pf = json.loads(pf_json) if pf_json else {}
-        except Exception:
-            continue
-        result.append({
-            "date": date_str,
-            "label": d.strftime("%b %d"),
-            "sources_configured": int(pf.get("sources_configured") or 0),
-            "sources_active": int(pf.get("sources_active") or 0),
-            "fetched": int(pf.get("fetched") or 0),
-            "confident": int(pf.get("confident") or 0),
-            "relevant": int(pf.get("relevant") or 0),
-            "utilized": int(pf.get("utilized") or 0),
-            "sources_active_pct": float(pf.get("sources_active_pct") or 0),
-            "confident_pct": float(pf.get("confident_pct") or 0),
-            "relevant_pct": float(pf.get("relevant_pct") or 0),
-            "utilized_pct": float(pf.get("utilized_pct") or 0),
-            "empty_source_names": pf.get("empty_source_names") or [],
-            "theme_funnel": pf.get("theme_funnel") or {},
-        })
-    return result
-
-
-def _get_warning_history(days: int = 30) -> List[Dict[str, Any]]:
-    """Fetch warning_counts rows for the last N days."""
-    settings = load_settings()
-    conn = sqlite3.connect(str(settings.database_path))
-    try:
-        cur = conn.execute(
-            """
-            SELECT DISTINCT date FROM warning_counts
-            ORDER BY date DESC LIMIT ?
-            """,
-            (days,),
-        )
-        dates = [r[0] for r in cur.fetchall()]
-
-        result: List[Dict[str, Any]] = []
-        for date_str in dates:
-            cur2 = conn.execute(
-                """
-                SELECT warning_type, count, consecutive_days
-                FROM warning_counts WHERE date = ?
-                """,
-                (date_str,),
-            )
-            warnings = {
-                r[0]: {"count": r[1], "consecutive_days": r[2]}
-                for r in cur2.fetchall()
-            }
-            try:
-                d = datetime.strptime(date_str, "%Y-%m-%d")
-                label = d.strftime("%b %d")
-            except Exception:
-                label = date_str
-            result.append({"date": date_str, "label": label, "warnings": warnings})
-    finally:
-        conn.close()
-    return result
-
-
-def _get_prompt_versions_all() -> Dict[str, List[Dict[str, Any]]]:
-    """Fetch all prompt versions grouped by call_name."""
-    settings = load_settings()
-    conn = sqlite3.connect(str(settings.database_path))
-    try:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS prompt_versions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                active_from TEXT NOT NULL, active_to TEXT,
-                call_name TEXT NOT NULL, prompt_hash TEXT NOT NULL,
-                change_reason TEXT, proposed_by TEXT DEFAULT 'manual'
-            )
-            """
-        )
-        cur = conn.execute(
-            """
-            SELECT call_name, active_from, active_to, prompt_hash,
-                   change_reason, proposed_by
-            FROM prompt_versions
-            ORDER BY active_from DESC
-            """
-        )
-        rows = cur.fetchall()
-    finally:
-        conn.close()
-
-    by_call: Dict[str, List[Dict[str, Any]]] = {}
-    for call_name, active_from, active_to, ph, reason, by in rows:
-        by_call.setdefault(call_name, []).append({
-            "active_from": active_from,
-            "active_to": active_to,
-            "prompt_hash": ph,
-            "reason": reason or "",
-            "proposed_by": by or "manual",
-            "is_active": active_to is None,
-        })
-    return by_call
-
-
-def _get_quality_scores(days: int = 30) -> List[Dict[str, Any]]:
-    """Fetch all quality score dimensions for the last N days."""
-    settings = load_settings()
-    conn = sqlite3.connect(str(settings.database_path))
-    try:
-        cur = conn.execute(
-            """
-            SELECT date, llm_judge_json, pm_craft_json,
-                   interview_angle_json, overall_score, flags_json
-            FROM evals ORDER BY date DESC LIMIT ?
-            """,
-            (days,),
-        )
-        rows = cur.fetchall()
-    finally:
-        conn.close()
-
-    result: List[Dict[str, Any]] = []
-    for date_str, llm_j, pc_j, ia_j, overall, flags_j in rows:
-        try:
-            d = datetime.strptime(date_str, "%Y-%m-%d")
-            label = d.strftime("%b %d")
-        except Exception:
-            continue
-        llm = json.loads(llm_j) if llm_j else {}
-        pc = json.loads(pc_j) if pc_j else {}
-        ia = json.loads(ia_j) if ia_j else {}
-        flags = json.loads(flags_j) if flags_j else {}
-        result.append({
-            "date": date_str,
-            "label": label,
-            "overall_score": float(overall or 0),
-            "ws_coherence": float(llm.get("ws_avg_coherence") or 0),
-            "ws_insight": float(llm.get("ws_avg_insight_depth") or 0),
-            "ws_grounding": float(llm.get("ws_avg_citation_support") or 0),
-            "ws_breadth": float(llm.get("ws_topical_breadth") or 0),
-            "cw_coherence": float(llm.get("cw_avg_coherence") or 0),
-            "cw_insight": float(llm.get("cw_avg_insight_depth") or 0),
-            "cw_grounding": float(llm.get("cw_avg_citation_support") or 0),
-            "sr_coherence": float(llm.get("sr_avg_coherence") or 0),
-            "sr_insight": float(llm.get("sr_avg_insight_depth") or 0),
-            "sr_grounding": float(llm.get("sr_avg_citation_support") or 0),
-            "pc_insight": float(pc.get("insight_depth") or 0),
-            "ia_relevance": float(ia.get("relevance") or 0),
-            "sections_scored": flags.get("sections_scored") or [],
-            "weak_pct": float(flags.get("weak_pct") or 0),
-            "ws_breadth_reason": str(llm.get("ws_topical_breadth_reason") or ""),
-            "ws_coherence_reason": str(llm.get("ws_coherence_reason") or ""),
-            "ws_insight_reason": str(llm.get("ws_insight_reason") or ""),
-            "ws_grounding_reason": str(llm.get("ws_grounding_reason") or ""),
-            "cw_coherence_reason": str(llm.get("cw_coherence_reason") or ""),
-            "sr_coherence_reason": str(llm.get("sr_coherence_reason") or ""),
-            "pc_insight_reason": str(pc.get("insight_depth_reason") or ""),
-            "ia_relevance_reason": str(ia.get("relevance_reason") or ""),
-        })
-    return result
 
 
 @app.route("/")
 def index():
-    synthesis, items_by_theme, generated_at, fetch_metadata = _get_or_run_pipeline(force_refresh=False)
+    record = _get_or_run_pipeline(force_refresh=False)
     eval_summary = None
-    if generated_at:
-        eval_summary = _get_eval_summary_for_date(generated_at.date().isoformat())
-    source_index_lookup = (synthesis or {}).get("source_index_lookup") or {}
+    if record.generated_at:
+        eval_summary = get_eval_summary_for_date(record.generated_at.date().isoformat())
+    source_index_lookup = (record.synthesis or {}).get("source_index_lookup") or {}
     citation_index_map = {
         (v["source_name"], v["title"]): k
         for k, v in source_index_lookup.items()
@@ -606,12 +294,12 @@ def index():
         (v["source_name"], v["title"]): int(k)
         for k, v in source_index_lookup.items()
     }
-    utilized_keys = _build_utilized_keys(synthesis or {})
+    utilized_keys = _build_utilized_keys(record.synthesis or {})
     return render_template(
         "index.html",
-        synthesis=synthesis or {},
-        items_by_theme=items_by_theme or {},
-        generated_at=generated_at,
+        synthesis=record.synthesis or {},
+        items_by_theme=record.items_by_theme or {},
+        generated_at=record.generated_at,
         eval_summary=eval_summary,
         citation_index_map=citation_index_map,
         citation_sort_map=citation_sort_map,
@@ -636,12 +324,13 @@ def refresh():
 def digest_health():
     signals = get_consecutive_warning_types()
     trend = get_score_trend(lookback_days=7)
-    pipeline = _get_pipeline_health(days=1)
-    today_pipeline = pipeline[0] if pipeline else {}
+    pipeline = get_pipeline_health(days=1)
+    today_str = date.today().isoformat()
+    today_pipeline = pipeline[0] if pipeline and pipeline[0]["date"] == today_str else {}
 
     # Today's eval for Output Quality card
     today_eval = None
-    quality_scores = _get_quality_scores(days=1)
+    quality_scores = get_quality_scores(days=1)
     if quality_scores:
         row = quality_scores[0]
         dimensions = {
@@ -672,79 +361,39 @@ def digest_health():
 
 @app.route("/digest-health/pipeline")
 def digest_health_pipeline():
-    rows = _get_pipeline_health(days=14)
-    return render_template("source_pipeline.html", rows=rows)
+    rows = get_pipeline_health(days=14)
+    return render_template(
+        "source_pipeline.html",
+        rows=rows,
+        today_date=date.today().isoformat(),
+    )
 
 
 @app.route("/digest-health/deviations")
 def digest_health_deviations():
-    warnings = _get_warning_history(days=30)
-    versions = _get_prompt_versions_all()
-    change_dates = {
-        v["active_from"]
-        for versions_list in versions.values()
-        for v in versions_list
-    }
+    warnings = get_warning_history(days=30)
     warning_types = sorted({
         wt for entry in warnings for wt in entry.get("warnings", {})
     })
     return render_template(
         "prompt_deviations.html",
         warnings=warnings,
-        versions=versions,
-        change_dates=change_dates,
         warning_types=warning_types,
     )
 
 
 @app.route("/digest-health/quality")
 def digest_health_quality():
-    scores = _get_quality_scores(days=30)
-    versions = _get_prompt_versions_all()
-    change_dates = {
-        v["active_from"]
-        for versions_list in versions.values()
-        for v in versions_list
-    }
+    scores = get_quality_scores(days=30)
     return render_template(
         "output_quality.html",
         scores=scores,
-        versions=versions,
-        change_dates=change_dates,
     )
 
 
 @app.route("/history")
 def history():
-    settings = load_settings()
-    conn = sqlite3.connect(str(settings.database_path))
-    try:
-        cur = conn.execute(
-            "SELECT date, generated_at FROM digests ORDER BY date DESC"
-        )
-        rows = cur.fetchall()
-    finally:
-        conn.close()
-
-    history_rows: List[Dict[str, Any]] = []
-    for date_str, generated_at_str in rows:
-        try:
-            d = datetime.strptime(date_str, "%Y-%m-%d")
-        except ValueError:
-            continue
-        try:
-            gen_dt = datetime.fromisoformat(generated_at_str)
-        except Exception:
-            gen_dt = None
-
-        history_rows.append(
-            {
-                "date": date_str,
-                "label": d.strftime("%B %d, %Y"),
-                "generated_at": gen_dt.strftime("%H:%M") if gen_dt else "",
-            }
-        )
-
+    history_rows = get_digest_history()
     return render_template(
         "history.html",
         history_rows=history_rows,
@@ -762,12 +411,11 @@ def debug_eval(date_str: str):
     a malformed-date row to the evals table and polluted the eval history page.
     Now returns the synthesis as JSON without any DB write.
     """
-    result = _get_digest_for_date(date_str)
-    if result is None:
+    record = get_digest_by_date(date_str)
+    if record is None:
         return "No digest found for this date", 404
-    synthesis, items_by_theme, generated_at, fetch_metadata = result
     return app.response_class(
-        json.dumps({"synthesis": synthesis, "generated_at": generated_at.isoformat()}, indent=2),
+        json.dumps({"synthesis": record.synthesis, "generated_at": record.generated_at.isoformat()}, indent=2),
         mimetype="application/json",
     )
 
@@ -779,13 +427,12 @@ def digest_by_date(date_str: str):
     except ValueError:
         abort(404)
 
-    result = _get_digest_for_date(date_str)
-    if result is None:
+    record = get_digest_by_date(date_str)
+    if record is None:
         abort(404)
 
-    synthesis, items_by_theme, generated_at, fetch_metadata = result
-    eval_summary = _get_eval_summary_for_date(date_str)
-    source_index_lookup = (synthesis or {}).get("source_index_lookup") or {}
+    eval_summary = get_eval_summary_for_date(date_str)
+    source_index_lookup = (record.synthesis or {}).get("source_index_lookup") or {}
     citation_index_map = {
         (v["source_name"], v["title"]): k
         for k, v in source_index_lookup.items()
@@ -794,12 +441,12 @@ def digest_by_date(date_str: str):
         (v["source_name"], v["title"]): int(k)
         for k, v in source_index_lookup.items()
     }
-    utilized_keys = _build_utilized_keys(synthesis or {})
+    utilized_keys = _build_utilized_keys(record.synthesis or {})
     return render_template(
         "index.html",
-        synthesis=synthesis or {},
-        items_by_theme=items_by_theme or {},
-        generated_at=generated_at,
+        synthesis=record.synthesis or {},
+        items_by_theme=record.items_by_theme or {},
+        generated_at=record.generated_at,
         eval_summary=eval_summary,
         citation_index_map=citation_index_map,
         citation_sort_map=citation_sort_map,
@@ -841,9 +488,10 @@ def _register_all_prompts() -> None:
         register_prompt("summarizer.call_c.system", _CALL_C_SYSTEM)
         register_prompt("synthesizer.shared.system", SYSTEM_PROMPT)
         register_prompt("synthesizer.call_1a.system", _CALL_1A_SYSTEM)
-        register_prompt("synthesizer.call_3_cw", _CALL_3_SYSTEM)
+        register_prompt("synthesizer.call_2_pm_craft.system", _CALL_4B_SYSTEM)
+        register_prompt("synthesizer.call_3_cw.system", _CALL_3_SYSTEM)
         register_prompt("synthesizer.call_4a.system", _CALL_4A_SYSTEM)
-        register_prompt("synthesizer.call_4b_sr", _CALL_4B_SYSTEM)
+        register_prompt("synthesizer.call_4b_sr.system", SYSTEM_PROMPT)
 
         logger.info("Prompt versions registered at startup.")
     except Exception:

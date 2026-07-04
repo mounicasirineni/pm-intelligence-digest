@@ -10,47 +10,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
 
   <style>
-    :root {
-      --bg: #FAFAF8;
-      --text: #1A1A18;
-      --accent: #1B3A6B;
-      --muted: #7A7A72;
-      --border-subtle: #DFDED7;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      padding: 24px 16px 40px;
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: "Source Serif 4", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, serif;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .page {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    h1, h2 {
-      font-family: "Playfair Display", "Source Serif 4", Georgia, serif;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      margin: 0;
-    }
-
-    .header {
-      margin-bottom: 2.5rem;
-      border-bottom: 1px solid var(--border-subtle);
-      padding-bottom: 1.25rem;
-    }
-
     .header-title {
       font-size: clamp(2.1rem, 3vw, 2.6rem);
       text-transform: uppercase;
@@ -63,30 +25,6 @@
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.16em;
-    }
-
-    .header-nav {
-      margin-top: 0.5rem;
-      font-size: 0.85rem;
-    }
-
-    .header-nav a {
-      color: var(--accent);
-      text-decoration: none;
-      border-bottom: 1px solid rgba(27, 58, 107, 0.25);
-    }
-
-    .header-nav a:hover {
-      border-bottom-color: rgba(27, 58, 107, 0.6);
-    }
-
-    .section {
-      padding: 1.5rem 0 1.75rem;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .section:last-of-type {
-      border-bottom: none;
     }
 
     .section-heading {
@@ -116,16 +54,6 @@
 
     .history-item:first-child {
       border-top: none;
-    }
-
-    .history-date a {
-      color: var(--accent);
-      text-decoration: none;
-      border-bottom: 1px solid rgba(27, 58, 107, 0.25);
-    }
-
-    .history-date a:hover {
-      border-bottom-color: rgba(27, 58, 107, 0.6);
     }
 
     .history-time {

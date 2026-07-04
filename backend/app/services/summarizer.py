@@ -5,9 +5,8 @@ import logging
 import re
 from typing import Any, Dict, List
 
-from anthropic import Anthropic
-
 from ..config import load_settings
+from .client import get_client
 from ..constants import OG_DESCRIPTION_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -38,18 +37,31 @@ _CALL_A_SYSTEM = (
     "For every insight, ask: would a reader get this from the headline or first paragraph alone? "
     "If yes, it is not an insight — it is a restatement. A genuine insight names a non-obvious implication, "
     "a second-order consequence, a strategic tradeoff, or a pattern that requires reading the full content to surface. "
-    "Format each bullet as plain text only. No bold, italics, or markdown inside bullet text."
+    "Format each bullet as plain text only. No bold, italics, or markdown inside bullet text.\n\n"
+
+    "ORDERING: Order bullets from most specific (named mechanisms, products, concrete tradeoffs, "
+    "verifiable numbers) to most abstract (patterns, strategic observations). "
+    "Rank in this order: (1) specific product design consequence or measurable tradeoff, "
+    "(2) strategic pattern with a named mechanism, (3) market observation without a concrete action.\n\n"
+
+    "CONTRADICTION MANDATE: If the content contains a fact, data point, or claim that contradicts, "
+    "qualifies, or significantly complicates the article's central claim, you MUST include it as a bullet. "
+    "A qualifying fact that changes the conclusion a reader would draw is as important as an explicit contradiction.\n\n"
+
+    "SOURCE FIDELITY: Every bullet must trace to a specific claim, data point, or quote in the content body. "
+    "Do not introduce named entities not in the content. Do not assert specific numbers not in the content. "
+    "Do not assign strategic motivations a source does not explicitly state. "
+    "Match source hedge levels exactly — if source says 'suggests', write 'suggests', not 'demonstrates'. "
+    "Scope claims to actual examples — a single company's move does not establish a universal pattern. "
+    "Do not assert why a company did something unless the source explicitly states it.\n\n"
+
+    "EDGE CASES: "
+    "If content is cadence-driven (weekly roundup, event listing, award announcement) with no strategic "
+    "mechanism revealed, return 1 bullet naming what it is and why it lacks signal. "
+    "If content is a newsletter or roundup with multiple distinct stories, extract at least one bullet "
+    "per PM-relevant story — do not limit to the lead story."
 )
 
-
-def _build_client() -> Anthropic:
-    settings = load_settings()
-    if not settings.anthropic_api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY is not set. "
-            "Populate it in your .env file before running the summarizer."
-        )
-    return Anthropic(api_key=settings.anthropic_api_key)
 
 
 def _extract_json(text: str) -> str:
@@ -72,8 +84,7 @@ def _build_call_a_prompt(
     url: str,
     content: str,
 ) -> str:
-    return f"""
-Source: {source_name}
+    return f"""Source: {source_name}
 Theme: {theme}
 Title: {title}
 URL: {url}
@@ -83,45 +94,7 @@ Content:
 
 Extract 3-5 insight bullets from this content.
 
-Return strict JSON: {{"insights": ["bullet 1", "bullet 2", ...]}}
-
-RULES:
-
-SPECIFICITY-FIRST RULE: Order bullets from most specific (named mechanisms, products, concrete
-tradeoffs, verifiable numbers) to most abstract (patterns, strategic observations).
-
-INSIGHT PRIORITIZATION RULE: Rank bullets in this order:
-  (1) Specific product design consequence, architectural decision, or measurable tradeoff
-  (2) Strategic pattern or competitive dynamic with a named mechanism
-  (3) Market observation or trend without a concrete action
-Include highest-ranked first. A bullet that tells a PM what to decide differently outranks
-one that tells them what is happening.
-
-CONTRADICTION MANDATE: If the content contains a fact, data point, or claim that contradicts,
-qualifies, or significantly complicates the article's central claim, you MUST include it as a
-bullet. A qualifying fact that changes the conclusion a reader would draw is as important as
-an explicit contradiction.
-
-SOURCE FIDELITY RULES:
-  - Every bullet must trace to a specific claim, data point, or quote in the content body.
-  - Do not introduce named entities (companies, products, people) not in the content.
-  - Do not assert specific numbers (percentages, dollar figures, timelines) not in the content.
-  - Do not assign strategic motivations a source does not explicitly state.
-  - QUALIFIER PRESERVATION: Match source hedge levels exactly. If source says 'suggests',
-    write 'suggests', not 'demonstrates' or 'proves'.
-  - UNIVERSALITY TEST: A single company's move does not establish a universal pattern.
-    Scope claims to actual examples — 'this suggests platforms in X category may...'
-    not 'all platforms must...'.
-  - VERIFIED MOTIVATION RULE: Do not assert why a company did something unless the source
-    explicitly states it. Use 'this may signal' or 'this suggests' framing for inferred intent.
-
-ROUTINE UPDATE RULE: If this content is cadence-driven (weekly roundup, new title/game
-additions, event listing, award announcement) with no strategic mechanism revealed, return
-1 bullet naming what it is and why it lacks signal. Do not force insights from thin content.
-
-ROUNDUP HANDLING RULE: If this is a newsletter or roundup with multiple distinct stories,
-extract at least one bullet per PM-relevant story. Do not limit to the lead story.
-""".strip()
+Return strict JSON: {{"insights": ["bullet 1", "bullet 2", ...]}}""".strip()
 
 
 def _call_extract(
@@ -135,7 +108,7 @@ def _call_extract(
     url: str,
 ) -> List[str]:
     """Call A: extract insight bullets from article content. Returns insights list."""
-    max_tokens = 1800 if content_word_count > 1000 else 1200
+    max_tokens = 400
 
     response = client.messages.create(
         model=settings.claude_model,
@@ -426,7 +399,7 @@ def summarize_item(item: Dict[str, Any]) -> Dict[str, Any]:
         return _low_result(content_word_count, is_og_fallback, reason="content_too_short")
 
     settings = load_settings()
-    client = _build_client()
+    client = get_client()
 
     insights = _call_extract(
         client, settings, content, content_word_count,

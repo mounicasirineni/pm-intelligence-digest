@@ -24,36 +24,30 @@ class Settings:
     digest_timezone: str
 
 
+_settings: Settings | None = None
+
+
 def load_settings() -> Settings:
+    global _settings
+    if _settings is not None:
+        return _settings
+
     load_dotenv()
 
-    app_env = os.getenv("APP_ENV", "dev")
-    host = os.getenv("APP_HOST", "127.0.0.1")
-    port = int(os.getenv("APP_PORT", "8000"))
-
-    database_path = Path(os.getenv("DATABASE_PATH", "data/digest.sqlite3"))
-    sources_config_path = Path(os.getenv("SOURCES_CONFIG_PATH", "config/sources.json"))
-
-    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY") or None
-    claude_model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5")
-    lookback_hours = int(os.getenv("LOOKBACK_HOURS", "24"))
-    digest_schedule_hour = int(os.getenv("DIGEST_SCHEDULE_HOUR", "7"))
-    digest_schedule_minute = int(os.getenv("DIGEST_SCHEDULE_MINUTE", "0"))
-    digest_timezone = os.getenv("DIGEST_TIMEZONE", "Asia/Kolkata")
-
-    return Settings(
-        app_env=app_env,
-        host=host,
-        port=port,
-        database_path=database_path,
-        sources_config_path=sources_config_path,
-        anthropic_api_key=anthropic_api_key,
-        claude_model=claude_model,
-        lookback_hours=lookback_hours,
-        digest_schedule_hour=digest_schedule_hour,
-        digest_schedule_minute=digest_schedule_minute,
-        digest_timezone=digest_timezone,
+    _settings = Settings(
+        app_env=os.getenv("APP_ENV", "dev"),
+        host=os.getenv("APP_HOST", "127.0.0.1"),
+        port=int(os.getenv("APP_PORT", "8000")),
+        database_path=Path(os.getenv("DATABASE_PATH", "data/digest.sqlite3")),
+        sources_config_path=Path(os.getenv("SOURCES_CONFIG_PATH", "config/sources.json")),
+        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY") or None,
+        claude_model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5"),
+        lookback_hours=int(os.getenv("LOOKBACK_HOURS", "24")),
+        digest_schedule_hour=int(os.getenv("DIGEST_SCHEDULE_HOUR", "7")),
+        digest_schedule_minute=int(os.getenv("DIGEST_SCHEDULE_MINUTE", "0")),
+        digest_timezone=os.getenv("DIGEST_TIMEZONE", "Asia/Kolkata"),
     )
+    return _settings
 
 
 def load_sources_config(path: Path) -> dict[str, Any]:

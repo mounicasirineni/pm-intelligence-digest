@@ -8,26 +8,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
   <style>
-    :root{--bg:#FAFAF8;--text:#1A1A18;--accent:#1B3A6B;--muted:#7A7A72;
-      --border:#DFDED7;--green:#2D6A4F;--amber:#B45309;--red:#991B1B;}
-    *{box-sizing:border-box;}
-    body{margin:0;padding:24px 16px 40px;background:var(--bg);color:var(--text);
-      font-family:"Source Serif 4",-apple-system,serif;-webkit-font-smoothing:antialiased;}
     .page{max-width:960px;margin:0 auto;}
-    h1,h2{font-family:"Playfair Display",serif;font-weight:600;letter-spacing:0.02em;margin:0;}
-    .header{margin-bottom:2rem;border-bottom:1px solid var(--border);padding-bottom:1.25rem;}
     .header-title{font-size:clamp(1.8rem,3vw,2.4rem);text-transform:uppercase;letter-spacing:0.18em;}
     .header-subtitle{margin-top:0.4rem;font-size:0.9rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.16em;}
-    .header-nav{margin-top:0.5rem;font-size:0.85rem;display:flex;gap:1.25rem;}
-    .header-nav a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(27,58,107,0.25);}
-    .header-nav a:hover{border-bottom-color:rgba(27,58,107,0.6);}
     .header-nav span{color:var(--muted);font-style:italic;}
-    .section{padding:1.5rem 0 1.75rem;border-bottom:1px solid var(--border);}
-    .section:last-of-type{border-bottom:none;}
     .section-heading{font-size:1.15rem;margin-bottom:0.3rem;}
     .section-sub{font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;}
-    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
 
     /* Score table */
     .tbl{width:100%;border-collapse:collapse;font-size:0.82rem;}
@@ -45,26 +33,6 @@
       color:var(--accent);padding-top:0.2rem;padding-bottom:0.35rem;
       border-bottom:1px solid var(--border);text-align:center;}
     .tbl thead tr:nth-child(2) th{padding-top:0.35rem;}
-
-    /* Prompt change rows */
-    .tbl tr.prompt-change td{
-      background:rgba(27,58,107,0.04);
-      border-top:2px solid var(--accent);
-      padding-top:0.6rem;padding-bottom:0.6rem;
-    }
-    .prompt-change-banner{
-      font-size:0.72rem;font-weight:600;color:var(--accent);
-      display:flex;align-items:center;gap:6px;
-    }
-    .prompt-change-banner::before{
-      content:"";display:inline-block;width:8px;height:8px;
-      border-radius:50%;background:var(--accent);flex-shrink:0;
-    }
-
-    .good{color:var(--green);font-weight:600;}
-    .amber{color:var(--amber);}
-    .bad{color:var(--red);}
-    .dash{color:var(--muted);}
 
     .overall-badge{
       display:inline-block;font-weight:700;font-size:0.95rem;
@@ -190,17 +158,6 @@
       <tbody>
         {% for row in scores %}
 
-        {# Prompt change banner #}
-        {% if row.date in change_dates %}
-        <tr class="prompt-change">
-          <td colspan="15">
-            <div class="prompt-change-banner">
-              Prompt updated — {{ row.date }} · see git log for details
-            </div>
-          </td>
-        </tr>
-        {% endif %}
-
         <tr>
           <td style="color:var(--accent);font-weight:500;">
             <a href="/{{ row.date }}" style="color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(27,58,107,0.25);">{{ row.label }}</a>
@@ -261,12 +218,6 @@
   </section>
 
 </div>
-<script>
-function toggle(id) {
-  const el = document.getElementById(id);
-  if (el) el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
-}
-
-</script>
+<script src="/static/digest.js"></script>
 </body>
 </html>

@@ -10,16 +10,16 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from anthropic import Anthropic
-
 from ..config import load_settings
+from .client import get_client
 from ..digest_utils import get_used_indices
 from .summarizer import _extract_json
 
 
 logger = logging.getLogger(__name__)
 
-EVAL_MODEL = "claude-haiku-4-5-20251001"
+EVAL_MODEL = "claude-haiku-4-5-20251001"          # classification: breadth, pm_craft, interview_angle
+PARAGRAPH_EVAL_MODEL = "claude-sonnet-4-6"         # grounding/traceability: paragraph scoring
 
 PATCH_SIGNAL_THRESHOLDS = {
     # Prompt compliance failures — model ignoring a specific rule
@@ -27,8 +27,6 @@ PATCH_SIGNAL_THRESHOLDS = {
     "theme_diversity_warnings": 3,
     "theme_audit_warnings": 2,
     "routing_warnings": 2,
-    # Pipeline health — SR starvation after WS dedup
-    "market_signals_sr_empty": 2,
     # cw_source_integrity_violations — removed: auto-corrected in synthesizer
     # pm_craft_source_violations — removed: auto-corrected in synthesizer
 }
@@ -290,15 +288,6 @@ def get_score_trend(lookback_days: int = 7) -> Dict[str, Any]:
     }
 
 
-def _build_llm_client() -> Anthropic:
-    settings = load_settings()
-    if not settings.anthropic_api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY is not set. "
-            "Populate it in your .env file before running LLM-based evals."
-        )
-    return Anthropic(api_key=settings.anthropic_api_key)
-
 
 # --------------------------------
 # Guardrail 1 — pipeline_funnel
@@ -471,7 +460,7 @@ async def llm_judge(
     items_by_theme: Dict[str, Any],
     ws_available_themes: Dict[str, int] | None = None,
 ) -> Dict[str, Any]:
-    client = _build_llm_client()
+    client = get_client()
     whats_shifting = synthesis.get("whats_shifting") or []
     company_watch = synthesis.get("company_watch") or {}
     startup_radar = synthesis.get("startup_radar") or []
@@ -516,6 +505,13 @@ async def llm_judge(
             return None
 
         source_summaries = _build_source_summaries(indices)
+        logger.debug(
+            "PARAGRAPH EVAL [%s]: scoring with %s (%d source bullets available)",
+            section_context,
+            PARAGRAPH_EVAL_MODEL,
+            sum(len(v) for v in source_summaries.values()),
+        )
+
         evidence_block = (
             "Source evidence (ALL bullets for each cited source — not just the ones used in synthesis):\n"
             "NOTE: The bullet numbers [1], [2], [3] below are internal reference numbers for this evaluation only. "
@@ -610,21 +606,21 @@ async def llm_judge(
         )
 
         response = client.messages.create(
-            model=EVAL_MODEL,
+            model=PARAGRAPH_EVAL_MODEL,
             max_tokens=512,
             temperature=0.0,
             system=(
                 "You are an expert evaluator of product management intelligence briefs. "
-                "You assess synthesis quality with precision and consistency. "
-                "You are skeptical by default — a paragraph must earn high scores by meeting explicit criteria, "
-                "not by sounding confident or well-written. "
-                "You have access to ALL source bullets for each cited source, not just the ones the synthesis used. "
-                "Your job is to check both what the synthesis included AND what it omitted. "
-                "A well-constructed argument built on selectively chosen evidence does not earn a high score. "
-                "CRITICAL OUTPUT RULE: In your reason text fields, refer to sources by publication name only. "
-                "Never include any index number, bracket number, or numeric reference in reason text. "
-                "Write 'MIT Technology Review' not 'source [1]'. Write 'the TechCrunch article' not 'TechCrunch [14]'. "
-                "Any index number in your output text invalidates the evaluation."
+                "You receive a synthesis paragraph and ALL source bullets for every cited source — "
+                "not just the bullets the synthesis used. "
+                "Your job is two-directional: check what the synthesis included (forward traceability) "
+                "and what it omitted (backward completeness). "
+                "A paragraph that selects only narrative-supporting bullets and ignores complicating evidence "
+                "does not earn a high score regardless of writing quality. "
+                "Be skeptical by default — scores must be earned against explicit criteria, not awarded for fluency. "
+                "In all reason fields: refer to sources by publication name only. "
+                "Never write index numbers or bracket references in reason text. "
+                "'MIT Technology Review' not 'source [3]'. 'the TechCrunch article' not 'TechCrunch [14]'."
             ),
             messages=[{"role": "user", "content": user_prompt}],
         )
@@ -905,9 +901,6 @@ async def llm_judge(
         "sr_coherence_reason": _representative_reason(sr_scores, "coherence"),
         "sr_insight_reason": _representative_reason(sr_scores, "insight_depth"),
         "sr_grounding_reason": _representative_reason(sr_scores, "citation_support"),
-        "avg_coherence": ws_avg_c,
-        "avg_insight_depth": ws_avg_i,
-        "avg_citation_support": ws_avg_g,
         "flagged_paragraphs": flagged,
         "total_scored": total_scored,
         "weak_pct": weak_pct,
@@ -922,7 +915,7 @@ async def llm_judge(
 async def interview_angle_quality(
     synthesis: Dict[str, Any],
 ) -> Dict[str, Any]:
-    client = _build_llm_client()
+    client = get_client()
     interview_angle = str(synthesis.get("interview_angle") or "").strip()
 
     if not interview_angle:
@@ -977,7 +970,7 @@ async def interview_angle_quality(
 async def pm_craft_quality(
     synthesis: Dict[str, Any],
 ) -> Dict[str, Any]:
-    client = _build_llm_client()
+    client = get_client()
 
     pm_craft_raw = synthesis.get("pm_craft_today") or {}
     pm_craft = (

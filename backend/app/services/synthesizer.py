@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 import uuid
 from datetime import date
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from anthropic import Anthropic
-
 from ..config import load_settings
+from .client import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +70,8 @@ _CALL_1A_SYSTEM = (
     "company's regulatory trouble is company-specific even if it has broader implications."
 )
 
-# PM Craft uses SYSTEM_PROMPT via _CALL_4B_SYSTEM — no separate system prompt needed
-# since it shares a call with Startup Radar.
+# PM Craft uses _CALL_4B_SYSTEM — single-source extraction, not cross-source synthesis.
+# Startup Radar uses SYSTEM_PROMPT (cross-source pattern detection).
 
 _CALL_3_SYSTEM = SYSTEM_PROMPT  # Company Watch uses the shared synthesizer system prompt
 
@@ -81,21 +81,18 @@ _CALL_4A_SYSTEM = (
     "Be conservative — when in doubt about a well-known name, classify as established."
 )
 
-_CALL_4B_SYSTEM = SYSTEM_PROMPT  # Startup Radar uses the shared synthesizer system prompt
+_CALL_4B_SYSTEM = (
+    "You are a PM craft analyst for a product management intelligence digest. "
+    "Your job is to extract the single most actionable insight from PM craft content — "
+    "a non-obvious pattern, tradeoff, or reframe that changes how a practitioner approaches "
+    "a real decision. Draw from one source only. Do not synthesize across sources. "
+    "The insight must be grounded in the specific content provided, not general PM wisdom."
+)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _build_client() -> Anthropic:
-    settings = load_settings()
-    if not settings.anthropic_api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY is not set. "
-            "Populate it in your .env file before running the synthesizer."
-        )
-    return Anthropic(api_key=settings.anthropic_api_key)
 
 
 def _extract_json(text: str) -> str:
@@ -455,26 +452,41 @@ Items:
 First, write your anchor selection reasoning inside <reasoning>...</reasoning> tags.
 For each required anchor theme:
 (1) List ALL insight bullets across every source eligible for that theme, ranked by non-obviousness.
-(2) Name the highest-ranked bullet and declare it the closing implication anchor. The closing sentence of the paragraph must be traceable to this bullet specifically — not to a synthesizer-constructed bridge across bullets, and not to a lower-ranked bullet. If you find yourself writing a closing sentence that does not trace to this bullet, return to the ranked list and select a different anchor.
-(3) List every bullet from the cited sources that contradicts, qualifies, or limits the anchor's claim. For each one, decide: incorporate it into the paragraph, or explicitly acknowledge it as a scope limitation. Omission is not an option — if a qualifying bullet would change the conclusion a reader draws, it must appear in the paragraph or the closing implication must be scoped to exclude it.
-(4) If you are combining items from more than one source into this paragraph, name the specific causal mechanism that justifies the combination. If you cannot name a mechanism beyond a shared category label, do not combine — anchor to the single strongest source instead.
+(2) Name the highest-ranked bullet and declare it the closing implication anchor.
+(3) List every bullet from the cited sources that contradicts, qualifies, or limits the anchor's claim.
+(4) If combining items from more than one source, name the specific causal mechanism. If you cannot name one beyond a shared category label, anchor to the single strongest source instead.
+
+PARAGRAPH RULES — apply these when writing every paragraph:
+- STRUCTURE: Open by restating the headline claim with one clause of context. Develop across 3-4 sentences. Close with one PM implication directly traceable to a cited source.
+- CITATIONS: Every sentence must end with at least one inline [n] citation. Only cite [n] if a specific insight bullet from that item directly supports the exact claim.
+- SOURCES: Draw from at least 2 distinct insight bullets. If combining multiple sources, only do so if you can name a specific causal mechanism connecting them — a shared category label is not a mechanism.
+- HEDGE MATCH: Match source hedge levels exactly. If source says 'suggests', write 'suggests', not 'demonstrates'.
+- NO TIMELINE: Omit any timeline not stated verbatim in a source.
+- NO UNIVERSALITY: Scope claims to actual examples — not 'all platforms must' but 'this suggests platforms in X category may'.
+- COMPLICATION RULE: Before finalizing, check every cited source for bullets that contradict or qualify the central claim. Either incorporate them or scope the closing implication to reflect the limitation. Omission is not an option.
+- SPLIT CHECK: Does the closing sentence contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences — split and keep only the stronger one.
+- CLOSING SENTENCE: Exactly one consequence, directly traceable to a specific cited bullet, matching the source's hedge level. Never write 'this means PMs must/should' unless a cited source explicitly states that directive.
+- INSIGHT SELECTION: The closing implication must trace to the single highest-ranked bullet from your reasoning — the most non-obvious, specific, and source-grounded insight available.
+
+HEADLINE RULES:
+- One declarative sentence, maximum 15 words.
+- Names the underlying structural force or pattern — not an event description.
+- Scannable and self-contained.
 
 Then produce a JSON object with this exact structure:
 {{
   "whats_shifting": [
     {{
-      "headline": "One declarative sentence, maximum 15 words, naming the underlying structural force or pattern. Not an event description. Renders as the visible collapsed card headline — scannable and self-contained.",
-      "paragraph": "Open by restating the headline claim with one additional clause of context. Develop across 3-4 sentences. If drawing from a single source, build depth by incorporating its strongest and most complicating bullets. If drawing from multiple sources, only combine them if you can name a specific causal mechanism that connects them — one that neither source states alone. A shared category label ('both are about AI costs') is not a mechanism. A shared causal chain ('both reveal that X causes Y through mechanism Z') is. When in doubt, anchor to one source's strongest bullet and build depth rather than breadth. Close with one PM implication directly traceable to a cited source. Every sentence ends with inline [n] citations. HEDGE MATCH: match source hedge levels throughout — 'suggests' not 'demonstrates'. NO TIMELINE: omit any timeline not verbatim in a source. NO UNIVERSALITY: scope claims to actual examples. Draw from at least 2 distinct insight bullets — use the best available rather than omitting the paragraph. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. If any exist, either incorporate them or scope the closing implication to reflect the limitation. A paragraph that ignores complicating evidence from its own cited sources will score lower than one that acknowledges the complication and commits to a narrower claim. INSIGHT SELECTION RULE: The closing implication must trace to the single highest-ranked bullet identified in your reasoning — the most non-obvious, specific, and source-grounded insight available. Do not close with a broad pattern observation when a more specific mechanical consequence is available in the source bullets. The broad observation is usually derivable from the headline. The specific mechanical consequence requires reading the full content. Keep the latter. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences. Split them, keep only the stronger one, and discard the other. A closing sentence that states two consequences is a split implication regardless of how tightly connected they seem. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources. Match the hedge level of the source — if the source says 'suggests', write 'suggests', not 'means' or 'demonstrates'. Do not convert a source observation into a prescription. If no source bullet explicitly states a PM action, use 'this suggests' or 'this may signal' framing. Never write 'this means PMs must/should' unless a cited source explicitly states that directive. A well-hedged implication that commits to one specific consequence scores higher than a confident assertion that goes beyond the source.",
+      "headline": "string",
+      "paragraph": "string",
       "source_indices": [1, 2],
-      "theme": "The single theme this paragraph addresses. Must be exactly one of: technology_trends | market_signals | user_behavior | regulation_policy. Pick the theme whose core claim this paragraph develops — not a secondary mention."
+      "theme": "technology_trends | market_signals | user_behavior | regulation_policy"
     }}
-  ],
-  "interview_angle": "One specific tradeoff a PM should have a prepared opinion on this week, derived from a whats_shifting source. Empty string if no whats_shifting paragraph was produced. Frame as a debatable tradeoff at PM decision level — feature prioritization, architecture, safety design, retention, compliance, pricing, or go-to-market. Scope to the context the source describes. DOMAIN RULE: Do not frame in legal, financial, or policy terms even if the source is a legal or regulatory story — translate into a product decision a PM owns. The angle must be answerable by a PM from product judgment, not legal or financial expertise."
+  ]
 }}
 
 IMPORTANT: Do not include anchor_reasoning inside the JSON. All reasoning goes in the <reasoning> block only.
-OUTPUT RULE: Produce a paragraph for every required anchor theme. Imperfect paragraphs are better than empty arrays — missing themes will trigger individual retry calls that cost extra latency and tokens.
-CITATION RULE: Only cite item [n] if a specific insight bullet from that item directly supports the exact claim. Every sentence must have at least one citation.
+OUTPUT RULE: Produce a paragraph for every required anchor theme. Imperfect paragraphs are better than empty arrays.
 """.strip()
 
     response = client.messages.create(
@@ -499,7 +511,7 @@ CITATION RULE: Only cite item [n] if a specific insight bullet from that item di
         parsed = json.loads(cleaned)
     except Exception:
         logger.warning("Call 1 response was not valid JSON. Raw (first 500): %s", (text or "")[:500])
-        parsed = {"whats_shifting": [], "interview_angle": ""}
+        parsed = {"whats_shifting": []}
 
     parsed["_call1_reasoning"] = reasoning_text
     return parsed, ws_indexed
@@ -519,7 +531,7 @@ def _call_whats_shifting_single_theme(
     covered_themes: Set[str] | None = None,
 ) -> Optional[Dict[str, Any]]:
     if not theme_items:
-        logger.warning("FILL [theme=%s]: No items available — skipping", anchor["theme"])
+        logger.warning("1b-fill [theme=%s]: No items available — skipping", anchor["theme"])
         return None
 
     lines: List[str] = []
@@ -547,7 +559,7 @@ def _call_whats_shifting_single_theme(
 
     context_block = "\n".join(lines)
     if not context_block.strip():
-        logger.warning("FILL [theme=%s]: Empty context block — skipping", anchor["theme"])
+        logger.warning("1b-fill [theme=%s]: Empty context block — skipping", anchor["theme"])
         return None
 
     theme = anchor["theme"]
@@ -583,10 +595,27 @@ First, write your reasoning inside <reasoning>...</reasoning> tags:
 (3) List every bullet that contradicts or qualifies the anchor's claim.
 (4) Name the causal mechanism if combining multiple sources.
 
+PARAGRAPH RULES — apply these when writing the paragraph:
+- STRUCTURE: Open by restating the headline claim with one clause of context. Develop across 3-4 sentences. Close with one PM implication directly traceable to a cited source.
+- CITATIONS: Every sentence must end with at least one inline [n] citation. Only cite [n] if a specific insight bullet from that item directly supports the exact claim.
+- SOURCES: Draw from at least 2 distinct insight bullets. If combining multiple sources, only do so if you can name a specific causal mechanism connecting them — a shared category label is not a mechanism.
+- HEDGE MATCH: Match source hedge levels exactly. If source says 'suggests', write 'suggests', not 'demonstrates'.
+- NO TIMELINE: Omit any timeline not stated verbatim in a source.
+- NO UNIVERSALITY: Scope claims to actual examples — not 'all platforms must' but 'this suggests platforms in X category may'.
+- COMPLICATION RULE: Before finalizing, check every cited source for bullets that contradict or qualify the central claim. Either incorporate them or scope the closing implication to reflect the limitation. Omission is not an option.
+- SPLIT CHECK: Does the closing sentence contain 'and', 'while also', 'as well as', or 'in addition'? If yes, it contains two consequences — split and keep only the stronger one.
+- CLOSING SENTENCE: Exactly one consequence, directly traceable to a specific cited bullet, matching the source's hedge level. Never write 'this means PMs must/should' unless a cited source explicitly states that directive.
+- INSIGHT SELECTION: The closing implication must trace to the single highest-ranked bullet from your reasoning — the most non-obvious, specific, and source-grounded insight available.
+
+HEADLINE RULES:
+- One declarative sentence, maximum 15 words.
+- Names the underlying structural force or pattern — not an event description.
+- Scannable and self-contained.
+
 Then produce a JSON object:
 {{
-  "headline": "One declarative sentence, maximum 15 words, naming the structural force or pattern. Scannable, self-contained, not an event description.",
-  "paragraph": "3-5 sentences. Open with the headline claim plus one clause of context. Develop with 2+ bullets from the items above. Close with one PM implication traceable to a cited source. Every sentence has inline [n] citations. HEDGE MATCH: match source hedge levels. NO TIMELINE unless verbatim in source. NO UNIVERSALITY beyond actual examples. COMPLICATION RULE: Before finalizing the paragraph, check every cited source for bullets that contradict or qualify the central claim. SPLIT CHECK: Before writing the closing sentence, ask: does it contain 'and', 'while also', 'as well as', or 'in addition'? If yes, split and keep only the stronger one. CLOSING SENTENCE: State exactly one consequence directly traceable to a specific bullet in the cited sources.",
+  "headline": "string",
+  "paragraph": "string",
   "source_indices": [],
   "theme": "{theme}"
 }}
@@ -613,7 +642,7 @@ CITATION RULE: Use the item index numbers shown above exactly as written.
         parsed = json.loads(cleaned)
     except Exception:
         logger.warning(
-            "FILL [theme=%s]: Response was not valid JSON. Raw (first 300): %s",
+            "1b-fill [theme=%s]: Response was not valid JSON. Raw (first 300): %s",
             theme, (text or "")[:300],
         )
         return None
@@ -631,10 +660,10 @@ CITATION RULE: Use the item index numbers shown above exactly as written.
             continue
 
     if not paragraph.strip():
-        logger.warning("FILL [theme=%s]: Paragraph is empty after parsing — fill failed", theme)
+        logger.warning("1b-fill [theme=%s]: Paragraph is empty after parsing — fill failed", theme)
         return None
 
-    logger.info("FILL [theme=%s]: Paragraph produced (%d words)", theme, len(paragraph.split()))
+    logger.info("1b-fill [theme=%s]: Paragraph produced (%d words)", theme, len(paragraph.split()))
     return {
         "headline": headline,
         "paragraph": paragraph,
@@ -642,6 +671,307 @@ CITATION RULE: Use the item index numbers shown above exactly as written.
         "_fill_theme": theme,
         "_fill_reasoning": reasoning_text,
     }
+
+
+# ---------------------------------------------------------------------------
+# Call 1c — Interview Angle (Sonnet)
+# ---------------------------------------------------------------------------
+
+def _call_interview_angle(
+    client: Anthropic,
+    settings: Any,
+    ws_paragraphs: List[Dict[str, Any]],
+    source_index_lookup: Dict[str, Dict[str, Any]],
+    today: str,
+) -> str:
+    """
+    Call 1c: Derive one interview angle from WS output.
+    Runs after Call 1b and fill calls so it has access to the full WS section.
+    Returns the interview angle string, or "" if none can be derived.
+    """
+    if not ws_paragraphs:
+        logger.info("Call 1c (Interview Angle): no WS paragraphs — skipping")
+        return ""
+
+    # Build a compact representation of today's WS section
+    ws_block_lines = []
+    for i, ws in enumerate(ws_paragraphs):
+        headline = ws.get("headline", "")
+        paragraph = ws.get("paragraph", "")
+        theme = ws.get("theme", "")
+        indices = ws.get("source_indices", [])
+        source_names = [
+            source_index_lookup.get(str(idx), {}).get("source_name", "")
+            for idx in indices
+            if source_index_lookup.get(str(idx))
+        ]
+        ws_block_lines.append(
+            f"[WS {i+1}] Theme: {theme}\n"
+            f"Headline: {headline}\n"
+            f"Paragraph: {paragraph}\n"
+            f"Sources: {', '.join(s for s in source_names if s)}"
+        )
+
+    ws_block = "\n\n".join(ws_block_lines)
+
+    user_prompt = f"""
+Today's date is {today}.
+
+You are reviewing today's What's Shifting section and deriving one interview angle for a Senior PM.
+
+What's Shifting section:
+{ws_block}
+
+Derive exactly one interview angle — a specific, debatable tradeoff that a Senior PM should have a prepared opinion on this week.
+
+RULES:
+- Must derive directly from one of the What's Shifting paragraphs above — not from general PM knowledge.
+- Frame as a debatable tradeoff at PM decision level: feature prioritization, architecture, safety design, retention, compliance, pricing, or go-to-market.
+- Scope to the specific context the source describes — not a universal principle.
+- DOMAIN RULE: If the source is a regulatory or legal story, translate into a product decision a PM owns. Do not frame in legal or financial terms.
+- The angle must be answerable from product judgment, not legal or financial expertise.
+- Return empty string if no paragraph produces a genuine PM-level tradeoff.
+
+Return strict JSON: {{"interview_angle": "string or empty string"}}
+""".strip()
+
+    for attempt in range(3):
+        try:
+            response = client.messages.create(
+                model=settings.claude_model,
+                max_tokens=256,
+                temperature=0.3,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            block = response.content[0]
+            text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+            parsed = json.loads(_extract_json(text or ""))
+            angle = _strip_date_check_flags(str(parsed.get("interview_angle") or ""))
+
+            # Poison string check — same as before
+            POISON_STRINGS = [
+                "synthesis pipeline",
+                "surface this week",
+                "run the",
+            ]
+            if any(p in angle.lower() for p in POISON_STRINGS):
+                logger.warning(
+                    "Call 1c (Interview Angle): prompt bleed detected — suppressing. Raw: %s",
+                    angle[:200],
+                )
+                return ""
+
+            logger.info(
+                "Call 1c (Interview Angle): derived (%d chars)",
+                len(angle),
+            )
+            return angle
+
+        except Exception as exc:
+            if attempt < 2:
+                logger.warning(
+                    "Call 1c (Interview Angle) failed (attempt %d/3): %s — retrying in %ds",
+                    attempt + 1, exc, 2 ** attempt,
+                )
+                time.sleep(2 ** attempt)
+            else:
+                logger.warning(
+                    "Call 1c (Interview Angle) failed after 3 attempts — returning empty"
+                )
+                return ""
+
+
+# ---------------------------------------------------------------------------
+# Call 2 — PM Craft (Sonnet)
+# ---------------------------------------------------------------------------
+
+def _call_pm_craft(
+    client: Anthropic,
+    settings: Any,
+    pm_items: List[Dict[str, Any]],
+    today: str,
+    start_idx: int,
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    Call 2: Extract the single most actionable PM craft insight.
+    Draws only from pm_craft-tagged items. Single-source extraction, not cross-source synthesis.
+    """
+    if not pm_items:
+        logger.info("Call 2 (PM Craft): no pm_craft items — returning empty.")
+        return {
+            "pm_craft_today": {"text": "", "source_indices": []},
+            "_call2_reasoning": "",
+        }, []
+
+    context_block, pc_indexed, _ = _build_context_block(pm_items, start_idx=start_idx)
+
+    user_prompt = f"""
+You are extracting the single most actionable PM craft insight for a Senior PM digest.
+Today's date is {today}.
+
+Items (pm_craft sources only):
+{context_block}
+
+First, write your reasoning inside <reasoning>...</reasoning> tags:
+(1) List all insight bullets ranked by non-obviousness and actionability.
+(2) Name the highest-ranked bullet and declare it the anchor.
+(3) Note any bullets that qualify or complicate the anchor's claim.
+
+Then produce a JSON object:
+{{
+  "pm_craft_today": {{
+    "text": "Single most actionable PM craft insight. Draw from ONE source only — do not synthesize across sources. The insight must be non-obvious, grounded in the specific source content, and immediately applicable to a real PM decision. Not generic PM blog advice. SPLIT CHECK: closing sentence must state exactly one actionable consequence traceable to a cited bullet. Empty string if no eligible item exists.",
+    "source_indices": []
+  }}
+}}
+
+IMPORTANT: All reasoning goes in <reasoning> only. JSON contains output only.
+CITATION RULE: Only cite [n] if a specific bullet directly supports the exact claim.
+EMPTY STRING RULE: If no eligible pm_craft item exists, return empty string — do not hallucinate content.
+""".strip()
+
+    reasoning_text = ""
+    text = ""
+    for attempt in range(3):
+        try:
+            response = client.messages.create(
+                model=settings.claude_model,
+                max_tokens=800,
+                temperature=0.3,
+                system=_CALL_4B_SYSTEM,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            content_block = response.content[0]
+            text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
+            logger.debug("Raw Call 2 (PM Craft) response: %s", text)
+
+            reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
+            if reasoning_text:
+                logger.info("Call 2 (PM Craft) reasoning extracted (%d chars)", len(reasoning_text))
+
+            cleaned = _extract_json(text_without_reasoning)
+            parsed = json.loads(cleaned)
+            parsed["_call2_reasoning"] = reasoning_text
+            return parsed, pc_indexed
+
+        except Exception as exc:
+            if attempt < 2:
+                logger.warning(
+                    "Call 2 (PM Craft) failed (attempt %d/3): %s — retrying in %ds",
+                    attempt + 1, exc, 2 ** attempt,
+                )
+                time.sleep(2 ** attempt)
+            else:
+                logger.warning(
+                    "Call 2 (PM Craft) response not valid JSON after 3 attempts. "
+                    "Raw (first 500): %s", (text or "")[:500],
+                )
+
+    return {
+        "pm_craft_today": {"text": "", "source_indices": []},
+        "_call2_reasoning": reasoning_text,
+    }, pc_indexed
+
+
+# ---------------------------------------------------------------------------
+# Call 4b — Startup Radar (Sonnet)
+# ---------------------------------------------------------------------------
+
+def _call_startup_radar(
+    client: Anthropic,
+    settings: Any,
+    sr_items: List[Dict[str, Any]],
+    today: str,
+    start_idx: int,
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    Call 4b: Synthesize Startup Radar bullets from company-specific market_signals items
+    that have been classified as genuine startups by Call 4a.
+    Cross-source synthesis — identify patterns across early-stage companies.
+    """
+    if not sr_items:
+        logger.info("Call 4b (Startup Radar): no items — returning empty.")
+        return {
+            "startup_radar": [],
+            "_call4b_reasoning": "",
+        }, []
+
+    context_block, sr_indexed, _ = _build_context_block(sr_items, start_idx=start_idx)
+
+    user_prompt = f"""
+You are writing Startup Radar bullets for a Senior PM digest.
+Today's date is {today}.
+
+Items are early-stage or emerging companies from market_signals sources.
+
+Items:
+{context_block}
+
+First, write your reasoning inside <reasoning>...</reasoning> tags:
+(1) List all insight bullets ranked by non-obviousness.
+(2) Name the highest-ranked bullet and declare it the closing implication anchor.
+(3) List every bullet that contradicts or qualifies the anchor's claim.
+(4) Name the causal mechanism if combining multiple companies.
+
+Then produce a JSON object:
+{{
+  "startup_radar": [
+    {{
+      "bullet": "2-3 items on early-stage or emerging companies only. Structure: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. HEDGE MATCH: match source hedge levels. NO TIMELINE unless verbatim in source. METRICS: include funding amount or key metric if available. THEMATIC COMBINATION: only combine companies if you can name the specific causal mechanism both share — a shared category label is not a mechanism. SPLIT CHECK: closing sentence must state exactly one consequence traceable to a cited bullet.",
+      "source_indices": []
+    }}
+  ]
+}}
+
+IMPORTANT: All reasoning goes in <reasoning> only. JSON contains output only.
+STARTUP FILTER: Only include genuinely early-stage or emerging companies. Established companies must not appear here.
+CITATION RULE: Only cite [n] if a specific bullet directly supports the exact claim.
+EMPTY ARRAY RULE: If no eligible startup items exist, return empty array — do not hallucinate content.
+CRITICAL OUTPUT RULE: Your response must contain the <reasoning> block first, then end with a valid JSON object. Do not write any text or markdown after the closing brace of the JSON.
+""".strip()
+
+    reasoning_text = ""
+    text = ""
+    for attempt in range(3):
+        try:
+            response = client.messages.create(
+                model=settings.claude_model,
+                max_tokens=1200,
+                temperature=0.3,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            content_block = response.content[0]
+            text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
+            logger.debug("Raw Call 4b (Startup Radar) response: %s", text)
+
+            reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
+            if reasoning_text:
+                logger.info("Call 4b (Startup Radar) reasoning extracted (%d chars)", len(reasoning_text))
+
+            cleaned = _extract_json(text_without_reasoning)
+            parsed = json.loads(cleaned)
+            parsed["_call4b_reasoning"] = reasoning_text
+            return parsed, sr_indexed
+
+        except Exception as exc:
+            if attempt < 2:
+                logger.warning(
+                    "Call 4b (Startup Radar) failed (attempt %d/3): %s — retrying in %ds",
+                    attempt + 1, exc, 2 ** attempt,
+                )
+                time.sleep(2 ** attempt)
+            else:
+                logger.warning(
+                    "Call 4b (Startup Radar) response not valid JSON after 3 attempts. "
+                    "Raw (first 500): %s", (text or "")[:500],
+                )
+
+    return {
+        "startup_radar": [],
+        "_call4b_reasoning": reasoning_text,
+    }, sr_indexed
 
 
 # ---------------------------------------------------------------------------
@@ -739,105 +1069,6 @@ CITATION RULE: Only cite [n] if a specific bullet directly supports the exact cl
 
 
 # ---------------------------------------------------------------------------
-# Call 2b: Startup Radar + PM Craft
-# ---------------------------------------------------------------------------
-
-def _call_sr_pm_craft(
-    client: Anthropic,
-    settings: Any,
-    sr_pm_items: List[Dict[str, Any]],
-    today: str,
-    start_idx: int,
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """
-    Dedicated call for Startup Radar and PM Craft only.
-
-    Separating these from Company Watch gives SR and PM Craft their own
-    full attention budget. Previously these sections received whatever
-    token headroom remained after 9 company evaluations — directly causing
-    SR's 43% run rate and coherence volatility.
-    """
-    if not sr_pm_items:
-        logger.info("Call 2b (SR+PC): No items — returning empty.")
-        return {
-            "startup_radar": [],
-            "pm_craft_today": {"text": "", "source_indices": []},
-            "_call2b_reasoning": "",
-        }, []
-
-    context_block, sr_pm_indexed, _ = _build_context_block(sr_pm_items, start_idx=start_idx)
-
-    user_prompt = f"""
-You are reasoning across market_signals and pm_craft items for a Senior PM digest.
-Today's date is {today}.
-
-Items are tagged either:
-  - startup_radar ONLY  (theme: market_signals)
-  - pm_craft_today ONLY (theme: pm_craft)
-
-Items:
-{context_block}
-
-First, write your anchor selection reasoning inside <reasoning>...</reasoning> tags.
-For startup_radar and pm_craft_today:
-(1) List ALL insight bullets ranked by non-obviousness.
-(2) Name the highest-ranked bullet and declare it the closing implication anchor.
-(3) List every bullet that contradicts or qualifies the anchor's claim.
-(4) Name the causal mechanism if combining multiple sources.
-
-Then produce a JSON object:
-
-{{
-  "startup_radar": [
-    {{
-      "bullet": "2-3 items on early-stage or emerging companies only. Structure: [what the company did] + [why it matters strategically] + [what pattern or shift it represents]. HEDGE MATCH. NO TIMELINE unless verbatim in source. METRICS: include funding amount or key metric if available. THEMATIC COMBINATION: only combine companies if you can name the specific causal mechanism both share. SPLIT CHECK: closing sentence must state exactly one consequence traceable to a cited bullet.",
-      "source_indices": []
-    }}
-  ],
-  "pm_craft_today": {{
-    "text": "Single most actionable PM craft insight. Draw ONLY from items tagged pm_craft_today ONLY (pm_craft). Empty string if no such item exists. INSIGHT QUALITY: non-obvious pattern, tradeoff, or reframe that changes how a PM approaches a real decision. SPLIT CHECK: closing sentence must state exactly one actionable consequence traceable to a cited bullet.",
-    "source_indices": []
-  }}
-}}
-
-IMPORTANT: Do not include reasoning inside the JSON. All reasoning goes in <reasoning> only.
-SECTION ROUTING RULE: startup_radar ONLY items (market_signals) → startup_radar only. pm_craft_today ONLY items (pm_craft) → pm_craft_today only. Hard constraints, not suggestions.
-CITATION RULE: Only cite item [n] if a specific insight bullet directly supports the exact claim.
-STARTUP FILTER: Only include companies with company_maturity=startup in startup_radar. Established companies must not appear here.
-EMPTY STRING RULE: If no eligible items exist for a section, return empty string or empty array — do not hallucinate content.
-""".strip()
-
-    response = client.messages.create(
-        model=settings.claude_model,
-        max_tokens=2000,
-        temperature=0.3,
-        system=_CALL_4B_SYSTEM,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
-
-    content_block = response.content[0]
-    text = getattr(content_block, "text", None) or content_block.get("text")  # type: ignore[union-attr]
-    logger.debug("Raw Claude Call 2b (SR+PC) response: %s", text)
-
-    reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
-    if reasoning_text:
-        logger.info("Call 2b (SR+PC) reasoning extracted (%d chars)", len(reasoning_text))
-
-    cleaned = _extract_json(text_without_reasoning)
-    try:
-        parsed = json.loads(cleaned)
-    except Exception:
-        logger.warning("Call 2b (SR+PC) response not valid JSON. Raw (first 500): %s", (text or "")[:500])
-        parsed = {
-            "startup_radar": [],
-            "pm_craft_today": {"text": "", "source_indices": []},
-        }
-
-    parsed["_call2b_reasoning"] = reasoning_text
-    return parsed, sr_pm_indexed
-
-
-# ---------------------------------------------------------------------------
 # Call 1a — Cross-market classifier (Haiku)
 # ---------------------------------------------------------------------------
 
@@ -921,33 +1152,42 @@ Return strict JSON — a dict mapping each item_id to true (cross-market) or fal
 Use the exact item_id strings shown in brackets above.
 """.strip()
 
-    try:
-        response = client.messages.create(
-            model=HAIKU_MODEL,
-            max_tokens=512,
-            temperature=0,
-            system=_CALL_1A_SYSTEM,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-        block = response.content[0]
-        text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
-        parsed = json.loads(_extract_json(text or ""))
-        classifications = parsed.get("classifications") or {}
-        result = {
-            item["item_id"]: bool(classifications.get(item["item_id"], False))
-            for item in ws_items
-        }
-        cross_market_count = sum(1 for v in result.values() if v)
-        logger.info(
-            "Call 1a (cross-market): %d/%d items classified as cross-market → WS pool",
-            cross_market_count, len(ws_items),
-        )
-        return result
-    except Exception:
-        logger.warning(
-            "Call 1a classification failed — defaulting all items to company-specific (conservative)"
-        )
-        return {item["item_id"]: False for item in ws_items}
+    for attempt in range(3):
+        try:
+            response = client.messages.create(
+                model=HAIKU_MODEL,
+                max_tokens=512,
+                temperature=0,
+                system=_CALL_1A_SYSTEM,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            block = response.content[0]
+            text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+            parsed = json.loads(_extract_json(text or ""))
+            classifications = parsed.get("classifications") or {}
+            result = {
+                item["item_id"]: bool(classifications.get(item["item_id"], False))
+                for item in ws_items
+            }
+            cross_market_count = sum(1 for v in result.values() if v)
+            logger.info(
+                "Call 1a (cross-market): %d/%d items classified as cross-market → WS pool",
+                cross_market_count, len(ws_items),
+            )
+            return result
+        except Exception as exc:
+            if attempt < 2:
+                logger.warning(
+                    "Call 1a classification failed (attempt %d/3): %s — retrying in %ds",
+                    attempt + 1, exc, 2 ** attempt,
+                )
+                time.sleep(2 ** attempt)
+            else:
+                logger.warning(
+                    "Call 1a classification failed after 3 attempts — "
+                    "defaulting all items to company-specific (conservative)"
+                )
+                return {item["item_id"]: False for item in ws_items}
 
 
 # ---------------------------------------------------------------------------
@@ -1017,31 +1257,42 @@ true = startup, false = established.
 Use the exact item_id strings shown in brackets above.
 """.strip()
 
-    try:
-        response = client.messages.create(
-            model=HAIKU_MODEL,
-            max_tokens=256,
-            temperature=0,
-            system=_CALL_4A_SYSTEM,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-        block = response.content[0]
-        text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
-        parsed = json.loads(_extract_json(text or ""))
-        classifications = parsed.get("classifications") or {}
-        result = {
-            item["item_id"]: bool(classifications.get(item["item_id"], False))
-            for item in sr_items
-        }
-        startup_count = sum(1 for v in result.values() if v)
-        logger.info(
-            "Call 4a (startup): %d/%d items classified as startup",
-            startup_count, len(sr_items),
-        )
-        return result
-    except Exception:
-        logger.warning("Call 4a classification failed — defaulting all items to startup")
-        return {item["item_id"]: True for item in sr_items}
+    for attempt in range(3):
+        try:
+            response = client.messages.create(
+                model=HAIKU_MODEL,
+                max_tokens=256,
+                temperature=0,
+                system=_CALL_4A_SYSTEM,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            block = response.content[0]
+            text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+            parsed = json.loads(_extract_json(text or ""))
+            classifications = parsed.get("classifications") or {}
+            result = {
+                item["item_id"]: bool(classifications.get(item["item_id"], False))
+                for item in sr_items
+            }
+            startup_count = sum(1 for v in result.values() if v)
+            logger.info(
+                "Call 4a (startup): %d/%d items classified as startup",
+                startup_count, len(sr_items),
+            )
+            return result
+        except Exception as exc:
+            if attempt < 2:
+                logger.warning(
+                    "Call 4a classification failed (attempt %d/3): %s — retrying in %ds",
+                    attempt + 1, exc, 2 ** attempt,
+                )
+                time.sleep(2 ** attempt)
+            else:
+                logger.warning(
+                    "Call 4a classification failed after 3 attempts — "
+                    "defaulting all items to startup"
+                )
+                return {item["item_id"]: True for item in sr_items}
 
 
 # ---------------------------------------------------------------------------
@@ -1058,14 +1309,6 @@ def _persist_synthesizer_input(
     try:
         conn = sqlite3.connect(db_path)
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS synthesizer_inputs ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-            "run_date TEXT NOT NULL, "
-            "created_at TEXT NOT NULL, "
-            "grouped_summaries TEXT NOT NULL"
-            ")"
-        )
-        conn.execute(
             "INSERT INTO synthesizer_inputs (run_date, created_at, grouped_summaries) VALUES (?, ?, ?)",
             (
                 today,
@@ -1081,7 +1324,7 @@ def _persist_synthesizer_input(
 
 
 def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
-    client = _build_client()
+    client = get_client()
     settings = load_settings()
     today = date.today().strftime("%B %d, %Y")
 
@@ -1143,6 +1386,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         "pm_craft_today": {"text": "", "source_indices": []},
         "interview_angle": "",
         "source_index_lookup": {},
+        "ws_theme_dist": {},
         "editorial_warnings": {
             "multi_thread_violations": [],
             "date_warnings": [],
@@ -1155,7 +1399,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             "pm_craft_source_violations": [],
             "source_concentration_warnings": [],
             "theme_diversity_warnings": [],
-            "market_signals_sr_empty": [],
         },
     }
 
@@ -1252,16 +1495,21 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         elif theme == "pm_craft":
             sr_pm_items.append(item)
         elif theme == "market_signals":
-            if cross_market_map.get(item["item_id"], False):
+            is_cross_market = cross_market_map.get(item["item_id"], False)
+            if is_cross_market:
                 ws_items.append(item)
-            sr_items.append(item)  # all market_signals eligible for SR regardless
+            else:
+                # Company-specific market_signals → Startup Radar
+                sr_items.append(item)
         elif theme in WHATS_SHIFTING_THEMES:
+            # technology_trends, regulation_policy, user_behavior
+            # Company-specific items are dropped — no dedicated section for them
             if cross_market_map.get(item["item_id"], False):
                 ws_items.append(item)
 
     logger.info(
-        "Call 1a: %d items in WS pool, %d in SR pool after cross-market filter",
-        len(ws_items), len(sr_items),
+        "Routing: %d WS items, %d CW items, %d SR items, %d PM Craft items",
+        len(ws_items), len(cw_items), len(sr_items), len(sr_pm_items),
     )
 
     dedicated_items = cw_items + sr_items + sr_pm_items
@@ -1348,7 +1596,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             theme_items = [i for i in ws_items if i["theme"] == theme]
 
             logger.info(
-                "WS FILL [theme=%s]: Calling targeted fill with %d items",
+                "1b-fill [theme=%s]: Calling targeted fill with %d items",
                 theme, len(theme_items)
             )
 
@@ -1360,7 +1608,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             if fill_result and fill_result.get("paragraph", "").strip():
                 ws_paragraphs.append(fill_result)
                 logger.info(
-                    "WS FILL [theme=%s]: Merged into ws_paragraphs (%d total paragraphs now)",
+                    "1b-fill [theme=%s]: Merged into ws_paragraphs (%d total paragraphs now)",
                     theme, len(ws_paragraphs)
                 )
                 if fill_result.get("_fill_reasoning"):
@@ -1370,7 +1618,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                     })
             else:
                 logger.error(
-                    "WS FILL [theme=%s]: Fill call produced no usable paragraph",
+                    "1b-fill [theme=%s]: Fill call produced no usable paragraph",
                     theme
                 )
 
@@ -1398,37 +1646,16 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 len(required_anchors), sorted(final_covered)
             )
 
-        # Remove WS-consumed market_signals items from Startup Radar pool
-        ws_used_indices: Set[int] = set()
-        for ws in ws_paragraphs:
-            ws_used_indices.update(ws.get("source_indices", []))
+        # ---------------------------------------------------------------------------
+        # Call 1c: Interview Angle
+        # ---------------------------------------------------------------------------
+        interview_angle = _call_interview_angle(
+            client, settings, ws_paragraphs, source_index_lookup, today
+        )
 
-        ws_used_item_ids: Set[str] = set()
-        for entry in ws_indexed:
-            if entry["index"] in ws_used_indices and entry.get("item_id"):
-                ws_used_item_ids.add(entry["item_id"])
-
-        if ws_used_item_ids:
-            before_sr_count = len(sr_items)
-            sr_items = [
-                item for item in sr_items
-                if item.get("item_id") not in ws_used_item_ids
-            ]
-            removed_sr = before_sr_count - len(sr_items)
-            if removed_sr:
-                logger.info(
-                    "DEDUP [ws_consumed]: Removed %d market_signals item(s) from "
-                    "Startup Radar pool already cited in WS",
-                    removed_sr
-                )
-
-        if not sr_items:
-            logger.warning(
-                "SR POOL EMPTY: no market_signals items remain for Startup Radar "
-                "after WS dedup — Startup Radar will be empty today"
-            )
-
-        # Call 4a — startup classification
+        # ---------------------------------------------------------------------------
+        # Call 4a — Startup classifier
+        # ---------------------------------------------------------------------------
         startup_map: Dict[str, bool] = {}
         if sr_items:
             startup_map = _call_startup_classifier(client, settings, sr_items, today)
@@ -1439,44 +1666,40 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
             ]
             dropped = before_count - len(sr_items)
             logger.info(
-                "Call 4a: %d established companies removed from market_signals SR pool",
+                "Call 4a: %d established companies removed from SR pool",
                 dropped,
             )
 
         # ---------------------------------------------------------------------------
-        # Call 3: Company Watch
+        # Call 2 — PM Craft
         # ---------------------------------------------------------------------------
-        start_idx = len(ws_indexed) + 1
+        start_idx_pc = len(ws_indexed) + 1
+        call2_parsed, pc_indexed = _call_pm_craft(
+            client, settings, sr_pm_items, today, start_idx=start_idx_pc
+        )
 
-        call4_items = sr_items + sr_pm_items
+        # ---------------------------------------------------------------------------
+        # Call 3 — Company Watch
+        # ---------------------------------------------------------------------------
+        start_idx_cw = start_idx_pc + len(pc_indexed)
+        call3_parsed, cw_indexed = _call_company_watch(
+            client, settings, cw_items, today, start_idx=start_idx_cw
+        )
+
+        # ---------------------------------------------------------------------------
+        # Call 4b — Startup Radar
+        # ---------------------------------------------------------------------------
+        start_idx_sr = start_idx_cw + len(cw_indexed)
+        call4b_parsed, sr_indexed = _call_startup_radar(
+            client, settings, sr_items, today, start_idx=start_idx_sr
+        )
+
+        dedicated_indexed = pc_indexed + cw_indexed + sr_indexed
 
         logger.info(
-            "Call 3/4 split: %d company_strategy → Call 3, %d startup + %d PM Craft → Call 4",
-            len(cw_items), len(sr_items), len(sr_pm_items),
+            "Call routing: %d PM Craft → Call 2, %d CW → Call 3, %d SR → Call 4b",
+            len(sr_pm_items), len(cw_items), len(sr_items),
         )
-
-        call3_parsed, cw_indexed = _call_company_watch(
-            client, settings, cw_items, today, start_idx=start_idx
-        )
-
-        # ---------------------------------------------------------------------------
-        # Call 4: Startup Radar + PM Craft
-        # ---------------------------------------------------------------------------
-        call4_parsed, sr_pm_indexed = _call_sr_pm_craft(
-            client, settings, call4_items, today,
-            start_idx=start_idx + len(cw_indexed),
-        )
-
-        dedicated_indexed = cw_indexed + sr_pm_indexed
-
-        # Merge into the shape the rest of the pipeline expects
-        call2_parsed = {
-            "company_watch":  call3_parsed.get("company_watch") or {},
-            "startup_radar":  call4_parsed.get("startup_radar") or [],
-            "pm_craft_today": call4_parsed.get("pm_craft_today") or {"text": "", "source_indices": []},
-            "_call3_reasoning": call3_parsed.get("_call3_reasoning", ""),
-            "_call2b_reasoning": call4_parsed.get("_call2b_reasoning", ""),
-        }
 
         for entry in dedicated_indexed:
             source_index_lookup[str(entry["index"])] = {
@@ -1487,25 +1710,15 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "item_id": entry.get("item_id"),
             }
 
-        interview_angle = _strip_date_check_flags(str(call1_parsed.get("interview_angle") or ""))
-
-        # FIX: documented poison strings with context about when each was added.
-        # These catch specific prompt-bleed patterns observed in production.
-        INTERVIEW_ANGLE_POISON_STRINGS = [
-            "synthesis pipeline",  # Claude echoed orchestration context
-            "surface this week",   # Claude echoed prompt phrasing verbatim
-            "run the",             # Claude echoed "run the digest" from prompt
-        ]
-        if any(p in interview_angle.lower() for p in INTERVIEW_ANGLE_POISON_STRINGS):
-            logger.warning(
-                "INTERVIEW ANGLE: Prompt bleed detected — suppressing output. Raw: %s",
-                interview_angle[:200],
-            )
-            interview_angle = ""
-
-        normalized_company_watch = _normalize_company_watch(call2_parsed.get("company_watch") or {})
-        normalized_startup_radar = _normalize_startup_radar(call2_parsed.get("startup_radar") or [])
-        pm_craft_today = _normalize_pm_craft(call2_parsed.get("pm_craft_today") or {})
+        normalized_company_watch = _normalize_company_watch(
+            call3_parsed.get("company_watch") or {}
+        )
+        normalized_startup_radar = _normalize_startup_radar(
+            call4b_parsed.get("startup_radar") or []
+        )
+        pm_craft_today = _normalize_pm_craft(
+            call2_parsed.get("pm_craft_today") or {}
+        )
 
         # ---------------------------------------------------------------------------
         # Post-processing validators
@@ -1925,15 +2138,12 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
                 "split_implication_warnings": split_implication_warnings,
                 "theme_audit_warnings": theme_audit_warnings,
                 "theme_diversity_warnings": theme_diversity_warnings,
-                "market_signals_sr_empty": (
-                    [{"warning": "No market_signals items remain for SR after WS dedup"}]
-                    if not sr_items else []
-                ),
                 "call1_anchor_reasoning_debug": call1_parsed.get("_call1_reasoning", ""),
                 "call1a_cross_market_debug": cross_market_map,
-                "call3_anchor_reasoning_debug": call2_parsed.get("_call3_reasoning", ""),
-                "call2b_anchor_reasoning_debug": call2_parsed.get("_call2b_reasoning", ""),
+                "call3_anchor_reasoning_debug": call3_parsed.get("_call3_reasoning", ""),
+                "call2_pm_craft_reasoning_debug": call2_parsed.get("_call2_reasoning", ""),
                 "call4a_startup_debug": startup_map,
+                "call4b_sr_reasoning_debug": call4b_parsed.get("_call4b_reasoning", ""),
                 "fill_anchor_reasoning_debug": fill_reasonings,
             },
         }

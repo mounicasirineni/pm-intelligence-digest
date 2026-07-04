@@ -8,26 +8,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
   <style>
-    :root{--bg:#FAFAF8;--text:#1A1A18;--accent:#1B3A6B;--muted:#7A7A72;
-      --border:#DFDED7;--green:#2D6A4F;--amber:#B45309;--red:#991B1B;}
-    *{box-sizing:border-box;}
-    body{margin:0;padding:24px 16px 40px;background:var(--bg);color:var(--text);
-      font-family:"Source Serif 4",-apple-system,serif;-webkit-font-smoothing:antialiased;}
     .page{max-width:900px;margin:0 auto;}
-    h1,h2{font-family:"Playfair Display",serif;font-weight:600;letter-spacing:0.02em;margin:0;}
-    .header{margin-bottom:2rem;border-bottom:1px solid var(--border);padding-bottom:1.25rem;}
     .header-title{font-size:clamp(1.8rem,3vw,2.4rem);text-transform:uppercase;letter-spacing:0.18em;}
     .header-subtitle{margin-top:0.4rem;font-size:0.9rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.16em;}
-    .header-nav{margin-top:0.5rem;font-size:0.85rem;display:flex;gap:1.25rem;}
-    .header-nav a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(27,58,107,0.25);}
-    .header-nav a:hover{border-bottom-color:rgba(27,58,107,0.6);}
     .header-nav span{color:var(--muted);font-style:italic;}
-    .section{padding:1.5rem 0 1.75rem;border-bottom:1px solid var(--border);}
-    .section:last-of-type{border-bottom:none;}
     .section-heading{font-size:1.15rem;margin-bottom:0.3rem;}
     .section-sub{font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;}
-    .empty{color:var(--muted);font-style:italic;font-size:0.9rem;}
 
     /* Ledger */
     .ledger{width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:0.5rem;}
@@ -57,30 +45,6 @@
     .streak-pill.patch{background:rgba(153,27,27,0.1);border:1px solid rgba(153,27,27,0.3);color:var(--red);}
     .feed-detail{font-size:0.78rem;color:var(--muted);}
 
-    /* Prompt change banner */
-    .prompt-change-banner{
-      display:flex;align-items:center;gap:8px;
-      padding:0.6rem 0;margin-bottom:0;
-      font-size:0.72rem;font-weight:600;color:var(--accent);
-      border-top:2px solid var(--accent);
-    }
-    .prompt-change-banner::before{
-      content:"";display:inline-block;width:8px;height:8px;
-      border-radius:50%;background:var(--accent);flex-shrink:0;
-    }
-
-    /* Version history */
-    .version-group{margin-bottom:1.5rem;}
-    .version-group-label{font-size:0.72rem;font-weight:600;text-transform:uppercase;
-      letter-spacing:0.1em;color:var(--accent);margin-bottom:0.5rem;}
-    .version-row{display:flex;gap:1rem;align-items:baseline;font-size:0.82rem;
-      padding:0.3rem 0;border-bottom:1px solid rgba(223,222,215,0.4);}
-    .version-row:last-child{border-bottom:none;}
-    .v-date{min-width:80px;color:var(--muted);}
-    .v-hash{font-family:"SF Mono","Fira Code",monospace;font-size:0.75rem;color:var(--accent);}
-    .v-active{font-size:0.65rem;background:#dcfce7;color:#166534;padding:1px 5px;border-radius:3px;font-weight:700;}
-    .v-reason{color:var(--text);flex:1;}
-    .v-by{font-size:0.72rem;color:var(--muted);}
   </style>
 </head>
 <body>
@@ -134,11 +98,6 @@
           <td>A source was cited in the wrong section — a dedicated-section source appeared in What's Shifting, or vice versa.</td>
           <td>2 consecutive days</td>
         </tr>
-        <tr>
-          <td>Startup Radar Pool Empty <span class="threshold-badge">2d</span></td>
-          <td>No market_signals items remained for Startup Radar after What's Shifting consumed them. Startup Radar ran empty today.</td>
-          <td>2 consecutive days</td>
-        </tr>
       </tbody>
     </table>
   </section>
@@ -155,20 +114,12 @@
       "split_implication_warnings": {"label": "Split Implication", "threshold": 3},
       "theme_diversity_warnings":   {"label": "Theme Diversity",   "threshold": 3},
       "theme_audit_warnings":       {"label": "Theme Audit",       "threshold": 2},
-      "routing_warnings":           {"label": "Routing",           "threshold": 2},
-      "market_signals_sr_empty":    {"label": "Startup Radar Pool Empty",     "threshold": 2}
+      "routing_warnings":           {"label": "Routing",           "threshold": 2}
     } %}
 
     {% if warnings %}
     <div class="feed">
       {% for row in warnings %}
-
-        {# Prompt change banner #}
-        {% if row.date in change_dates %}
-        <div class="prompt-change-banner">
-          Prompt updated — {{ row.date }} · see git log for details
-        </div>
-        {% endif %}
 
         {% set fired = [] %}
         {% for wtype, meta in tracked_warnings.items() %}
