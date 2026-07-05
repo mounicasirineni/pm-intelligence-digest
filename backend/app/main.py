@@ -26,6 +26,7 @@ from .services.cache import (
     get_warning_history,
     get_quality_scores,
     get_digest_history,
+    get_prompt_versions_all,
     init_db,
     save_digest,
     DigestRecord,
@@ -372,6 +373,12 @@ def digest_health_pipeline():
 @app.route("/digest-health/deviations")
 def digest_health_deviations():
     warnings = get_warning_history(days=30)
+    versions = get_prompt_versions_all()
+    change_dates = {
+        v["active_from"]
+        for versions_list in versions.values()
+        for v in versions_list
+    }
     warning_types = sorted({
         wt for entry in warnings for wt in entry.get("warnings", {})
     })
@@ -379,15 +386,23 @@ def digest_health_deviations():
         "prompt_deviations.html",
         warnings=warnings,
         warning_types=warning_types,
+        change_dates=change_dates,
     )
 
 
 @app.route("/digest-health/quality")
 def digest_health_quality():
     scores = get_quality_scores(days=30)
+    versions = get_prompt_versions_all()
+    change_dates = {
+        v["active_from"]
+        for versions_list in versions.values()
+        for v in versions_list
+    }
     return render_template(
         "output_quality.html",
         scores=scores,
+        change_dates=change_dates,
     )
 
 

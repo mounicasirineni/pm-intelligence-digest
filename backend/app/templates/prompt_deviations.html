@@ -45,6 +45,26 @@
     .streak-pill.patch{background:rgba(153,27,27,0.1);border:1px solid rgba(153,27,27,0.3);color:var(--red);}
     .feed-detail{font-size:0.78rem;color:var(--muted);}
 
+    .prompt-change-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0.6rem 0;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--accent);
+      border-top: 2px solid var(--accent);
+    }
+    .prompt-change-banner::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
   </style>
 </head>
 <body>
@@ -128,6 +148,12 @@
             {% if fired.append((wtype, meta, wdata)) %}{% endif %}
           {% endif %}
         {% endfor %}
+
+        {% if row.date in change_dates %}
+        <div class="prompt-change-banner">
+          Prompt updated — {{ row.date }} · see git log for details
+        </div>
+        {% endif %}
 
         <div class="feed-day">
           <div class="feed-day-header">

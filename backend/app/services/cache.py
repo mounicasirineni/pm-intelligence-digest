@@ -12,6 +12,59 @@ from ..config import load_settings
 
 logger = logging.getLogger(__name__)
 
+def get_prompt_versions_all() -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Return prompt version history for all registered call names.
+
+    Shape matches the legacy usage in digest-health routes:
+    { call_name: [ {id, active_from, active_to, prompt_hash, change_reason, proposed_by}, ... ] }
+    """
+    conn = _get_connection()
+    try:
+        # Keep this table definition aligned with services/prompt_registry.py
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompt_versions (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                active_from  TEXT NOT NULL,
+                active_to    TEXT,
+                call_name    TEXT NOT NULL,
+                prompt_hash  TEXT NOT NULL,
+                change_reason TEXT,
+                proposed_by  TEXT DEFAULT 'manual'
+            )
+            """
+        )
+        cur = conn.execute("SELECT DISTINCT call_name FROM prompt_versions")
+        call_names = [r[0] for r in cur.fetchall() if r and r[0]]
+
+        versions: Dict[str, List[Dict[str, Any]]] = {}
+        for call_name in call_names:
+            cur = conn.execute(
+                """
+                SELECT id, active_from, active_to, prompt_hash, change_reason, proposed_by
+                FROM prompt_versions
+                WHERE call_name = ?
+                ORDER BY active_from DESC
+                """,
+                (call_name,),
+            )
+            rows = cur.fetchall()
+            versions[call_name] = [
+                {
+                    "id": r[0],
+                    "active_from": r[1],
+                    "active_to": r[2],
+                    "prompt_hash": r[3],
+                    "change_reason": r[4],
+                    "proposed_by": r[5],
+                }
+                for r in rows
+            ]
+        return versions
+    finally:
+        conn.close()
+
 
 @dataclass(frozen=True)
 class DigestRecord:

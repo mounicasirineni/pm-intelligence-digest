@@ -52,6 +52,30 @@
       white-space:normal;
     }
     .reasons-grid strong{color:var(--text);}
+
+    .tbl tr.prompt-change td {
+      background: rgba(27, 58, 107, 0.04);
+      border-top: 2px solid var(--accent);
+      padding-top: 0.6rem;
+      padding-bottom: 0.6rem;
+    }
+    .prompt-change-banner {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .prompt-change-banner::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -157,6 +181,16 @@
       </thead>
       <tbody>
         {% for row in scores %}
+
+        {% if row.date in change_dates %}
+        <tr class="prompt-change">
+          <td colspan="15">
+            <div class="prompt-change-banner">
+              Prompt updated — {{ row.date }} · see git log for details
+            </div>
+          </td>
+        </tr>
+        {% endif %}
 
         <tr>
           <td style="color:var(--accent);font-weight:500;">
