@@ -108,7 +108,7 @@
         <tr>
           <td>Utilized Articles</td>
           <td>Relevant articles actually cited in today's synthesis output</td>
-          <td>🟢 ≥80% of relevant · 🟡 ≥60% · 🔴 &lt;60%</td>
+          <td>🟢 ≥35% of relevant · 🟡 ≥20% · 🔴 &lt;20%</td>
         </tr>
         <tr>
           <td>Silent Sources</td>
@@ -157,10 +157,10 @@
       </div>
       <div class="funnel-step">
         <div class="fs-label">Utilized Articles</div>
-        <div class="fs-value {% if today.utilized_pct >= 80 %}good{% elif today.utilized_pct >= 60 %}amber{% else %}bad{% endif %}">
+        <div class="fs-value {% if today.utilized_pct >= 35 %}good{% elif today.utilized_pct >= 20 %}amber{% else %}bad{% endif %}">
           {{ today.utilized }}
         </div>
-        <div class="fs-pct {% if today.utilized_pct >= 80 %}good{% elif today.utilized_pct >= 60 %}amber{% else %}bad{% endif %}">
+        <div class="fs-pct {% if today.utilized_pct >= 35 %}good{% elif today.utilized_pct >= 20 %}amber{% else %}bad{% endif %}">
           {{ "%.0f"|format(today.utilized_pct) }}% of relevant
         </div>
       </div>
@@ -243,7 +243,7 @@
           <td class="{% if row.relevant_pct >= 70 %}good{% elif row.relevant_pct >= 50 %}amber{% else %}bad{% endif %}">
             {{ "%.0f"|format(row.relevant_pct) }}%
           </td>
-          <td class="{% if row.utilized_pct >= 80 %}good{% elif row.utilized_pct >= 60 %}amber{% else %}bad{% endif %}">
+          <td class="{% if row.utilized_pct >= 35 %}good{% elif row.utilized_pct >= 20 %}amber{% else %}bad{% endif %}">
             {{ "%.0f"|format(row.utilized_pct) }}%
           </td>
           <td>

@@ -98,12 +98,30 @@ _CALL_4B_SYSTEM = (
 def _extract_json(text: str) -> str:
     if not text:
         return text
+    # Strip <reasoning>...</reasoning> blocks if present
+    text = re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL).strip()
+    # Try ```json ... ``` fence
     json_fence = re.search(r"```json(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     if json_fence:
         return json_fence.group(1).strip()
+    # Try generic ``` ... ``` fence
     generic_fence = re.search(r"```(.*?)```", text, flags=re.DOTALL)
     if generic_fence:
         return generic_fence.group(1).strip()
+    # Find outermost { } or [ ] — whichever comes first
+    brace_start = text.find("{")
+    bracket_start = text.find("[")
+    if brace_start == -1 and bracket_start == -1:
+        return text.strip()
+    if brace_start == -1:
+        start, end_char = bracket_start, "]"
+    elif bracket_start == -1:
+        start, end_char = brace_start, "}"
+    else:
+        start, end_char = (brace_start, "}") if brace_start < bracket_start else (bracket_start, "]")
+    end = text.rfind(end_char)
+    if end != -1 and end > start:
+        return text[start:end + 1]
     return text.strip()
 
 
@@ -1163,7 +1181,10 @@ Use the exact item_id strings shown in brackets above.
             )
             block = response.content[0]
             text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
-            parsed = json.loads(_extract_json(text or ""))
+            extracted = _extract_json(text or "")
+            if not extracted:
+                raise ValueError("Empty response from API")
+            parsed = json.loads(extracted)
             classifications = parsed.get("classifications") or {}
             result = {
                 item["item_id"]: bool(classifications.get(item["item_id"], False))
@@ -1268,7 +1289,10 @@ Use the exact item_id strings shown in brackets above.
             )
             block = response.content[0]
             text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
-            parsed = json.loads(_extract_json(text or ""))
+            extracted = _extract_json(text or "")
+            if not extracted:
+                raise ValueError("Empty response from API")
+            parsed = json.loads(extracted)
             classifications = parsed.get("classifications") or {}
             result = {
                 item["item_id"]: bool(classifications.get(item["item_id"], False))
@@ -1430,49 +1454,6 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         logger.warning("SOURCE CONCENTRATION WARNINGS: %s", json.dumps(source_concentration_warnings, indent=2))
 
     # ---------------------------------------------------------------------------
-    # Source diversity cap
-    # ---------------------------------------------------------------------------
-    MAX_ITEMS_PER_SOURCE = 3
-
-    source_item_counts: Dict[str, int] = {}
-    diversity_capped_items: List[Dict[str, Any]] = []
-    diversity_overflow: List[Dict[str, Any]] = []
-
-    relevance_order = {"high": 0, "medium": 1}
-    filtered_items.sort(key=lambda x: relevance_order.get(x.get("pm_relevance_score", "medium"), 1))
-
-    for item in filtered_items:
-        src = item.get("source_name", "unknown")
-        current_count = source_item_counts.get(src, 0)
-        if current_count < MAX_ITEMS_PER_SOURCE:
-            diversity_capped_items.append(item)
-            source_item_counts[src] = current_count + 1
-        else:
-            diversity_overflow.append(item)
-            logger.info(
-                "DIVERSITY CAP: '%s' from '%s' held in overflow (source already at %d items)",
-                item.get("title"), src, MAX_ITEMS_PER_SOURCE
-            )
-
-    represented_themes = {item["theme"] for item in diversity_capped_items}
-    for item in diversity_overflow:
-        if item["theme"] not in represented_themes:
-            diversity_capped_items.append(item)
-            represented_themes.add(item["theme"])
-            logger.info(
-                "DIVERSITY CAP OVERRIDE: '%s' from '%s' restored — only item for theme '%s'",
-                item.get("title"), item.get("source_name"), item["theme"]
-            )
-
-    filtered_items = diversity_capped_items
-
-    theme_funnel_after_cap: Dict[str, int] = {}
-    for item in filtered_items:
-        t = item["theme"]
-        theme_funnel_after_cap[t] = theme_funnel_after_cap.get(t, 0) + 1
-    logger.info("THEME FUNNEL [stage=after_diversity_cap]: %s", json.dumps(theme_funnel_after_cap))
-
-    # ---------------------------------------------------------------------------
     # Partition by routing eligibility
     # ---------------------------------------------------------------------------
     ws_items: List[Dict[str, Any]] = []
@@ -1561,11 +1542,18 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         # ---------------------------------------------------------------------------
         # Call 1: all WS themes together
         # ---------------------------------------------------------------------------
-        call1_parsed, ws_indexed = _call_whats_shifting(
-            client, settings, ws_items, today,
-            ws_theme_distribution=ws_theme_dist,
-            required_anchors=required_anchors,
-        )
+        if not ws_items:
+            logger.warning(
+                "Call 1 skipped — ws_items empty after cross-market classification "
+                "(Call 1a likely failed all retries). WS section will be empty."
+            )
+            call1_parsed, ws_indexed = {"whats_shifting": []}, []
+        else:
+            call1_parsed, ws_indexed = _call_whats_shifting(
+                client, settings, ws_items, today,
+                ws_theme_distribution=ws_theme_dist,
+                required_anchors=required_anchors,
+            )
 
         ws_paragraphs = _normalize_whats_shifting(call1_parsed.get("whats_shifting") or [])
         ws_paragraphs = [ws for ws in ws_paragraphs if ws.get("paragraph", "").strip()]

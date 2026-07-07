@@ -68,12 +68,30 @@ def _extract_json(text: str) -> str:
     """Best-effort extraction of a JSON object from a Claude reply."""
     if not text:
         return text
+    # Strip <reasoning>...</reasoning> blocks if present
+    text = re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL).strip()
+    # Try ```json ... ``` fence
     json_fence = re.search(r"```json(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     if json_fence:
         return json_fence.group(1).strip()
+    # Try generic ``` ... ``` fence
     generic_fence = re.search(r"```(.*?)```", text, flags=re.DOTALL)
     if generic_fence:
         return generic_fence.group(1).strip()
+    # Find outermost { } or [ ] — whichever comes first
+    brace_start = text.find("{")
+    bracket_start = text.find("[")
+    if brace_start == -1 and bracket_start == -1:
+        return text.strip()
+    if brace_start == -1:
+        start, end_char = bracket_start, "]"
+    elif bracket_start == -1:
+        start, end_char = brace_start, "}"
+    else:
+        start, end_char = (brace_start, "}") if brace_start < bracket_start else (bracket_start, "]")
+    end = text.rfind(end_char)
+    if end != -1 and end > start:
+        return text[start:end + 1]
     return text.strip()
 
 
@@ -108,7 +126,7 @@ def _call_extract(
     url: str,
 ) -> List[str]:
     """Call A: extract insight bullets from article content. Returns insights list."""
-    max_tokens = 400
+    max_tokens = 800
 
     response = client.messages.create(
         model=settings.claude_model,
