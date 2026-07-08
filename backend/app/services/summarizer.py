@@ -68,8 +68,10 @@ def _extract_json(text: str) -> str:
     """Best-effort extraction of a JSON object from a Claude reply."""
     if not text:
         return text
-    # Strip <reasoning>...</reasoning> blocks if present
+    # Strip complete blocks first
     text = re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL).strip()
+    # Strip unclosed blocks (truncated responses — no </reasoning> present)
+    text = re.sub(r"<reasoning>.*", "", text, flags=re.DOTALL).strip()
     # Try ```json ... ``` fence
     json_fence = re.search(r"```json(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     if json_fence:

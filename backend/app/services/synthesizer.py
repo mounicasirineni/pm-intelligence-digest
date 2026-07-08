@@ -98,8 +98,10 @@ _CALL_4B_SYSTEM = (
 def _extract_json(text: str) -> str:
     if not text:
         return text
-    # Strip <reasoning>...</reasoning> blocks if present
+    # Strip complete blocks first
     text = re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL).strip()
+    # Strip unclosed blocks (truncated responses — no </reasoning> present)
+    text = re.sub(r"<reasoning>.*", "", text, flags=re.DOTALL).strip()
     # Try ```json ... ``` fence
     json_fence = re.search(r"```json(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     if json_fence:
@@ -133,6 +135,14 @@ def _extract_reasoning_block(text: str) -> Tuple[str, str]:
         reasoning = match.group(1).strip()
         remaining = text[:match.start()] + text[match.end():]
         return reasoning, remaining.strip()
+    # Fallback: handle unclosed <reasoning> (truncated response)
+    unclosed = re.search(r"<reasoning>(.*)", text, flags=re.DOTALL)
+    if unclosed:
+        logger.warning(
+            "Unclosed <reasoning> block detected — response likely truncated. "
+            "Extracting partial reasoning; no JSON expected."
+        )
+        return unclosed.group(1).strip(), text[:unclosed.start()].strip()
     return "", text
 
 
@@ -955,7 +965,7 @@ CRITICAL OUTPUT RULE: Your response must contain the <reasoning> block first, th
         try:
             response = client.messages.create(
                 model=settings.claude_model,
-                max_tokens=1200,
+                max_tokens=2000,
                 temperature=0.3,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
@@ -1182,8 +1192,8 @@ Use the exact item_id strings shown in brackets above.
             block = response.content[0]
             text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
             extracted = _extract_json(text or "")
-            if not extracted:
-                raise ValueError("Empty response from API")
+            if not extracted or not (extracted.startswith("{") or extracted.startswith("[")):
+                raise ValueError(f"Non-JSON response from API (first 100): {extracted[:100]!r}")
             parsed = json.loads(extracted)
             classifications = parsed.get("classifications") or {}
             result = {
@@ -1290,8 +1300,8 @@ Use the exact item_id strings shown in brackets above.
             block = response.content[0]
             text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
             extracted = _extract_json(text or "")
-            if not extracted:
-                raise ValueError("Empty response from API")
+            if not extracted or not (extracted.startswith("{") or extracted.startswith("[")):
+                raise ValueError(f"Non-JSON response from API (first 100): {extracted[:100]!r}")
             parsed = json.loads(extracted)
             classifications = parsed.get("classifications") or {}
             result = {
@@ -1646,6 +1656,7 @@ def synthesize_trends(grouped_summaries: Dict[str, List[Dict[str, Any]]]) -> Dic
         # ---------------------------------------------------------------------------
         startup_map: Dict[str, bool] = {}
         if sr_items:
+            time.sleep(1)  # brief spacing after the WS synthesis burst
             startup_map = _call_startup_classifier(client, settings, sr_items, today)
             before_count = len(sr_items)
             sr_items = [
