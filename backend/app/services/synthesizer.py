@@ -102,6 +102,9 @@ def _extract_json(text: str) -> str:
     text = re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL).strip()
     # Strip unclosed blocks (truncated responses — no </reasoning> present)
     text = re.sub(r"<reasoning>.*", "", text, flags=re.DOTALL).strip()
+    # Strip opening ```json or ``` fence markers (handles truncated responses)
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"```\s*$", "", text).strip()
     # Try ```json ... ``` fence
     json_fence = re.search(r"```json(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     if json_fence:
@@ -1184,7 +1187,7 @@ Use the exact item_id strings shown in brackets above.
         try:
             response = client.messages.create(
                 model=HAIKU_MODEL,
-                max_tokens=512,
+                max_tokens=1024,
                 temperature=0,
                 system=_CALL_1A_SYSTEM,
                 messages=[{"role": "user", "content": user_prompt}],
@@ -1292,7 +1295,7 @@ Use the exact item_id strings shown in brackets above.
         try:
             response = client.messages.create(
                 model=HAIKU_MODEL,
-                max_tokens=256,
+                max_tokens=512,
                 temperature=0,
                 system=_CALL_4A_SYSTEM,
                 messages=[{"role": "user", "content": user_prompt}],

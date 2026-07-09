@@ -72,6 +72,9 @@ def _extract_json(text: str) -> str:
     text = re.sub(r"<reasoning>.*?</reasoning>", "", text, flags=re.DOTALL).strip()
     # Strip unclosed blocks (truncated responses — no </reasoning> present)
     text = re.sub(r"<reasoning>.*", "", text, flags=re.DOTALL).strip()
+    # Strip opening ```json or ``` fence markers (handles truncated responses)
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"```\s*$", "", text).strip()
     # Try ```json ... ``` fence
     json_fence = re.search(r"```json(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     if json_fence:
