@@ -1072,31 +1072,44 @@ IMPORTANT: Reasoning in <reasoning> only. JSON contains paragraphs only.
 CITATION RULE: Only cite [n] if a specific bullet directly supports the exact claim.
 """.strip()
 
-    response = client.messages.create(
-        model=settings.claude_model,
-        max_tokens=3000,
-        temperature=0.3,
-        system=_CALL_3_SYSTEM,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
+    reasoning_text = ""
+    text = ""
+    for attempt in range(3):
+        try:
+            response = client.messages.create(
+                model=settings.claude_model,
+                max_tokens=4000,
+                temperature=0.3,
+                system=_CALL_3_SYSTEM,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            block = response.content[0]
+            text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
+            logger.debug("Raw Call 3 (CW) response: %s", text)
 
-    block = response.content[0]
-    text = getattr(block, "text", None) or block.get("text")  # type: ignore[union-attr]
-    logger.debug("Raw Call 3 (CW) response: %s", text)
+            reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
+            if reasoning_text:
+                logger.info("Call 3 (CW) reasoning extracted (%d chars)", len(reasoning_text))
 
-    reasoning_text, text_without_reasoning = _extract_reasoning_block(text or "")
-    if reasoning_text:
-        logger.info("Call 3 (CW) reasoning extracted (%d chars)", len(reasoning_text))
+            cleaned = _extract_json(text_without_reasoning)
+            parsed = json.loads(cleaned)  # raises on truncation — retry fires
+            parsed["_call3_reasoning"] = reasoning_text
+            return parsed, cw_indexed
 
-    cleaned = _extract_json(text_without_reasoning)
-    try:
-        parsed = json.loads(cleaned)
-    except Exception:
-        logger.warning("Call 3 (CW) not valid JSON. Raw (first 500): %s", (text or "")[:500])
-        parsed = {"company_watch": {}}
+        except Exception as exc:
+            if attempt < 2:
+                logger.warning(
+                    "Call 3 (CW) failed (attempt %d/3): %s — retrying in %ds",
+                    attempt + 1, exc, 2 ** attempt,
+                )
+                time.sleep(2 ** attempt)
+            else:
+                logger.warning(
+                    "Call 3 (CW) not valid JSON after 3 attempts. Raw (first 500): %s",
+                    (text or "")[:500],
+                )
 
-    parsed["_call3_reasoning"] = reasoning_text
-    return parsed, cw_indexed
+    return {"company_watch": {}, "_call3_reasoning": reasoning_text}, cw_indexed
 
 
 # ---------------------------------------------------------------------------
@@ -1187,7 +1200,7 @@ Use the exact item_id strings shown in brackets above.
         try:
             response = client.messages.create(
                 model=HAIKU_MODEL,
-                max_tokens=1024,
+                max_tokens=2048,
                 temperature=0,
                 system=_CALL_1A_SYSTEM,
                 messages=[{"role": "user", "content": user_prompt}],
@@ -1295,7 +1308,7 @@ Use the exact item_id strings shown in brackets above.
         try:
             response = client.messages.create(
                 model=HAIKU_MODEL,
-                max_tokens=512,
+                max_tokens=1024,
                 temperature=0,
                 system=_CALL_4A_SYSTEM,
                 messages=[{"role": "user", "content": user_prompt}],
